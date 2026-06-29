@@ -6,8 +6,6 @@
     'importRoute',
     'exportRoute',
     'downloadIdsRoute',
-    'rfidTemplateRoute' => null,
-    'rfidImportRoute' => null,
 ])
 
 <div class="patron-panels">
@@ -42,28 +40,6 @@
                 </div>
             </div>
         </details>
-
-        @if($rfidTemplateRoute && $rfidImportRoute)
-            <details class="patron-panel patron-panel-rfid" open>
-                <summary class="patron-panel-heading">Update RFID</summary>
-                <div class="patron-panel-body">
-                    <p class="text-muted small mb-2">Match students by IDNum, RecordID, or QR code. Rows with blank RFID are skipped.</p>
-                    <div class="patron-panel-stack">
-                        <a href="{{ route($rfidTemplateRoute) }}" class="btn btn-outline-secondary btn-sm w-100">Download RFID Template</a>
-                        <form action="{{ route($rfidImportRoute) }}" method="POST" enctype="multipart/form-data" class="patron-import-form w-100">
-                            @csrf
-                            <div class="patron-import-row">
-                                <label class="patron-import-file flex-grow-1">
-                                    <span class="btn btn-light btn-sm mb-0 w-100">Choose file</span>
-                                    <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
-                                </label>
-                                <button type="submit" class="btn btn-primary btn-sm">Upload</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </details>
-        @endif
     @endcan
 
     <details class="patron-panel patron-panel-export" open>

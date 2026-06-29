@@ -96,11 +96,31 @@
                 'pendingUrl' => route('pending.index', ['tab' => 'students']),
                 'importTemplateRoute' => 'students.import.template',
                 'importRoute' => 'students.import',
-                'rfidTemplateRoute' => 'students.rfid.template',
-                'rfidImportRoute' => 'students.rfid.import',
                 'exportRoute' => route('students.export', request()->query()),
                 'downloadIdsRoute' => route('students.bulk.ids', request()->query()),
             ])
+
+            @can('isAdmin')
+                <details class="patron-panel patron-panel-rfid mb-3" open>
+                    <summary class="patron-panel-heading">Update RFID</summary>
+                    <div class="patron-panel-body">
+                        <p class="text-muted small mb-2">Match students by IDNum, RecordID, or QR code. Rows with blank RFID are skipped.</p>
+                        <div class="patron-panel-stack">
+                            <a href="{{ route('students.rfid.template') }}" class="btn btn-outline-secondary btn-sm w-100">Download RFID Template</a>
+                            <form action="{{ route('students.rfid.import') }}" method="POST" enctype="multipart/form-data" class="patron-import-form w-100">
+                                @csrf
+                                <div class="patron-import-row">
+                                    <label class="patron-import-file flex-grow-1">
+                                        <span class="btn btn-light btn-sm mb-0 w-100">Choose file</span>
+                                        <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+                                    </label>
+                                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </details>
+            @endcan
 
             <div class="table-responsive">
                 <table class="table table-bordered table-hover text-center align-middle patron-list-table">

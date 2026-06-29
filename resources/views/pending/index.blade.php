@@ -3,7 +3,7 @@
 @section('title', 'Pending Registrations')
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/layout/data-pages.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/layout/data-pages.css') }}">
     <style>.data-pending-panel.hidden { display: none; }</style>
 @endpush
 

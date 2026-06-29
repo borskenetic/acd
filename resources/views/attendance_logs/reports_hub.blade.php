@@ -2,6 +2,10 @@
 
 @section('title', 'Patron Reports')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/attendance_logs/index.css') }}">
+@endpush
+
 @section('content')
 <div class="attendance-logs-page container mt-2">
     <h4 class="mb-3" style="font-family:'Poppins',sans-serif;font-weight:700;">Patron gate — reports</h4>

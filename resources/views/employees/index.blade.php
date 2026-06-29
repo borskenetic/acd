@@ -3,8 +3,7 @@
 @section('title', 'Employees')
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/layout/data-pages.css') }}">
-    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/students/students-page.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/layout/data-pages.css') }}">
 @endpush
 
 @section('content')

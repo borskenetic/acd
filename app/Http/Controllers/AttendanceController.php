@@ -379,6 +379,10 @@ class AttendanceController extends Controller
         $token = trim(str_replace("\r", '', $raw));
         $student = Student::where('qrcode', $token)->first();
 
+        if (! $student && $token !== '') {
+            $student = Student::where('rfid', $token)->first();
+        }
+
         $parsed = $this->parseQr($raw);
 
         if (! $student && $parsed['student_no']) {

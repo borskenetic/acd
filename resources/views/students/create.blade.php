@@ -122,6 +122,18 @@
                 </div>
 
                 <div class="form-section">
+                    <div class="form-section-title">Gate access</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="rfid" class="form-label">RFID card number</label>
+                            <input type="text" name="rfid" id="rfid" class="form-control @error('rfid') is-invalid @enderror"
+                                   value="{{ old('rfid') }}" placeholder="Optional — can be added later">
+                            @error('rfid')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
                     <div class="form-section-title">Photo &amp; signature</div>
                     <div class="row g-3">
                         <div class="col-md-6">

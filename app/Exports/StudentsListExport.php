@@ -15,30 +15,36 @@ class StudentsListExport implements FromCollection, WithHeadings
     public function collection()
     {
         return $this->students->map(fn ($s) => [
+            $s->record_id ?? '',
             $s->student_id ?? '',
             $s->lastname,
             $s->firstname,
             $s->middle_initial ?? '',
-            $s->educational_level?->value ?? '',
-            $s->course ?? '',
+            $s->birth_date ?? '',
             $s->year ?? '',
-            $s->qrcode ?? '',
-            $s->mobile_number ?? '',
+            $s->course ?? '',
+            $s->emergency_person ?? '',
+            $s->emergency_address ?? '',
+            $s->emergency_number ?? '',
+            $s->rfid ?? '',
         ]);
     }
 
     public function headings(): array
     {
         return [
-            'student_id',
-            'lastname',
-            'firstname',
-            'middle_initial',
-            'educational_level',
-            'course',
-            'year',
-            'qrcode',
-            'mobile_number',
+            'RecordID',
+            'IDNum',
+            'LastName',
+            'FirstName',
+            'MiddleName',
+            'Birthday',
+            'GradeLevel',
+            'CourseStrand',
+            'GuardianName',
+            'GuardianAddress',
+            'GuardianContact',
+            'RFID',
         ];
     }
 }

@@ -20,6 +20,7 @@ use App\Http\Controllers\SchoolSetupController;
 use App\Http\Controllers\Sf2ReportController;
 use App\Http\Controllers\VisitorAdminController;
 use App\Http\Controllers\VisitorLogController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorRegistrationController;
 use Illuminate\Support\Facades\Route;
 
@@ -136,6 +137,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/register-student', [StudentController::class, 'store'])->name('students.store');
     Route::get('/students/import-template', [StudentController::class, 'downloadImportTemplate'])->name('students.import.template');
     Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
+    Route::get('/students/rfid-template', [StudentController::class, 'downloadRfidTemplate'])->name('students.rfid.template');
+    Route::post('/students/rfid-import', [StudentController::class, 'importRfid'])->name('students.rfid.import');
     Route::get('/employees/import-template', [EmployeeController::class, 'downloadImportTemplate'])->name('employees.import.template');
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
     Route::get('/students/{id}/edit', [StudentController::class, 'edit'])->name('students.edit');

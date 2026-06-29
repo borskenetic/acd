@@ -20,6 +20,30 @@
             @if(session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
+            @if(session('rfid_import_report'))
+                @php $rfidReport = session('rfid_import_report'); @endphp
+                @if(!empty($rfidReport['not_found']) || !empty($rfidReport['conflicts']))
+                    <div class="alert alert-warning text-start">
+                        <strong>RFID import details</strong>
+                        @if(!empty($rfidReport['not_found']))
+                            <p class="mb-1 mt-2 small fw-semibold">Not found</p>
+                            <ul class="small mb-2">
+                                @foreach($rfidReport['not_found'] as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        @if(!empty($rfidReport['conflicts']))
+                            <p class="mb-1 small fw-semibold">Conflicts</p>
+                            <ul class="small mb-0">
+                                @foreach($rfidReport['conflicts'] as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                @endif
+            @endif
 
             @php use App\Enums\EducationalLevel; @endphp
             <form action="{{ route('students.index') }}" method="GET" class="row g-2 mb-3">
@@ -72,6 +96,8 @@
                 'pendingUrl' => route('pending.index', ['tab' => 'students']),
                 'importTemplateRoute' => 'students.import.template',
                 'importRoute' => 'students.import',
+                'rfidTemplateRoute' => 'students.rfid.template',
+                'rfidImportRoute' => 'students.rfid.import',
                 'exportRoute' => route('students.export', request()->query()),
                 'downloadIdsRoute' => route('students.bulk.ids', request()->query()),
             ])

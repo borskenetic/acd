@@ -14,7 +14,9 @@ use App\Models\StudentEditRequest;
 use App\Console\Commands\NormalizeStudentNames;
 use App\Exports\StudentsImportTemplateExport;
 use App\Exports\StudentsListExport;
+use App\Exports\StudentsRfidTemplateExport;
 use App\Imports\StudentsImport;
+use App\Imports\StudentsRfidImport;
 use App\Services\BulkIdCardService;
 use App\Support\PatronOptions;
 use App\Support\SchoolSetupOptions;
@@ -100,6 +102,35 @@ class StudentController extends Controller
         return back()->with('success', 'Students imported successfully.');
     }
 
+    public function downloadRfidTemplate()
+    {
+        return Excel::download(
+            new StudentsRfidTemplateExport,
+            'students_rfid_update_template.xlsx'
+        );
+    }
+
+    public function importRfid(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:10240',
+        ]);
+
+        $import = new StudentsRfidImport;
+        Excel::import($import, $request->file('file'));
+
+        $report = $import->report();
+        $message = 'RFID update complete: '.$report['updated'].' student(s) updated.';
+
+        if ($report['skipped'] > 0) {
+            $message .= ' '.$report['skipped'].' row(s) skipped.';
+        }
+
+        return back()
+            ->with('success', $message)
+            ->with('rfid_import_report', $report);
+    }
+
     public function bulkDownloadIds(Request $request, BulkIdCardService $bulkIds)
     {
         $students = $this->filteredStudentsQuery($request)->orderBy('lastname')->get();
@@ -175,6 +206,7 @@ class StudentController extends Controller
             'emergency_relationship' => 'nullable|string|max:255',
             'emergency_number' => 'nullable|string|max:20',
             'emergency_address' => 'nullable|string',
+            'rfid' => 'nullable|string|max:255|unique:students,rfid',
         ]);
 
         // Handle profile picture upload
@@ -266,6 +298,7 @@ class StudentController extends Controller
             'emergency_relationship' => 'nullable|string|max:255',
             'emergency_number' => 'nullable|string|max:20',
             'emergency_address' => 'nullable|string',
+            'rfid' => 'nullable|string|max:255|unique:students,rfid,'.$id,
     
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'student_signature' => 'nullable|string',

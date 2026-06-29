@@ -9,9 +9,9 @@ use App\Models\Student;
 use App\Models\Visitor;
 use App\Models\VisitorLog;
 use App\Services\AttendanceSessionService;
+use App\Services\AttendanceSmsService;
 use App\Services\FaceMatchService;
 use App\Services\StudentDeparturePolicy;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
@@ -272,7 +272,7 @@ class AttendanceController extends Controller
             'scanned_at' => now(),
         ]);
 
-        $this->sendScanSms($student, $newStatus);
+        app(AttendanceSmsService::class)->handleStudentScan($student, $newStatus, $log->scanned_at);
 
         return response()->json([
             'status' => $newStatus,
@@ -422,27 +422,5 @@ class AttendanceController extends Controller
             'full_name' => $parts[0] ?? null,
             'course' => $parts[1] ?? null,
         ];
-    }
-
-    private function sendScanSms(Student $student, string $status): void
-    {
-        if (empty($student->mobile_number)) {
-            return;
-        }
-
-        $template = Setting::where('key', Setting::KEY_SCAN_SMS)->value('value')
-            ?? 'Hello {name}, you scanned {status} at the library at {time}.';
-
-        $message = str_replace(
-            ['{name}', '{status}', '{time}'],
-            [
-                trim($student->firstname.' '.$student->lastname),
-                $status,
-                Carbon::now('Asia/Manila')->format('h:i A'),
-            ],
-            $template
-        );
-
-        app(SmsController::class)->sendDirect($student->mobile_number, $message);
     }
 }

@@ -80,18 +80,11 @@
         <button class="btn btn-primary">
             Send SMS
         </button>
-        
 
-    </form>
-    <div class="mt-2" hidden>
-        <a href="/sms/scan-message" class="btn btn-secondary">
-            Edit Scan Message
+        <a href="{{ route('sms.scanMessage') }}" class="btn btn-outline-secondary ms-2">
+            Gate SMS settings
         </a>
-    </div>
-        
-    </div>
-    
-    
+    </form>
 
 </div>
 

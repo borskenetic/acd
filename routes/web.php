@@ -18,6 +18,7 @@ use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SchoolSetupController;
 use App\Http\Controllers\Sf2ReportController;
+use App\Http\Controllers\VisitorAdminController;
 use App\Http\Controllers\VisitorLogController;
 use App\Http\Controllers\VisitorRegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -106,6 +107,9 @@ Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
     Route::get('/attendance-logs/export/pdf', [AttendanceLogController::class, 'exportPdf'])->name('attendance_logs.export.pdf');
 
     Route::get('/visitor-logs', [VisitorLogController::class, 'index'])->name('visitor_logs.index');
+    Route::get('/visitors/issue', [VisitorAdminController::class, 'create'])->name('visitors.issue.create');
+    Route::get('/visitors/default-pass', [VisitorAdminController::class, 'defaultPass'])->name('visitors.default-pass');
+    Route::post('/visitors/issue', [VisitorAdminController::class, 'store'])->name('visitors.issue.store');
 
     Route::prefix('sf2')->name('sf2.')->group(function () {
         Route::get('/', [Sf2ReportController::class, 'index'])->name('index');

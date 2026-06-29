@@ -9,6 +9,7 @@
         $attendanceChildren[] = ['label' => 'Face Gate Terminal', 'route' => 'attendance.face', 'patterns' => ['attendance.face', 'attendance.face.identify'], 'icon' => 'scan', 'target' => '_blank'];
     }
     $attendanceChildren[] = ['label' => 'Manage Video', 'route' => 'attendance.changeVideo', 'patterns' => ['attendance.changeVideo', 'attendance.uploadVideo'], 'icon' => 'settings'];
+    $attendanceChildren[] = ['label' => 'Issue Visitor Pass', 'route' => 'visitors.issue.create', 'patterns' => ['visitors.issue.*'], 'icon' => 'badge'];
 
     $reportsChildren = [
         ['label' => 'School Form 2 (SF2)', 'route' => 'sf2.index',                    'patterns' => ['sf2.*'], 'icon' => 'book'],
@@ -27,7 +28,7 @@
         [
             'label'    => 'Attendance',
             'icon'     => 'calendar-check',
-            'patterns' => ['attendance.scan', 'attendance.face', 'attendance.face.identify', 'attendance.process', 'attendance.section', 'attendance.changeVideo', 'attendance.uploadVideo'],
+            'patterns' => ['attendance.scan', 'attendance.face', 'attendance.face.identify', 'attendance.process', 'attendance.section', 'attendance.changeVideo', 'attendance.uploadVideo', 'visitors.issue.*'],
             'children' => $attendanceChildren,
         ],
         [

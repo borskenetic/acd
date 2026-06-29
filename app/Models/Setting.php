@@ -14,6 +14,14 @@ class Setting extends Model
 
     public const KEY_SCAN_SMS = 'scan_sms';
 
+    public const KEY_SCAN_SMS_ARRIVAL = 'scan_sms_arrival';
+
+    public const KEY_SCAN_SMS_DEPARTURE = 'scan_sms_departure';
+
+    public const KEY_SMS_CONSECUTIVE_LATE = 'sms_consecutive_late';
+
+    public const KEY_SMS_CONSECUTIVE_ABSENT = 'sms_consecutive_absent';
+
     public const DEFAULT_ATTENDANCE_SECTIONS = [
         'Circulation Section',
         'Reference Section',
@@ -99,5 +107,47 @@ class Setting extends Model
             ['key' => self::KEY_ATTENDANCE_SECTIONS],
             ['value' => json_encode($sections, JSON_UNESCAPED_UNICODE)]
         );
+    }
+
+    public static function scanSmsArrivalTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_ARRIVAL)->value('value')
+            ?? static::where('key', self::KEY_SCAN_SMS)->value('value')
+            ?? 'Hello {name}, your child checked in at the library at {time} ({status}).';
+    }
+
+    public static function scanSmsDepartureTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_DEPARTURE)->value('value')
+            ?? 'Hello {name}, your child scanned at the library at {time} ({status}). Have a safe trip home.';
+    }
+
+    public static function smsConsecutiveLateTemplate(): string
+    {
+        return static::where('key', self::KEY_SMS_CONSECUTIVE_LATE)->value('value')
+            ?? 'Hello, {name} has been late {count} consecutive school days. Please contact the school.';
+    }
+
+    public static function smsConsecutiveAbsentTemplate(): string
+    {
+        return static::where('key', self::KEY_SMS_CONSECUTIVE_ABSENT)->value('value')
+            ?? 'Hello, {name} has been absent {count} consecutive school days. Please contact the school.';
+    }
+
+    /** @param  array<string, string>  $templates */
+    public static function setSmsTemplates(array $templates): void
+    {
+        $map = [
+            'arrival' => self::KEY_SCAN_SMS_ARRIVAL,
+            'departure' => self::KEY_SCAN_SMS_DEPARTURE,
+            'consecutive_late' => self::KEY_SMS_CONSECUTIVE_LATE,
+            'consecutive_absent' => self::KEY_SMS_CONSECUTIVE_ABSENT,
+        ];
+
+        foreach ($map as $field => $key) {
+            if (isset($templates[$field]) && trim($templates[$field]) !== '') {
+                static::updateOrCreate(['key' => $key], ['value' => trim($templates[$field])]);
+            }
+        }
     }
 }

@@ -25,25 +25,31 @@ class SmsController extends Controller
 
     public function scanMessage()
     {
-        $setting = Setting::where('key','scan_sms')->first();
-    
-        return view('sms.scan_message',[
-            'message' => $setting ? $setting->value : 'Hello {name}, you scanned {status} at the library.'
+        return view('sms.scan_message', [
+            'arrival' => Setting::scanSmsArrivalTemplate(),
+            'departure' => Setting::scanSmsDepartureTemplate(),
+            'consecutiveLate' => Setting::smsConsecutiveLateTemplate(),
+            'consecutiveAbsent' => Setting::smsConsecutiveAbsentTemplate(),
         ]);
     }
-    
+
     public function updateScanMessage(Request $request)
     {
         $request->validate([
-            'message' => 'required'
+            'arrival' => 'required|string|max:500',
+            'departure' => 'required|string|max:500',
+            'consecutive_late' => 'required|string|max:500',
+            'consecutive_absent' => 'required|string|max:500',
         ]);
-    
-        Setting::updateOrCreate(
-            ['key'=>'scan_sms'],
-            ['value'=>$request->message]
-        );
-    
-        return back()->with('success','Scan SMS updated');
+
+        Setting::setSmsTemplates([
+            'arrival' => $request->input('arrival'),
+            'departure' => $request->input('departure'),
+            'consecutive_late' => $request->input('consecutive_late'),
+            'consecutive_absent' => $request->input('consecutive_absent'),
+        ]);
+
+        return back()->with('success', 'Gate SMS templates saved.');
     }
     
     public function count(Request $request)

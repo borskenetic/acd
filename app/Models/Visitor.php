@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class Visitor extends Model
 {
+    public const DEFAULT_GUARD_QR = 'V-GUARDPASS';
+
     protected $fillable = [
         'firstname',
         'lastname',
@@ -40,5 +42,18 @@ class Visitor extends Model
 
             return 'V-'.str_pad((string) $nextNumber, 8, '0', STR_PAD_LEFT);
         });
+    }
+
+    /** Reusable QR for visitors without a phone — one record, many gate scans. */
+    public static function defaultGuardPass(): self
+    {
+        return static::firstOrCreate(
+            ['qrcode' => self::DEFAULT_GUARD_QR],
+            [
+                'firstname' => 'Walk-in',
+                'lastname' => 'Visitor',
+                'purpose' => 'Reusable guardhouse pass',
+            ]
+        );
     }
 }

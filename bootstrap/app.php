@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('attendance:close-stale-ins')
             ->dailyAt('00:05')
             ->timezone('Asia/Manila');
+        $schedule->command('attendance:check-consecutive-absences')
+            ->dailyAt('16:30')
+            ->timezone('Asia/Manila');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

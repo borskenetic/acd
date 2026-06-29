@@ -39,8 +39,9 @@
             <p class="vl-subtitle">Gate terminal check-ins and check-outs for registered visitors.</p>
         </div>
         <div class="vl-header__actions">
+            <a href="{{ route('visitors.issue.create') }}" class="vl-btn vl-btn--primary">Issue walk-in pass</a>
             <a href="{{ route('visitors.register') }}" target="_blank" rel="noopener" class="vl-btn vl-btn--ghost">Visitor registration</a>
-            <a href="{{ route('attendance.scan') }}" target="_blank" rel="noopener" class="vl-btn vl-btn--primary">Gate Terminal</a>
+            <a href="{{ route('attendance.scan') }}" target="_blank" rel="noopener" class="vl-btn vl-btn--ghost">Gate Terminal</a>
         </div>
     </header>
 

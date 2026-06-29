@@ -3,6 +3,11 @@
 return [
 
     /*
+    | Show ID card generate / bulk download on Students & Employees lists.
+    */
+    'id_cards_enabled' => env('PATRON_ID_CARDS_ENABLED', false),
+
+    /*
     | Year level options keyed by educational_level (see App\Enums\EducationalLevel).
     */
     'senior_high_grades' => ['Grade 11', 'Grade 12'],

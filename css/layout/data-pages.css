@@ -542,12 +542,17 @@
     background: #fff;
     border: 1px solid rgba(34, 51, 59, 0.08);
     border-radius: 14px;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .sp-table-card .table-responsive {
     overflow-x: auto;
+    overflow-y: visible;
+}
+
+.sp-table-card .table-responsive:has(.dropdown-menu.show) {
+    overflow: visible;
 }
 
 .sp-table {
@@ -623,6 +628,21 @@
 
 .sp-row-menu .dropdown-toggle::after {
     display: none;
+}
+
+.sp-row-menu .dropdown-menu {
+    z-index: 1080;
+    min-width: 10rem;
+    border-radius: 10px;
+    border: 1px solid rgba(34, 51, 59, 0.1);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    padding: 0.35rem;
+}
+
+.sp-row-menu .dropdown-menu .dropdown-item {
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.75rem;
 }
 
 .sp-pagination {

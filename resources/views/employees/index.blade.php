@@ -143,7 +143,11 @@
                             @can('isAdmin')
                                 <td class="text-end">
                                     <div class="dropdown sp-row-menu">
-                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-label="Actions for {{ $employee->firstname }}">
+                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown"
+                                                data-bs-popper-config='{"strategy":"fixed","placement":"bottom-end"}'
+                                                aria-expanded="false"
+                                                aria-label="Actions for {{ $employee->firstname }}">
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end sp-menu">

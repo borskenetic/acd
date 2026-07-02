@@ -13,6 +13,15 @@ return [
     'logout_feedback_enabled' => env('ATTENDANCE_LOGOUT_FEEDBACK_ENABLED', false),
 
     /*
+    | Gate login / logout times and tardy rules (overridable in Admin → Gate policy).
+    */
+    'gate' => [
+        'login_time' => env('ATTENDANCE_GATE_LOGIN_TIME', '08:00'),
+        'logout_time' => env('ATTENDANCE_GATE_LOGOUT_TIME', '16:00'),
+        'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 10),
+    ],
+
+    /*
     | Parent/guardian SMS on gate scans (emergency_number on student record).
     */
     'sms' => [

@@ -22,6 +22,7 @@ use App\Http\Controllers\VisitorAdminController;
 use App\Http\Controllers\VisitorLogController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorRegistrationController;
+use App\Http\Controllers\PlatformActivityLogController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -133,6 +134,9 @@ Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
 
 // Admin only
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {
+    Route::get('/attendance/policy', [AttendanceController::class, 'policySettings'])->name('attendance.policy.settings');
+    Route::post('/attendance/policy', [AttendanceController::class, 'updatePolicySettings'])->name('attendance.policy.settings.update');
+
     Route::get('/register-student', [StudentController::class, 'create'])->name('students.create');
     Route::post('/register-student', [StudentController::class, 'store'])->name('students.store');
     Route::get('/students/import-template', [StudentController::class, 'downloadImportTemplate'])->name('students.import.template');
@@ -179,4 +183,6 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/update-user/{id}', [UserController::class, 'update'])->name('users.update');
     Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+
+    Route::get('/activity-log', [PlatformActivityLogController::class, 'index'])->name('activity_logs.index');
 });

@@ -12,6 +12,12 @@
     </div>
     @endif
 
+    @if(session('error'))
+    <div class="alert alert-danger">
+        {{ session('error') }}
+    </div>
+    @endif
+
 
     
     
@@ -21,27 +27,36 @@
         {{-- FILTER SECTION --}}
         <div class="row mb-3">
 
-            <div class="col-md-6">
-                <label>Filter by Year</label>
-                <select name="year" id="yearFilter" class="form-control">
-                    <option value="">All Years</option>
-                    <option value="1">1st Year</option>
-                    <option value="2">2nd Year</option>
-                    <option value="3">3rd Year</option>
-                    <option value="4">4th Year</option>
+            <div class="col-md-4">
+                <label for="recipientFilter">Send to</label>
+                <select name="recipient" id="recipientFilter" class="form-control" required>
+                    <option value="emergency_contact" @selected(old('recipient', 'emergency_contact') === 'emergency_contact')>
+                        Emergency contact (parent/guardian)
+                    </option>
+                    <option value="student" @selected(old('recipient') === 'student')>
+                        Student mobile number
+                    </option>
                 </select>
             </div>
 
-            <div class="col-md-6">
-                <label>Filter by Course</label>
+            <div class="col-md-4">
+                <label for="yearFilter">Filter by Year</label>
+                <select name="year" id="yearFilter" class="form-control">
+                    <option value="">All Years</option>
+                    <option value="1" @selected(old('year') === '1')>1st Year</option>
+                    <option value="2" @selected(old('year') === '2')>2nd Year</option>
+                    <option value="3" @selected(old('year') === '3')>3rd Year</option>
+                    <option value="4" @selected(old('year') === '4')>4th Year</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label for="courseFilter">Filter by Course</label>
                 <select name="course" id="courseFilter" class="form-control">
-
                     <option value="">All Courses</option>
-
                     @foreach($courses as $course)
-                        <option value="{{ $course }}">{{ $course }}</option>
+                        <option value="{{ $course }}" @selected(old('course') === $course)>{{ $course }}</option>
                     @endforeach
-
                 </select>
             </div>
 
@@ -51,7 +66,7 @@
         {{-- LIVE COUNTER --}}
         <div class="alert alert-info">
 
-            Recipients: <b id="recipientCount">Loading...</b> students
+            Recipients: <b id="recipientCount">Loading...</b> <span id="recipientLabel">emergency contacts</span>
 
         </div>
 
@@ -93,22 +108,25 @@
 <script>
 
 function updateRecipientCount(){
+    const year = document.getElementById('yearFilter').value;
+    const course = document.getElementById('courseFilter').value;
+    const recipient = document.getElementById('recipientFilter').value;
+    const labels = {
+        emergency_contact: 'emergency contacts',
+        student: 'students with mobile numbers',
+    };
 
-    let year = document.getElementById('yearFilter').value;
-    let course = document.getElementById('courseFilter').value;
-
-    fetch("{{ route('sms.count') }}?year=" + year + "&course=" + course)
+    fetch("{{ route('sms.count') }}?year=" + encodeURIComponent(year) + "&course=" + encodeURIComponent(course) + "&recipient=" + encodeURIComponent(recipient))
     .then(res => res.json())
     .then(data => {
-
         document.getElementById("recipientCount").innerText = data.count;
-
+        document.getElementById("recipientLabel").innerText = labels[recipient] || '';
     });
-
 }
 
 document.getElementById('yearFilter').addEventListener('change', updateRecipientCount);
 document.getElementById('courseFilter').addEventListener('change', updateRecipientCount);
+document.getElementById('recipientFilter').addEventListener('change', updateRecipientCount);
 
 window.onload = updateRecipientCount;
 

@@ -10,6 +10,7 @@ use App\Models\Visitor;
 use App\Models\VisitorLog;
 use App\Services\AttendanceSessionService;
 use App\Services\AttendanceSmsService;
+use App\Services\AttendancePolicyService;
 use App\Services\FaceMatchService;
 use App\Services\StudentDeparturePolicy;
 use Illuminate\Http\Request;
@@ -136,6 +137,35 @@ class AttendanceController extends Controller
                 ? 'Section picker enabled with '.count($sections).' section(s) on the gate terminal.'
                 : 'Section picker disabled. '.count($sections).' section(s) saved for logs and filters.'
         );
+    }
+
+    public function policySettings(AttendancePolicyService $policy)
+    {
+        return view('attendance.policy_settings', [
+            'policy' => $policy,
+            'values' => $policy->toFormValues(),
+        ]);
+    }
+
+    public function updatePolicySettings(Request $request, AttendancePolicyService $policy)
+    {
+        $request->validate([
+            'login_time' => 'required|date_format:H:i',
+            'logout_time' => 'required|date_format:H:i',
+            'tardy_grace_minutes' => 'required|integer|min:0|max:120',
+            'consecutive_late_threshold' => 'required|integer|min:1|max:30',
+            'consecutive_absent_threshold' => 'required|integer|min:1|max:30',
+        ]);
+
+        $policy->save($request->only([
+            'login_time',
+            'logout_time',
+            'tardy_grace_minutes',
+            'consecutive_late_threshold',
+            'consecutive_absent_threshold',
+        ]));
+
+        return back()->with('success', 'Attendance policy saved. Gate logs, SF2, and SMS alerts will use the new times and thresholds.');
     }
 
     public function scan(Request $request)

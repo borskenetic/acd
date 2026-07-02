@@ -54,58 +54,60 @@ class SmsController extends Controller
     
     public function count(Request $request)
     {
-    
-        $query = Student::whereNotNull('mobile_number');
-    
-        if ($request->year) {
-            $query->where('year', $request->year);
-        }
-    
-        if ($request->course) {
-            $query->where('course', $request->course);
-        }
-    
-        return response()->json([
-            'count' => $query->count()
+        $request->validate([
+            'recipient' => 'nullable|in:student,emergency_contact',
         ]);
-    
+
+        return response()->json([
+            'count' => $this->blastQuery($request)->count(),
+        ]);
     }
 
     public function send(Request $request)
     {
         $request->validate([
-            'message' => 'required|string'
+            'message' => 'required|string',
+            'recipient' => 'required|in:student,emergency_contact',
+            'year' => 'nullable|string',
+            'course' => 'nullable|string',
         ]);
-    
-        $students = Student::whereNotNull('mobile_number')->get();
-    
+
+        $column = $this->recipientColumn($request->input('recipient'));
+        $students = $this->blastQuery($request)->get();
+
         $payload = [];
-    
+
         foreach ($students as $student) {
-            $name = $student->firstname . ' ' . $student->lastname;
+            $name = $student->firstname.' '.$student->lastname;
             $message = str_replace('{name}', $name, $request->message);
-            $number = $student->mobile_number;
-    
-            if(substr($number,0,1) == "0"){
-                $number = "+63" . substr($number,1);
+            $number = $this->normalizePhilippineMobile((string) $student->{$column});
+
+            if ($number === '') {
+                continue;
             }
-    
+
             $payload[] = [
                 'number' => $number,
-                'message' => $message
+                'message' => $message,
             ];
         }
-    
+
+        if ($payload === []) {
+            return back()->with('error', 'No recipients found with a valid number for the selected filters.');
+        }
+
         // send to your local Python server
         $python_server = "https://cloakedly-ineffective-amara.ngrok-free.dev/send-sms"; // your ngrok URL
         $api_key = "library123"; // must match Python server
-        
-        $response = Http::withHeaders([
-            'X-API-KEY' => $api_key
-        ])->timeout(300) 
-        ->post($python_server, $payload);
-            
-        return back()->with('success','SMS sent successfully');
+
+        Http::withHeaders([
+            'X-API-KEY' => $api_key,
+        ])->timeout(300)
+            ->post($python_server, $payload);
+
+        $label = $request->input('recipient') === 'student' ? 'student mobile numbers' : 'emergency contacts';
+
+        return back()->with('success', 'SMS sent to '.count($payload).' '.$label.'.');
     }
 
     public function sendDirect(string $number, string $message): bool
@@ -151,5 +153,30 @@ class SmsController extends Controller
         }
 
         return $number;
+    }
+
+    private function recipientColumn(string $recipient): string
+    {
+        return $recipient === 'student' ? 'mobile_number' : 'emergency_number';
+    }
+
+    private function blastQuery(Request $request)
+    {
+        $recipient = $request->input('recipient', 'emergency_contact');
+        $column = $this->recipientColumn($recipient);
+
+        $query = Student::query()
+            ->whereNotNull($column)
+            ->where($column, '!=', '');
+
+        if ($request->year) {
+            $query->where('year', $request->year);
+        }
+
+        if ($request->course) {
+            $query->where('course', $request->course);
+        }
+
+        return $query;
     }
 }

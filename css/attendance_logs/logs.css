@@ -117,7 +117,7 @@
 /* ── Stats ── */
 .al-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0.75rem;
     margin-bottom: 1.25rem;
 }
@@ -155,6 +155,13 @@
 }
 
 .al-stat-card--in .al-stat-card__value { color: #15803d; }
+
+.al-stat-card--late {
+    border-color: rgba(234, 88, 12, 0.25);
+    background: linear-gradient(180deg, rgba(234, 88, 12, 0.07) 0%, #fff 100%);
+}
+
+.al-stat-card--late .al-stat-card__value { color: #c2410c; }
 
 .al-stat-card--out {
     border-color: rgba(220, 38, 38, 0.2);
@@ -283,6 +290,11 @@
 .al-pill--in.is-active {
     background: #16a34a;
     border-color: #16a34a;
+}
+
+.al-pill--late.is-active {
+    background: #ea580c;
+    border-color: #ea580c;
 }
 
 .al-pill--out.is-active {
@@ -528,6 +540,11 @@
 .al-status--in {
     background: rgba(22, 163, 74, 0.12);
     color: #15803d;
+}
+
+.al-status--late {
+    background: rgba(234, 88, 12, 0.12);
+    color: #c2410c;
 }
 
 .al-status--out {

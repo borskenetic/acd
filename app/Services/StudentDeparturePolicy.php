@@ -8,6 +8,10 @@ use Carbon\Carbon;
 
 class StudentDeparturePolicy
 {
+    public function __construct(
+        protected AttendancePolicyService $attendancePolicy,
+    ) {}
+
     public function isEnabled(): bool
     {
         return (bool) config('patron.early_departure.enabled', true);
@@ -49,7 +53,7 @@ class StudentDeparturePolicy
 
     public function earliestOutLabel(): string
     {
-        $time = config('patron.early_departure.earliest_out', '16:00');
+        $time = $this->attendancePolicy->logoutTime();
 
         return Carbon::today($this->timezone())
             ->setTimeFromTimeString($time)
@@ -63,9 +67,7 @@ class StudentDeparturePolicy
 
     private function earliestOutToday(): Carbon
     {
-        $time = (string) config('patron.early_departure.earliest_out', '16:00');
-
-        return Carbon::today($this->timezone())->setTimeFromTimeString($time);
+        return Carbon::today($this->timezone())->setTimeFromTimeString($this->attendancePolicy->logoutTime());
     }
 
     private function resolveLevelValue(Student $student): ?string

@@ -8,6 +8,7 @@ use App\Models\GradeSection;
 use App\Models\Student;
 use Illuminate\Support\Facades\Schema;
 use App\Services\PatronAttendanceReportService;
+use App\Services\AttendancePolicyService;
 use App\Support\PatronOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
@@ -15,15 +16,15 @@ use App\Exports\AttendanceLogsExport;
 
 class AttendanceLogController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AttendancePolicyService $policy)
     {
-        $baseQuery = $this->filteredLogs($request);
+        $baseQuery = $this->filteredLogs($request, $policy);
 
         $logs = (clone $baseQuery)
             ->paginate(25)
             ->withQueryString();
 
-        $summary = $this->summaryForQuery(clone $baseQuery);
+        $summary = $this->summaryForQuery(clone $baseQuery, $policy);
 
         $yearOptions = PatronOptions::allYearOptions();
 
@@ -51,25 +52,30 @@ class AttendanceLogController extends Controller
             'summary',
             'yearOptions',
             'homeroomSections',
+            'policy',
         ));
     }
 
-    /** @return array{total: int, in: int, out: int, today: int} */
-    private function summaryForQuery($query): array
+    /** @return array{total: int, in: int, late: int, out: int, today: int} */
+    private function summaryForQuery($query, AttendancePolicyService $policy): array
     {
         $tz = config('app.timezone', 'Asia/Manila');
         $today = now($tz)->toDateString();
+        $lateCutoff = $policy->lateCutoffTimeString();
 
         return [
             'total' => (clone $query)->count(),
-            'in' => (clone $query)->where('status', 'IN')->count(),
+            'in' => (clone $query)->where('status', 'IN')->whereTime('scanned_at', '<=', $lateCutoff)->count(),
+            'late' => (clone $query)->where('status', 'IN')->whereTime('scanned_at', '>', $lateCutoff)->count(),
             'out' => (clone $query)->where('status', 'OUT')->count(),
             'today' => (clone $query)->whereDate('scanned_at', $today)->count(),
         ];
     }
 
-    private function filteredLogs(Request $request)
+    private function filteredLogs(Request $request, AttendancePolicyService $policy)
     {
+        $classification = strtoupper((string) ($request->classification ?: $request->status));
+
         return AttendanceLog::with('student')
 
             ->when($request->from,
@@ -88,8 +94,12 @@ class AttendanceLogController extends Controller
                     fn ($q2) => $q2->where('section', $request->homeroom_section)
                 ))
 
-            ->when($request->status,
+            ->when($request->status && ! $request->classification,
                 fn ($q) => $q->where('status', strtoupper((string) $request->status))
+            )
+
+            ->when(in_array($classification, ['IN', 'LATE', 'OUT'], true),
+                fn ($q) => $policy->applyClassificationFilter($q, $classification)
             )
 
             ->when($request->search, function ($q) use ($request) {
@@ -127,17 +137,17 @@ class AttendanceLogController extends Controller
             ->with('success', 'Attendance logged!');
     }
 
-    public function exportPdf(Request $request)
+    public function exportPdf(Request $request, AttendancePolicyService $policy)
     {
-        $logs = $this->filteredLogs($request)->get();
+        $logs = $this->filteredLogs($request, $policy)->get();
 
         $pdf = Pdf::loadView('attendance_logs.pdf', compact('logs'));
         return $pdf->download('attendance_logs.pdf');
     }
 
-    public function exportExcel(Request $request)
+    public function exportExcel(Request $request, AttendancePolicyService $policy)
     {
-        $logs = $this->filteredLogs($request)->get();
+        $logs = $this->filteredLogs($request, $policy)->get();
 
         return Excel::download(
             new AttendanceLogsExport($logs),

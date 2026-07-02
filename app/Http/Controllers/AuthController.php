@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly ActivityLogger $activityLogger,
+    ) {}
+
     public function showLogin()
     {
         if (auth()->check()) {
@@ -31,8 +36,24 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
+            $this->activityLogger->logAuthEvent(
+                'auth.login.success',
+                'Logged in',
+                Auth::user(),
+                $request,
+                ['email' => $request->input('email')],
+            );
+
             return $this->redirectForRole(Auth::user()->role);
         }
+
+        $this->activityLogger->logAuthEvent(
+            'auth.login.failed',
+            'Failed login attempt',
+            null,
+            $request,
+            ['email' => $request->input('email')],
+        );
 
         return back()->withErrors([
             'email' => 'Invalid credentials.',
@@ -41,9 +62,18 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        $this->activityLogger->logAuthEvent(
+            'auth.logout',
+            'Logged out',
+            $user,
+            $request,
+        );
 
         return redirect()->route('login');
     }

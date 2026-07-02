@@ -13,6 +13,7 @@ class AttendanceSmsService
 {
     public function __construct(
         protected StudentConsecutiveAttendanceService $consecutive,
+        protected AttendancePolicyService $policy,
     ) {}
 
     public function handleStudentScan(Student $student, string $status, Carbon $scannedAt): void
@@ -59,7 +60,7 @@ class AttendanceSmsService
     {
         $tz = config('sf2.timezone', 'Asia/Manila');
         $asOf ??= Carbon::now($tz);
-        $threshold = (int) config('attendance.sms.consecutive_absent_threshold', 3);
+        $threshold = $this->policy->consecutiveAbsentThreshold();
         $sent = 0;
 
         foreach ($this->consecutive->studentsInSf2Grades() as $student) {
@@ -101,7 +102,7 @@ class AttendanceSmsService
 
     protected function checkConsecutiveLateAlert(Student $student, Carbon $scannedAt): void
     {
-        $threshold = (int) config('attendance.sms.consecutive_late_threshold', 5);
+        $threshold = $this->policy->consecutiveLateThreshold();
         $counts = $this->consecutive->countsForStudent($student, $scannedAt, $scannedAt);
         $consecutiveLate = $counts['consecutive_late'];
 
@@ -136,11 +137,7 @@ class AttendanceSmsService
 
     protected function isDepartureWindow(Carbon $scannedAt): bool
     {
-        $tz = config('sf2.timezone', 'Asia/Manila');
-        $after = (string) config('attendance.sms.departure_after', '16:00');
-        $cutoff = Carbon::today($tz)->setTimeFromTimeString($after);
-
-        return $scannedAt->gte($cutoff);
+        return $this->policy->isDepartureWindow($scannedAt);
     }
 
     /** @param  array<string, string>  $vars */

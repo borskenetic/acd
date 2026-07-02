@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->web(append: [
+            \App\Http\Middleware\LogPlatformActivity::class,
+        ]);
     })
     ->withSchedule(function (Schedule $schedule) {
         $schedule->command('attendance:close-stale-ins')

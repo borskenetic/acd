@@ -11,6 +11,7 @@ class StudentConsecutiveAttendanceService
 {
     public function __construct(
         protected Sf2SchoolCalendar $calendar,
+        protected AttendancePolicyService $policy,
     ) {}
 
     /**
@@ -56,7 +57,7 @@ class StudentConsecutiveAttendanceService
 
             $consecutiveAbsent = 0;
 
-            if ($scannedAt->gt($this->tardyCutoffForDate($date))) {
+            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date))) {
                 $consecutiveLate++;
             } else {
                 $consecutiveLate = 0;
@@ -112,15 +113,6 @@ class StudentConsecutiveAttendanceService
             });
 
         return $map;
-    }
-
-    protected function tardyCutoffForDate(string $date): Carbon
-    {
-        $tz = config('sf2.timezone', 'Asia/Manila');
-        $startTime = config('sf2.class_start_time', '07:30');
-        $grace = (int) config('sf2.tardy_grace_minutes', 15);
-
-        return Carbon::parse($date.' '.$startTime, $tz)->addMinutes($grace);
     }
 
     /** @return Collection<int, Student> */

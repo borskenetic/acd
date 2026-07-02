@@ -22,6 +22,8 @@ class Setting extends Model
 
     public const KEY_SMS_CONSECUTIVE_ABSENT = 'sms_consecutive_absent';
 
+    public const KEY_ATTENDANCE_POLICY = 'attendance_policy';
+
     public const DEFAULT_ATTENDANCE_SECTIONS = [
         'Circulation Section',
         'Reference Section',
@@ -149,5 +151,28 @@ class Setting extends Model
                 static::updateOrCreate(['key' => $key], ['value' => trim($templates[$field])]);
             }
         }
+    }
+
+    /** @return array<string, mixed> */
+    public static function attendancePolicy(): array
+    {
+        $raw = static::where('key', self::KEY_ATTENDANCE_POLICY)->value('value');
+
+        if ($raw === null) {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /** @param  array<string, mixed>  $policy */
+    public static function setAttendancePolicy(array $policy): void
+    {
+        static::updateOrCreate(
+            ['key' => self::KEY_ATTENDANCE_POLICY],
+            ['value' => json_encode($policy, JSON_UNESCAPED_UNICODE)]
+        );
     }
 }

@@ -15,7 +15,11 @@
     $today = now($tz)->toDateString();
     $weekStart = now($tz)->startOfWeek()->toDateString();
     $monthStart = now($tz)->startOfMonth()->toDateString();
-    $currentStatus = strtoupper((string) request('status'));
+    $currentClassification = strtoupper((string) (request('classification') ?: request('status', '')));
+    $lateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime())
+        ->addMinutes($policy->tardyGraceMinutes())
+        ->format('g:i A');
 
     $filterUrl = function (array $merge = [], array $except = []) use ($query) {
         $params = collect($query)->except(array_merge(['page'], $except))->merge($merge)->filter(fn ($v) => $v !== null && $v !== '')->all();
@@ -36,7 +40,7 @@
     <header class="al-header">
         <div class="al-header__text">
             <h1 class="al-title">Attendance Logs</h1>
-            <p class="al-subtitle">Gate terminal scan history — filter by date, grade, section, or status.</p>
+            <p class="al-subtitle">Gate terminal scan history — late after {{ $lateCutoffDisplay }}. Filter by date, grade, section, or status.</p>
         </div>
         <div class="al-header__actions">
             <a href="{{ route('attendance.scan') }}" target="_blank" rel="noopener" class="al-btn al-btn--primary">
@@ -62,8 +66,12 @@
             <strong class="al-stat-card__value">{{ number_format($summary['total']) }}</strong>
         </div>
         <div class="al-stat-card al-stat-card--in">
-            <span class="al-stat-card__label">Check-ins</span>
+            <span class="al-stat-card__label">On time</span>
             <strong class="al-stat-card__value">{{ number_format($summary['in']) }}</strong>
+        </div>
+        <div class="al-stat-card al-stat-card--late">
+            <span class="al-stat-card__label">Late</span>
+            <strong class="al-stat-card__value">{{ number_format($summary['late']) }}</strong>
         </div>
         <div class="al-stat-card al-stat-card--out">
             <span class="al-stat-card__label">Check-outs</span>
@@ -104,12 +112,14 @@
                 <div class="al-control-group">
                     <span class="al-control-group__label">Status</span>
                     <div class="al-pills" role="group" aria-label="Scan status">
-                        <a href="{{ $filterUrl([], ['status']) }}"
-                           class="al-pill {{ $currentStatus === '' ? 'is-active' : '' }}">All</a>
-                        <a href="{{ $filterUrl(['status' => 'IN']) }}"
-                           class="al-pill al-pill--in {{ $currentStatus === 'IN' ? 'is-active' : '' }}">IN</a>
-                        <a href="{{ $filterUrl(['status' => 'OUT']) }}"
-                           class="al-pill al-pill--out {{ $currentStatus === 'OUT' ? 'is-active' : '' }}">OUT</a>
+                        <a href="{{ $filterUrl([], ['classification', 'status']) }}"
+                           class="al-pill {{ $currentClassification === '' ? 'is-active' : '' }}">All</a>
+                        <a href="{{ $filterUrl(['classification' => 'IN']) }}"
+                           class="al-pill al-pill--in {{ $currentClassification === 'IN' ? 'is-active' : '' }}">On time</a>
+                        <a href="{{ $filterUrl(['classification' => 'LATE']) }}"
+                           class="al-pill al-pill--late {{ $currentClassification === 'LATE' ? 'is-active' : '' }}">Late</a>
+                        <a href="{{ $filterUrl(['classification' => 'OUT']) }}"
+                           class="al-pill al-pill--out {{ $currentClassification === 'OUT' ? 'is-active' : '' }}">OUT</a>
                     </div>
                 </div>
             </div>
@@ -152,8 +162,8 @@
                 </div>
             </details>
 
-            @if($currentStatus !== '')
-                <input type="hidden" name="status" value="{{ $currentStatus }}">
+            @if($currentClassification !== '')
+                <input type="hidden" name="classification" value="{{ $currentClassification }}">
             @endif
         </form>
 
@@ -174,8 +184,8 @@
                 @if(request('homeroom_section'))
                     <a href="{{ $filterUrl([], ['homeroom_section']) }}" class="al-tag">Section: {{ request('homeroom_section') }} <span aria-hidden="true">×</span></a>
                 @endif
-                @if($currentStatus !== '')
-                    <a href="{{ $filterUrl([], ['status']) }}" class="al-tag">Status: {{ $currentStatus }} <span aria-hidden="true">×</span></a>
+                @if($currentClassification !== '')
+                    <a href="{{ $filterUrl([], ['classification', 'status']) }}" class="al-tag">Status: {{ $currentClassification === 'IN' ? 'On time' : $currentClassification }} <span aria-hidden="true">×</span></a>
                 @endif
             </div>
         @endif
@@ -209,7 +219,7 @@
                     @forelse($logs as $log)
                         @php
                             $student = $log->student;
-                            $status = strtoupper((string) $log->status);
+                            $classification = $policy->classifyLog($log) ?? strtoupper((string) $log->status);
                             $initials = $student
                                 ? strtoupper(substr($student->firstname ?? '', 0, 1).substr($student->lastname ?? '', 0, 1))
                                 : '?';
@@ -234,12 +244,14 @@
                             <td data-label="Grade">{{ $student?->year ?? '—' }}</td>
                             <td data-label="Section">{{ $student?->section ?? '—' }}</td>
                             <td data-label="Status">
-                                @if($status === 'IN')
+                                @if($classification === 'IN')
                                     <span class="al-status al-status--in">IN</span>
-                                @elseif($status === 'OUT')
+                                @elseif($classification === 'LATE')
+                                    <span class="al-status al-status--late">LATE</span>
+                                @elseif($classification === 'OUT')
                                     <span class="al-status al-status--out">OUT</span>
                                 @else
-                                    <span class="al-status al-status--muted">{{ $status ?: '—' }}</span>
+                                    <span class="al-status al-status--muted">{{ $classification ?: '—' }}</span>
                                 @endif
                             </td>
                             <td data-label="Scanned">

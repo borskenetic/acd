@@ -13,6 +13,7 @@ class Sf2AttendanceLogMapper
 {
     public function __construct(
         protected Sf2SchoolCalendar $calendar,
+        protected AttendancePolicyService $policy,
     ) {}
 
     /**
@@ -108,7 +109,7 @@ class Sf2AttendanceLogMapper
                 continue;
             }
 
-            if ($scannedAt->gt($this->tardyCutoffForDate($date))) {
+            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date))) {
                 $tardy[] = $date;
             }
         }
@@ -219,14 +220,5 @@ class Sf2AttendanceLogMapper
         }
 
         return $map;
-    }
-
-    protected function tardyCutoffForDate(string $date): Carbon
-    {
-        $tz = config('sf2.timezone', 'Asia/Manila');
-        $startTime = config('sf2.class_start_time', '07:30');
-        $grace = (int) config('sf2.tardy_grace_minutes', 15);
-
-        return Carbon::parse($date.' '.$startTime, $tz)->addMinutes($grace);
     }
 }

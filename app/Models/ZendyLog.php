@@ -40,10 +40,23 @@ class ZendyLog extends Model
             'zendy_launch' => 'Launch',
             'go_to_zendy' => 'Direct link',
             'zendy_return' => 'Return',
+            'zendy_tab_close' => 'Tab closed',
             'zendy_form_submission' => 'Form',
             'zendy_sso' => 'Sign-on',
             'zendy_sso_unavailable' => 'Sign-on unavailable',
             default => str_replace('_', ' ', ucfirst((string) $this->action)),
         };
+    }
+
+    public function durationSeconds(): ?int
+    {
+        $seconds = $this->metadata['estimated_duration_seconds'] ?? null;
+
+        return is_numeric($seconds) ? (int) $seconds : null;
+    }
+
+    public function durationLabel(): ?string
+    {
+        return \App\Services\ZendyTrackingService::formatDuration($this->durationSeconds());
     }
 }

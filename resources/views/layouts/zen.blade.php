@@ -16,6 +16,8 @@
     $initials = strtoupper(substr($user->fname ?? 'U', 0, 1) . substr($user->lname ?? '', 0, 1));
     $currentRoute = request()->route()?->getName();
     $roleLabels = \App\Models\ZendyUser::roleOptions();
+    $activeClickId = session(\App\Services\ZendyTrackingService::SESSION_CLICK_ID);
+    $activeLaunchedAt = session(\App\Services\ZendyTrackingService::SESSION_LAUNCHED_AT);
 @endphp
 
 <div class="app-shell" id="appShell">
@@ -116,6 +118,18 @@
 </div>
 
 <script src="{{ \App\Support\VersionedAsset::url('js/sidebar.js') }}"></script>
+<script>
+    window.zendySessionConfig = {
+        endUrl: @json(route('zendy.session-end')),
+        @if($activeClickId && $activeLaunchedAt)
+        clickId: @json($activeClickId),
+        launchedAt: @json($activeLaunchedAt),
+        @else
+        clearSession: true,
+        @endif
+    };
+</script>
+<script src="{{ \App\Support\VersionedAsset::url('js/zendy-session.js') }}"></script>
 @stack('scripts')
 @yield('footer')
 </body>

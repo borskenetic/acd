@@ -10,14 +10,36 @@
     <p style="color: var(--text-muted); margin: 0 0 24px;">
         You'll be redirected in a moment.
     </p>
-    <a href="{{ $redirectUrl }}" class="btn-app btn-primary-app">Continue now</a>
+    <a href="{{ $redirectUrl }}" id="zendyContinueLink" class="btn-app btn-primary-app">Continue now</a>
 </div>
 @endsection
 
 @section('footer')
 <script>
-    setTimeout(function () {
-        window.location.href = @json($redirectUrl);
-    }, 2000);
+    window.zendySessionConfig = {
+        endUrl: @json(route('zendy.session-end')),
+        @if(!empty($clickId) && !empty($launchedAt))
+        clickId: @json($clickId),
+        launchedAt: @json($launchedAt),
+        @else
+        clearSession: true,
+        @endif
+    };
+
+    var redirectUrl = @json($redirectUrl);
+
+    function goToZendy() {
+        if (window.zendySession) {
+            window.zendySession.markNavigatingAway();
+        }
+        window.location.href = redirectUrl;
+    }
+
+    document.getElementById('zendyContinueLink').addEventListener('click', function (event) {
+        event.preventDefault();
+        goToZendy();
+    });
+
+    setTimeout(goToZendy, 2000);
 </script>
 @endsection

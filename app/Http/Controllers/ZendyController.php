@@ -19,7 +19,10 @@ class ZendyController extends Controller
     {
         $this->tracking->recordReturnIfApplicable($request, $this->zendyUser());
 
-        return view('zendy.home');
+        return view('zendy.home', [
+            'activeClickId' => $request->session()->get(ZendyTrackingService::SESSION_CLICK_ID),
+            'activeLaunchedAt' => $request->session()->get(ZendyTrackingService::SESSION_LAUNCHED_AT),
+        ]);
     }
 
     public function launch(Request $request)
@@ -32,6 +35,8 @@ class ZendyController extends Controller
 
         return view('zendy.launch', [
             'redirectUrl' => config('zendy.redirect_url'),
+            'clickId' => $request->session()->get(ZendyTrackingService::SESSION_CLICK_ID),
+            'launchedAt' => $request->session()->get(ZendyTrackingService::SESSION_LAUNCHED_AT),
         ]);
     }
 
@@ -79,5 +84,22 @@ class ZendyController extends Controller
         $this->tracking->logAccess($request, 'zendy_form_submission', null, $validated);
 
         return response()->json(['success' => true]);
+    }
+
+    public function sessionEnd(Request $request)
+    {
+        $validated = $request->validate([
+            'click_id' => 'required|uuid',
+            'duration_seconds' => 'required|integer|min:0|max:604800',
+        ]);
+
+        $this->tracking->recordTabClose(
+            $request,
+            $this->zendyUser(),
+            $validated['click_id'],
+            (int) $validated['duration_seconds'],
+        );
+
+        return response()->noContent();
     }
 }

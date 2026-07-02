@@ -78,6 +78,7 @@ Route::middleware(['auth:zendy'])->prefix('zendy')->name('zendy.')->group(functi
     Route::get('/launch', [ZendyController::class, 'launch'])->name('launch');
     Route::get('/go', [ZendyController::class, 'go'])->name('go');
     Route::get('/activity', [ZendyController::class, 'activity'])->name('activity');
+    Route::post('/session-end', [ZendyController::class, 'sessionEnd'])->name('session-end');
 });
 
 Route::middleware(['auth:zendy', 'can:zendyAdmin'])->prefix('zendy')->name('zendy.')->group(function () {

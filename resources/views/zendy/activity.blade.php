@@ -13,6 +13,7 @@
             <option value="zendy_launch" {{ request('action') === 'zendy_launch' ? 'selected' : '' }}>Launch</option>
             <option value="go_to_zendy" {{ request('action') === 'go_to_zendy' ? 'selected' : '' }}>Direct link</option>
             <option value="zendy_return" {{ request('action') === 'zendy_return' ? 'selected' : '' }}>Return</option>
+            <option value="zendy_tab_close" {{ request('action') === 'zendy_tab_close' ? 'selected' : '' }}>Tab closed</option>
         </select>
         <button type="submit" class="btn-app btn-primary-app">Filter</button>
         <a href="{{ route('zendy.activity') }}" class="btn-app btn-outline-app">Reset</a>
@@ -26,7 +27,7 @@
                 <tr>
                     <th>Event</th>
                     <th>Date & time</th>
-                    <th>Details</th>
+                    <th>Duration</th>
                 </tr>
             </thead>
             <tbody>
@@ -35,13 +36,8 @@
                     <td><span class="badge-app">{{ $log->actionLabel() }}</span></td>
                     <td style="white-space: nowrap;">{{ $log->created_at->format('M d, Y g:i A') }}</td>
                     <td>
-                        @if($log->action === 'zendy_return' && isset($log->metadata['estimated_duration_seconds']))
-                            @php
-                                $seconds = (int) $log->metadata['estimated_duration_seconds'];
-                                $minutes = intdiv($seconds, 60);
-                                $remainder = $seconds % 60;
-                            @endphp
-                            Session length: about {{ $minutes > 0 ? $minutes . ' min ' : '' }}{{ $remainder }} sec
+                        @if($log->durationLabel())
+                            {{ $log->durationLabel() }}
                         @else
                             <span style="color: var(--text-muted);">—</span>
                         @endif

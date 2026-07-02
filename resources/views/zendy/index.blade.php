@@ -16,6 +16,7 @@
             <option value="zendy_launch" {{ request('action') === 'zendy_launch' ? 'selected' : '' }}>Launch</option>
             <option value="go_to_zendy" {{ request('action') === 'go_to_zendy' ? 'selected' : '' }}>Direct link</option>
             <option value="zendy_return" {{ request('action') === 'zendy_return' ? 'selected' : '' }}>Return</option>
+            <option value="zendy_tab_close" {{ request('action') === 'zendy_tab_close' ? 'selected' : '' }}>Tab closed</option>
             <option value="zendy_form_submission" {{ request('action') === 'zendy_form_submission' ? 'selected' : '' }}>Form</option>
             <option value="zendy_sso" {{ request('action') === 'zendy_sso' ? 'selected' : '' }}>Sign-on</option>
         </select>
@@ -38,6 +39,7 @@
                     <th>Course</th>
                     <th>Department</th>
                     <th>Campus</th>
+                    <th>Duration</th>
                     <th>Time</th>
                 </tr>
             </thead>
@@ -55,17 +57,18 @@
                         {{ $actorName !== '' ? $actorName : ($log->email ?? '—') }}
                     </td>
                     <td>{{ $log->actor_role ?? optional($log->actor)->role ?? '—' }}</td>
-                    <td><span class="badge-app">{{ $log->action ?? '—' }}</span></td>
+                    <td><span class="badge-app">{{ $log->actionLabel() }}</span></td>
                     <td>{{ trim(($log->first_name ?? '') . ' ' . ($log->last_name ?? '')) ?: '—' }}</td>
                     <td>{{ $log->email ?? '—' }}</td>
                     <td>{{ $log->course ?? '—' }}</td>
                     <td>{{ $log->department ?? '—' }}</td>
                     <td>{{ $log->campus ?? '—' }}</td>
+                    <td>{{ $log->durationLabel() ?? '—' }}</td>
                     <td style="white-space: nowrap;">{{ $log->created_at->format('M d, Y H:i') }}</td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 32px;">No activity found.</td>
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 32px;">No activity found.</td>
                 </tr>
                 @endforelse
             </tbody>

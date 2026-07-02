@@ -20,10 +20,10 @@ class ZendyReportController extends Controller
 
         $totalLaunches = (clone $baseQuery)->whereIn('action', $launchActions)->count();
         $uniqueUsers = (clone $baseQuery)->whereNotNull('zendy_user_id')->distinct('zendy_user_id')->count('zendy_user_id');
-        $estimatedReturns = (clone $baseQuery)->where('action', 'zendy_return')->count();
+        $estimatedReturns = (clone $baseQuery)->whereIn('action', ['zendy_return', 'zendy_tab_close'])->count();
 
         $avgDuration = (clone $baseQuery)
-            ->where('action', 'zendy_return')
+            ->whereIn('action', ['zendy_return', 'zendy_tab_close'])
             ->get()
             ->avg(fn ($log) => $log->metadata['estimated_duration_seconds'] ?? null);
 

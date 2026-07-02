@@ -45,7 +45,7 @@
                         <td>{{ $user->course ?? '—' }}</td>
                         <td style="white-space: nowrap;">
                             <a href="{{ route('zendy.users.edit', $user) }}" class="btn-app btn-outline-app btn-sm-app">Edit</a>
-                            @if($user->id !== auth()->id())
+                            @if($user->id !== auth('zendy')->id())
                             <form action="{{ route('zendy.users.destroy', $user) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this user?');">
                                 @csrf
                                 @method('DELETE')

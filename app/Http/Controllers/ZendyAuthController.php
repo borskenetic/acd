@@ -4,23 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
 
 class ZendyAuthController extends Controller
 {
     public function showLogin()
     {
-        if (auth()->check()) {
-            if (Gate::allows('canAccessZendy')) {
-                return redirect()->route('zendy.home');
-            }
-
-            Auth::logout();
-            request()->session()->invalidate();
-            request()->session()->regenerateToken();
-
-            return redirect()->route('zendy.login')
-                ->with('error', 'Your account does not have Zendy portal access.');
+        if (Auth::guard('zendy')->check()) {
+            return redirect()->route('zendy.home');
         }
 
         return view('zendy.login');
@@ -33,31 +23,21 @@ class ZendyAuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (Auth::guard('zendy')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-
-            if (! Gate::allows('canAccessZendy')) {
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-
-                return back()->withErrors([
-                    'email' => 'Your account does not have Zendy portal access.',
-                ]);
-            }
 
             return redirect()->route('zendy.home');
         }
 
         return back()->withErrors([
-            'email' => 'Invalid credentials.',
+            'email' => 'Invalid Zendy portal credentials.',
         ]);
     }
 
     public function logout(Request $request)
     {
-        Auth::logout();
-        $request->session()->invalidate();
+        Auth::guard('zendy')->logout();
+
         $request->session()->regenerateToken();
 
         return redirect()->route('zendy.login');

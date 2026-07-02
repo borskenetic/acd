@@ -23,7 +23,7 @@
                     <tr>
                         <td>{{ $user->fname }} {{ $user->lname }}</td>
                         <td>{{ $user->email }}</td>
-                        <td><span class="badge-app">{{ \App\Models\User::roleOptions()[$user->role] ?? ucfirst($user->role) }}</span></td>
+                        <td><span class="badge-app">{{ \App\Models\ZendyUser::roleOptions()[$user->role] ?? ucfirst($user->role) }}</span></td>
                         <td>{{ $user->campus ?? '—' }}</td>
                         <td>{{ $user->role === 'student' ? ($user->course ?? '—') : '—' }}</td>
                         <td style="white-space: nowrap;">{{ $user->created_at->format('M d, Y') }}</td>

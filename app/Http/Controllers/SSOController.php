@@ -12,7 +12,7 @@ class SSOController extends Controller
 
     public function redirectToLibrary(Request $request)
     {
-        $user = auth()->user();
+        $user = auth('zendy')->user();
 
         if (! config('zendy.sso_enabled')) {
             $this->tracking->logAccess($request, 'zendy_sso_unavailable', $user, [

@@ -15,12 +15,10 @@
 
         <a href="{{ route('home') }}" class="btn0 btn-sm {{ $linkActive(['home']) }}">Home</a>
 
-        @auth
-            @can('canAccessZendy')
-                <a href="{{ route('zendy.home') }}" class="btn0 btn-sm {{ $linkActive(['zendy.*']) }}">Zendy Portal</a>
-            @endcan
+        @auth('zendy')
+            <a href="{{ route('zendy.home') }}" class="btn0 btn-sm {{ $linkActive(['zendy.*']) }}">Zendy Portal</a>
         @else
-            <a href="{{ route('zendy.login') }}" class="btn0 btn-sm {{ $linkActive(['zendy.login']) }}">Zendy Portal</a>
+            <a href="{{ route('zendy.login') }}" class="btn0 btn-sm {{ $linkActive(['zendy.login', 'zendy.register']) }}">Zendy Portal</a>
         @endauth
 
         @auth

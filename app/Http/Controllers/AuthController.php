@@ -14,8 +14,8 @@ class AuthController extends Controller
 
     public function showLogin()
     {
-        if (auth()->check()) {
-            $role = auth()->user()->role;
+        if (Auth::guard('web')->check()) {
+            $role = Auth::guard('web')->user()->role;
             if (in_array($role, ['admin', 'staff'], true)) {
                 return redirect()->route('home');
             }
@@ -33,18 +33,18 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (Auth::guard('web')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
             $this->activityLogger->logAuthEvent(
                 'auth.login.success',
                 'Logged in',
-                Auth::user(),
+                Auth::guard('web')->user(),
                 $request,
                 ['email' => $request->input('email')],
             );
 
-            return $this->redirectForRole(Auth::user()->role);
+            return $this->redirectForRole(Auth::guard('web')->user()->role);
         }
 
         $this->activityLogger->logAuthEvent(
@@ -62,9 +62,9 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $user = $request->user();
+        $user = Auth::guard('web')->user();
 
-        Auth::logout();
+        Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

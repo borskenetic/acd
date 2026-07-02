@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PendingUser;
-use App\Models\User;
+use App\Models\ZendyUser;
 use Illuminate\Support\Facades\DB;
 
 class ZendyPendingController extends Controller
@@ -18,7 +18,7 @@ class ZendyPendingController extends Controller
     public function approve(PendingUser $pendingUser)
     {
         DB::transaction(function () use ($pendingUser) {
-            User::create([
+            ZendyUser::create([
                 'fname' => $pendingUser->fname,
                 'lname' => $pendingUser->lname,
                 'email' => $pendingUser->email,
@@ -32,7 +32,7 @@ class ZendyPendingController extends Controller
             $pendingUser->delete();
         });
 
-        return back()->with('success', 'Registration approved. The user can now sign in.');
+        return back()->with('success', 'Registration approved. The user can now sign in to the Zendy portal.');
     }
 
     public function reject(PendingUser $pendingUser)

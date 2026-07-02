@@ -12,7 +12,7 @@
         <a href="{{ route('zendy.launch') }}" class="btn-app btn-primary-app">Launch Zendy</a>
     </div>
 
-    @cannot('isAdmin')
+    @cannot('zendyAdmin')
     <div class="action-card">
         <div class="action-icon">🕐</div>
         <h3>My Activity</h3>
@@ -34,32 +34,32 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Name</div>
-            <div style="font-weight: 600;">{{ auth()->user()->fname }} {{ auth()->user()->lname }}</div>
+            <div style="font-weight: 600;">{{ auth('zendy')->user()->fname }} {{ auth('zendy')->user()->lname }}</div>
         </div>
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Email</div>
-            <div>{{ auth()->user()->email }}</div>
+            <div>{{ auth('zendy')->user()->email }}</div>
         </div>
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Role</div>
-            <div><span class="badge-app">{{ \App\Models\User::roleOptions()[auth()->user()->role] ?? ucfirst(auth()->user()->role) }}</span></div>
+            <div><span class="badge-app">{{ \App\Models\ZendyUser::roleOptions()[auth('zendy')->user()->role] ?? ucfirst(auth('zendy')->user()->role) }}</span></div>
         </div>
-        @if(auth()->user()->campus)
+        @if(auth('zendy')->user()->campus)
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Campus</div>
-            <div>{{ auth()->user()->campus }}</div>
+            <div>{{ auth('zendy')->user()->campus }}</div>
         </div>
         @endif
-        @if(auth()->user()->course)
+        @if(auth('zendy')->user()->course)
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Course</div>
-            <div>{{ auth()->user()->course }}</div>
+            <div>{{ auth('zendy')->user()->course }}</div>
         </div>
         @endif
-        @if(auth()->user()->department)
+        @if(auth('zendy')->user()->department)
         <div>
             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Department</div>
-            <div>{{ auth()->user()->department }}</div>
+            <div>{{ auth('zendy')->user()->department }}</div>
         </div>
         @endif
     </div>

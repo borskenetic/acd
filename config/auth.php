@@ -40,6 +40,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'zendy' => [
+            'driver' => 'session',
+            'provider' => 'zendy_users',
+        ],
     ],
 
     /*
@@ -64,11 +68,10 @@ return [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
-
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'zendy_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\ZendyUser::class,
+        ],
     ],
 
     /*

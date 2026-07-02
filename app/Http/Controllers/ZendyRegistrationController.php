@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PendingUser;
-use App\Models\User;
+use App\Models\ZendyUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ class ZendyRegistrationController extends Controller
 
     public function store(Request $request)
     {
-        $allowedRoles = array_diff(array_keys(User::roleOptions()), ['admin']);
+        $allowedRoles = array_diff(array_keys(ZendyUser::roleOptions()), ['admin']);
 
         $validated = $request->validate([
             'role' => ['required', Rule::in($allowedRoles)],
@@ -27,7 +27,7 @@ class ZendyRegistrationController extends Controller
                 'required',
                 'email',
                 'unique:pending_users,email',
-                'unique:users,email',
+                'unique:zendy_users,email',
             ],
             'password' => 'required|min:6',
             'campus' => 'nullable|string|max:255',

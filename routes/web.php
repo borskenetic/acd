@@ -71,25 +71,25 @@ Route::post('/zendy/store', [ZendyController::class, 'store']);
 
 Route::get('/sso-library', [SSOController::class, 'redirectToLibrary'])
     ->name('sso.library')
-    ->middleware(['auth', 'can:canAccessZendy']);
+    ->middleware(['auth:zendy']);
 
-Route::middleware(['auth', 'can:canAccessZendy'])->prefix('zendy')->name('zendy.')->group(function () {
+Route::middleware(['auth:zendy'])->prefix('zendy')->name('zendy.')->group(function () {
     Route::get('/', [ZendyController::class, 'home'])->name('home');
     Route::get('/launch', [ZendyController::class, 'launch'])->name('launch');
     Route::get('/go', [ZendyController::class, 'go'])->name('go');
     Route::get('/activity', [ZendyController::class, 'activity'])->name('activity');
 });
 
-Route::middleware(['auth', 'can:isAdmin'])->prefix('zendy')->name('zendy.')->group(function () {
+Route::middleware(['auth:zendy', 'can:zendyAdmin'])->prefix('zendy')->name('zendy.')->group(function () {
     Route::get('/logs', [ZendyController::class, 'index'])->name('logs');
     Route::get('/reports', [ZendyReportController::class, 'index'])->name('reports');
 
     Route::get('/users', [ZendyUserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [ZendyUserController::class, 'create'])->name('users.create');
     Route::post('/users', [ZendyUserController::class, 'store'])->name('users.store');
-    Route::get('/users/{user}/edit', [ZendyUserController::class, 'edit'])->name('users.edit');
-    Route::put('/users/{user}', [ZendyUserController::class, 'update'])->name('users.update');
-    Route::delete('/users/{user}', [ZendyUserController::class, 'destroy'])->name('users.destroy');
+    Route::get('/users/{zendyUser}/edit', [ZendyUserController::class, 'edit'])->name('users.edit');
+    Route::put('/users/{zendyUser}', [ZendyUserController::class, 'update'])->name('users.update');
+    Route::delete('/users/{zendyUser}', [ZendyUserController::class, 'destroy'])->name('users.destroy');
 
     Route::get('/pending', [ZendyPendingController::class, 'index'])->name('pending.index');
     Route::post('/pending/{pendingUser}/approve', [ZendyPendingController::class, 'approve'])->name('pending.approve');

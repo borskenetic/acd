@@ -19,7 +19,7 @@ class ZendyReportController extends Controller
         $launchActions = ['go_to_zendy', 'zendy_launch', 'zendy_sso', 'zendy_form_submission'];
 
         $totalLaunches = (clone $baseQuery)->whereIn('action', $launchActions)->count();
-        $uniqueUsers = (clone $baseQuery)->whereNotNull('actor_user_id')->distinct('actor_user_id')->count('actor_user_id');
+        $uniqueUsers = (clone $baseQuery)->whereNotNull('zendy_user_id')->distinct('zendy_user_id')->count('zendy_user_id');
         $estimatedReturns = (clone $baseQuery)->where('action', 'zendy_return')->count();
 
         $avgDuration = (clone $baseQuery)

@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\ZendyLog;
+use App\Models\ZendyUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -12,7 +12,7 @@ class ZendyTrackingService
     public const SESSION_CLICK_ID = 'zendy_click_id';
     public const SESSION_LAUNCHED_AT = 'zendy_launched_at';
 
-    public function logAccess(Request $request, string $action, ?User $user = null, array $extra = []): ZendyLog
+    public function logAccess(Request $request, string $action, ?ZendyUser $user = null, array $extra = []): ZendyLog
     {
         $this->recordReturnIfApplicable($request, $user);
 
@@ -20,8 +20,6 @@ class ZendyTrackingService
 
         $request->session()->put(self::SESSION_CLICK_ID, $clickId);
         $request->session()->put(self::SESSION_LAUNCHED_AT, now()->toIso8601String());
-
-        $profile = $user ? $this->profileSnapshot($user) : [];
 
         $metadata = array_merge([
             'click_id' => $clickId,
@@ -32,22 +30,22 @@ class ZendyTrackingService
         ], $extra);
 
         return ZendyLog::create([
-            'actor_user_id' => $user?->id,
+            'zendy_user_id' => $user?->id,
             'actor_role' => $user?->role,
             'action' => $action,
             'first_name' => $user?->fname ?? $extra['first_name'] ?? null,
             'last_name' => $user?->lname ?? $extra['last_name'] ?? null,
             'email' => $user?->email ?? $extra['email'] ?? null,
-            'course' => $profile['course'] ?? $extra['course'] ?? null,
-            'department' => $profile['department'] ?? $extra['department'] ?? null,
-            'campus' => $profile['campus'] ?? $extra['campus'] ?? null,
+            'course' => $user?->course ?? $extra['course'] ?? null,
+            'department' => $user?->department ?? $extra['department'] ?? null,
+            'campus' => $user?->campus ?? $extra['campus'] ?? null,
             'ip_address' => $request->ip(),
             'user_agent' => (string) $request->userAgent(),
             'metadata' => $metadata,
         ]);
     }
 
-    public function recordReturnIfApplicable(Request $request, ?User $user = null): void
+    public function recordReturnIfApplicable(Request $request, ?ZendyUser $user = null): void
     {
         $launchedAt = $request->session()->get(self::SESSION_LAUNCHED_AT);
         $clickId = $request->session()->get(self::SESSION_CLICK_ID);
@@ -63,18 +61,17 @@ class ZendyTrackingService
 
         $launchTime = \Carbon\Carbon::parse($launchedAt);
         $durationSeconds = (int) $launchTime->diffInSeconds(now());
-        $profile = $user ? $this->profileSnapshot($user) : [];
 
         ZendyLog::create([
-            'actor_user_id' => $user?->id,
+            'zendy_user_id' => $user?->id,
             'actor_role' => $user?->role,
             'action' => 'zendy_return',
             'first_name' => $user?->fname,
             'last_name' => $user?->lname,
             'email' => $user?->email,
-            'course' => $profile['course'] ?? null,
-            'department' => $profile['department'] ?? null,
-            'campus' => $profile['campus'] ?? null,
+            'course' => $user?->course,
+            'department' => $user?->department,
+            'campus' => $user?->campus,
             'ip_address' => $request->ip(),
             'user_agent' => (string) $request->userAgent(),
             'metadata' => [
@@ -121,16 +118,5 @@ class ZendyTrackingService
         }
 
         return $query;
-    }
-
-    private function profileSnapshot(User $user): array
-    {
-        $student = $user->relationLoaded('student') ? $user->student : $user->student()->first();
-
-        return [
-            'course' => $user->course ?? $student?->course,
-            'department' => $user->department,
-            'campus' => $user->campus,
-        ];
     }
 }

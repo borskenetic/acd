@@ -12,10 +12,10 @@
 </head>
 <body>
 @php
-    $user = auth()->user();
+    $user = auth('zendy')->user();
     $initials = strtoupper(substr($user->fname ?? 'U', 0, 1) . substr($user->lname ?? '', 0, 1));
     $currentRoute = request()->route()?->getName();
-    $roleLabels = \App\Models\User::roleOptions();
+    $roleLabels = \App\Models\ZendyUser::roleOptions();
 @endphp
 
 <div class="app-shell" id="appShell">
@@ -43,14 +43,14 @@
                 <span class="icon">↗</span>
                 <span class="label">Go to Zendy</span>
             </a>
-            @cannot('isAdmin')
+            @cannot('zendyAdmin')
             <a href="{{ route('zendy.activity') }}" class="sidebar-link {{ $currentRoute === 'zendy.activity' ? 'active' : '' }}">
                 <span class="icon">🕐</span>
                 <span class="label">My Activity</span>
             </a>
             @endcannot
 
-            @can('isAdmin')
+            @can('zendyAdmin')
             <div class="sidebar-section-label">Administration</div>
             <a href="{{ route('zendy.logs') }}" class="sidebar-link {{ $currentRoute === 'zendy.logs' ? 'active' : '' }}">
                 <span class="icon">📋</span>

@@ -23,9 +23,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'course',
-        'department',
-        'campus',
     ];
 
     /**
@@ -59,17 +56,10 @@ class User extends Authenticatable
     public static function roleOptions(): array
     {
         return [
-            'student' => 'Student',
-            'faculty' => 'Faculty',
-            'staff' => 'Staff',
-            'librarian' => 'Librarian',
             'admin' => 'Administrator',
+            'staff' => 'Staff',
+            'faculty' => 'Faculty',
+            'student' => 'Student',
         ];
-    }
-
-    /** Roles that may use the Zendy research portal. */
-    public static function zendyRoles(): array
-    {
-        return ['admin', 'staff', 'librarian', 'faculty', 'student'];
     }
 }

@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Models\ZendyUser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class ZendyUserController extends Controller
 {
-    private function validationRules(?User $user = null): array
+    private function validationRules(?ZendyUser $zendyUser = null): array
     {
         return [
             'fname' => 'required|string|max:255',
@@ -17,19 +18,19 @@ class ZendyUserController extends Controller
             'email' => [
                 'required',
                 'email',
-                Rule::unique('users', 'email')->ignore($user?->id),
+                Rule::unique('zendy_users', 'email')->ignore($zendyUser?->id),
             ],
-            'role' => ['required', Rule::in(User::zendyRoles())],
+            'role' => ['required', Rule::in(array_keys(ZendyUser::roleOptions()))],
             'campus' => 'nullable|string|max:255',
             'department' => 'nullable|string|max:255',
             'course' => 'nullable|string|max:255|required_if:role,student',
-            'password' => $user ? 'nullable|string|min:6' : 'required|string|min:6',
+            'password' => $zendyUser ? 'nullable|string|min:6' : 'required|string|min:6',
         ];
     }
 
     public function index(Request $request)
     {
-        $query = User::query()->whereIn('role', User::zendyRoles());
+        $query = ZendyUser::query();
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -49,14 +50,14 @@ class ZendyUserController extends Controller
 
         return view('zendy.users.index', [
             'users' => $users,
-            'roles' => User::roleOptions(),
+            'roles' => ZendyUser::roleOptions(),
         ]);
     }
 
     public function create()
     {
         return view('zendy.users.create', [
-            'roles' => User::roleOptions(),
+            'roles' => ZendyUser::roleOptions(),
         ]);
     }
 
@@ -64,7 +65,7 @@ class ZendyUserController extends Controller
     {
         $validated = $request->validate($this->validationRules());
 
-        User::create([
+        ZendyUser::create([
             'fname' => $validated['fname'],
             'lname' => $validated['lname'],
             'email' => $validated['email'],
@@ -78,21 +79,17 @@ class ZendyUserController extends Controller
         return redirect()->route('zendy.users.index')->with('success', 'Portal user created.');
     }
 
-    public function edit(User $user)
+    public function edit(ZendyUser $zendyUser)
     {
-        abort_unless(in_array($user->role, User::zendyRoles(), true), 404);
-
         return view('zendy.users.edit', [
-            'user' => $user,
-            'roles' => User::roleOptions(),
+            'user' => $zendyUser,
+            'roles' => ZendyUser::roleOptions(),
         ]);
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, ZendyUser $zendyUser)
     {
-        abort_unless(in_array($user->role, User::zendyRoles(), true), 404);
-
-        $validated = $request->validate($this->validationRules($user));
+        $validated = $request->validate($this->validationRules($zendyUser));
 
         $payload = [
             'fname' => $validated['fname'],
@@ -108,20 +105,18 @@ class ZendyUserController extends Controller
             $payload['password'] = Hash::make($validated['password']);
         }
 
-        $user->update($payload);
+        $zendyUser->update($payload);
 
         return redirect()->route('zendy.users.index')->with('success', 'Portal user updated.');
     }
 
-    public function destroy(User $user)
+    public function destroy(ZendyUser $zendyUser)
     {
-        abort_unless(in_array($user->role, User::zendyRoles(), true), 404);
-
-        if ($user->id === auth()->id()) {
+        if ($zendyUser->id === Auth::guard('zendy')->id()) {
             return redirect()->route('zendy.users.index')->with('error', 'You cannot delete your own account.');
         }
 
-        $user->delete();
+        $zendyUser->delete();
 
         return redirect()->route('zendy.users.index')->with('success', 'Portal user deleted.');
     }

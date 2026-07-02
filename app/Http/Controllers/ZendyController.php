@@ -4,21 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Services\ZendyTrackingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ZendyController extends Controller
 {
     public function __construct(private ZendyTrackingService $tracking) {}
 
+    private function zendyUser()
+    {
+        return Auth::guard('zendy')->user();
+    }
+
     public function home(Request $request)
     {
-        $this->tracking->recordReturnIfApplicable($request, auth()->user());
+        $this->tracking->recordReturnIfApplicable($request, $this->zendyUser());
 
         return view('zendy.home');
     }
 
     public function launch(Request $request)
     {
-        $user = auth()->user();
+        $user = $this->zendyUser();
 
         $this->tracking->logAccess($request, 'zendy_launch', $user, [
             'destination' => config('zendy.redirect_url'),
@@ -31,7 +37,7 @@ class ZendyController extends Controller
 
     public function go(Request $request)
     {
-        $user = auth()->user();
+        $user = $this->zendyUser();
 
         $this->tracking->logAccess($request, 'go_to_zendy', $user, [
             'destination' => config('zendy.redirect_url'),
@@ -53,7 +59,7 @@ class ZendyController extends Controller
     public function activity(Request $request)
     {
         $logs = $this->tracking->baseQuery($request)
-            ->where('actor_user_id', auth()->id())
+            ->where('zendy_user_id', Auth::guard('zendy')->id())
             ->latest()
             ->paginate(15);
 

@@ -11,7 +11,7 @@ class ZendyLog extends Model
     use HasFactory;
 
     protected $fillable = [
-        'actor_user_id',
+        'zendy_user_id',
         'actor_role',
         'action',
         'first_name',
@@ -31,7 +31,7 @@ class ZendyLog extends Model
 
     public function actor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'actor_user_id');
+        return $this->belongsTo(ZendyUser::class, 'zendy_user_id');
     }
 
     public function actionLabel(): string

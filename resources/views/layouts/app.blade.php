@@ -15,7 +15,9 @@
     @yield('styles')
     @stack('page-styles')
     @php
-        $usesAdminShell = auth()->check() && auth()->user()->can('isAdminOrStaff');
+        $usesAdminShell = auth('web')->check()
+            && auth('web')->user()->can('isAdminOrStaff')
+            && ! request()->routeIs('home');
     @endphp
 </head>
 <body class="@yield('body_class') {{ $usesAdminShell ? 'admin-shell-body' : '' }}" style="background: var(--brand-page-bg, #f5f7fa);">

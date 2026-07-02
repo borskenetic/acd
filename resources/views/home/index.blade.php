@@ -57,6 +57,15 @@
                     </p>
                 </div>
 
+                @guest('web')
+                <div class="faq-item">
+                    <p><strong>Staff or admin sign-in</strong></p>
+                    <p class="mb-0 mt-2">
+                        <a href="{{ route('login') }}" class="faq-toggle">Sign in to the attendance portal</a>
+                    </p>
+                </div>
+                @endguest
+
                 <div class="faq-item">
                     <p><strong>Visiting the campus?</strong></p>
                     <p class="mb-0 mt-2">
@@ -64,7 +73,7 @@
                     </p>
                 </div>
 
-                @guest
+                @guest('web')
                 <div class="faq-item">
                     <p><strong>Ready to register?</strong></p>
                     <p class="mb-0 mt-2">

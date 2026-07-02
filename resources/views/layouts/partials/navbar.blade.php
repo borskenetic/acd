@@ -21,7 +21,7 @@
             <a href="{{ route('zendy.login') }}" class="btn0 btn-sm {{ $linkActive(['zendy.login', 'zendy.register']) }}">Zendy Portal</a>
         @endauth
 
-        @auth
+        @auth('web')
             @can('isAdminOrStaff')
                 <div class="nav-dropdown">
                     <button type="button" class="nav-dropdown-button {{ $dropActive(['attendance.scan', 'attendance.face', 'attendance.process', 'attendance.section', 'attendance.changeVideo', 'attendance.uploadVideo']) }}">
@@ -82,6 +82,11 @@
                     </div>
                 @endcan
 
+                <form action="{{ route('logout') }}" method="POST" class="d-inline mb-0">
+                    @csrf
+                    <button type="submit" class="btn5">Logout</button>
+                </form>
+            @else
                 <form action="{{ route('logout') }}" method="POST" class="d-inline mb-0">
                     @csrf
                     <button type="submit" class="btn5">Logout</button>

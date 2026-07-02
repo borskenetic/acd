@@ -3,8 +3,7 @@
 @section('title', 'Activity Log')
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('css/layout/data-pages.css') }}">
-    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/activity_logs/index.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/layout/data-pages.css') }}">
 @endpush
 
 @section('content')
@@ -26,9 +25,9 @@
         <form method="GET" class="act-controls__form">
             <div class="act-search-row">
                 <label class="act-search" for="actSearch">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input type="search" id="actSearch" name="search" value="{{ request('search') }}"
-                           placeholder="Search summary, user, or URL…" autocomplete="off">
+                           placeholder="Search summary, user, or URL..." autocomplete="off">
                 </label>
                 <button type="submit" class="act-btn act-btn--primary">Search</button>
             </div>

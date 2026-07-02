@@ -16,6 +16,14 @@
         <a href="{{ route('home') }}" class="btn0 btn-sm {{ $linkActive(['home']) }}">Home</a>
 
         @auth
+            @can('canAccessZendy')
+                <a href="{{ route('zendy.home') }}" class="btn0 btn-sm {{ $linkActive(['zendy.*']) }}">Zendy Portal</a>
+            @endcan
+        @else
+            <a href="{{ route('zendy.login') }}" class="btn0 btn-sm {{ $linkActive(['zendy.login']) }}">Zendy Portal</a>
+        @endauth
+
+        @auth
             @can('isAdminOrStaff')
                 <div class="nav-dropdown">
                     <button type="button" class="nav-dropdown-button {{ $dropActive(['attendance.scan', 'attendance.face', 'attendance.process', 'attendance.section', 'attendance.changeVideo', 'attendance.uploadVideo']) }}">

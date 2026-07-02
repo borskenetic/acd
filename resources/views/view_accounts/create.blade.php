@@ -52,6 +52,7 @@
                         <select name="role" class="form-select" required>
                             <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                             <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>Staff</option>
+                            <option value="librarian" {{ old('role') === 'librarian' ? 'selected' : '' }}>Librarian</option>
                             <option value="faculty" {{ old('role') === 'faculty' ? 'selected' : '' }}>Faculty</option>
                         </select>
                     </div>

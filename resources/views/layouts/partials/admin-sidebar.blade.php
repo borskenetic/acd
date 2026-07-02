@@ -26,6 +26,13 @@
             'icon'     => 'home',
         ],
         [
+            'label'    => 'Zendy Portal',
+            'route'    => 'zendy.home',
+            'patterns' => ['zendy.*'],
+            'icon'     => 'book',
+            'target'   => '_blank',
+        ],
+        [
             'label'    => 'Attendance',
             'icon'     => 'calendar-check',
             'patterns' => ['attendance.scan', 'attendance.face', 'attendance.face.identify', 'attendance.process', 'attendance.section', 'attendance.changeVideo', 'attendance.uploadVideo', 'visitors.issue.*'],
@@ -204,6 +211,7 @@
                 <a href="{{ route($link['route']) }}"
                    class="admin-sidebar-link {{ $linkActive ? 'active' : '' }}"
                    title="{{ $link['label'] }}"
+                   @if(!empty($link['target'])) target="{{ $link['target'] }}" rel="noopener" @endif
                    @if($linkActive) aria-current="page" @endif>
                     <svg viewBox="0 0 24 24" aria-hidden="true">{!! $icon($link['icon']) !!}</svg>
                     <span>{{ $link['label'] }}</span>

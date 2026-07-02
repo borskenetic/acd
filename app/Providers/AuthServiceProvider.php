@@ -25,5 +25,9 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('isStudent', fn(User $user) =>
             in_array($user->role, ['student', 'faculty']) // treat faculty same
         );
+
+        Gate::define('canAccessZendy', fn(User $user) =>
+            in_array($user->role, User::zendyRoles(), true)
+        );
     }
 }

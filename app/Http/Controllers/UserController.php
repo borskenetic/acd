@@ -21,7 +21,7 @@ class UserController extends Controller
             'fname' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'role' => 'required|in:admin,staff,faculty',
+            'role' => 'required|in:admin,staff,faculty,librarian',
         ]);
 
         // Create user
@@ -68,7 +68,7 @@ class UserController extends Controller
             'fname' => 'required|string',
             'lname' => 'required|string',
             'email' => 'required|email',
-            'role' => 'required|in:admin,staff,faculty,student',
+            'role' => 'required|in:admin,staff,faculty,student,librarian',
         ]);
 
         $user = User::findOrFail($id);

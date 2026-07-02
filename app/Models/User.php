@@ -23,6 +23,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'course',
+        'department',
+        'campus',
     ];
 
     /**
@@ -51,5 +54,22 @@ class User extends Authenticatable
     public function student()
     {
         return $this->hasOne(Student::class);
+    }
+
+    public static function roleOptions(): array
+    {
+        return [
+            'student' => 'Student',
+            'faculty' => 'Faculty',
+            'staff' => 'Staff',
+            'librarian' => 'Librarian',
+            'admin' => 'Administrator',
+        ];
+    }
+
+    /** Roles that may use the Zendy research portal. */
+    public static function zendyRoles(): array
+    {
+        return ['admin', 'staff', 'librarian', 'faculty', 'student'];
     }
 }

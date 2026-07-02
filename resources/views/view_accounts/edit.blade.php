@@ -48,6 +48,7 @@
                     <select name="role" id="role" class="form-select" required>
                         <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
                         <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
+                        <option value="librarian" {{ $user->role === 'librarian' ? 'selected' : '' }}>Librarian</option>
                         <option value="faculty" {{ $user->role === 'faculty' ? 'selected' : '' }}>Faculty</option>
                         @if($user->role === 'student')
                             <option value="student" selected>Student (legacy)</option>

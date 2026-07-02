@@ -22,10 +22,15 @@ use App\Http\Controllers\VisitorAdminController;
 use App\Http\Controllers\VisitorLogController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorRegistrationController;
+use App\Http\Controllers\SSOController;
+use App\Http\Controllers\ZendyAuthController;
+use App\Http\Controllers\ZendyController;
+use App\Http\Controllers\ZendyPendingController;
+use App\Http\Controllers\ZendyRegistrationController;
+use App\Http\Controllers\ZendyReportController;
+use App\Http\Controllers\ZendyUserController;
 use App\Http\Controllers\PlatformActivityLogController;
 use Illuminate\Support\Facades\Route;
-
-// Public
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
@@ -54,6 +59,42 @@ Route::post('/attendance/face', [AttendanceController::class, 'identifyByFace'])
 Route::post('/attendance/section', [AttendanceController::class, 'processSection'])->name('attendance.section');
 Route::post('/attendance/visitor', [AttendanceController::class, 'processVisitor'])->name('attendance.visitor');
 Route::post('/attendance-feedback', [FeedController::class, 'store'])->name('attendance.feedback.store');
+
+// Zendy research portal (separate UI from attendance)
+Route::get('/zendy/login', [ZendyAuthController::class, 'showLogin'])->name('zendy.login');
+Route::post('/zendy/login', [ZendyAuthController::class, 'login']);
+Route::post('/zendy/logout', [ZendyAuthController::class, 'logout'])->name('zendy.logout');
+Route::get('/zendy/register', [ZendyRegistrationController::class, 'create'])->name('zendy.register');
+Route::post('/zendy/register', [ZendyRegistrationController::class, 'store'])->name('zendy.register.store');
+
+Route::post('/zendy/store', [ZendyController::class, 'store']);
+
+Route::get('/sso-library', [SSOController::class, 'redirectToLibrary'])
+    ->name('sso.library')
+    ->middleware(['auth', 'can:canAccessZendy']);
+
+Route::middleware(['auth', 'can:canAccessZendy'])->prefix('zendy')->name('zendy.')->group(function () {
+    Route::get('/', [ZendyController::class, 'home'])->name('home');
+    Route::get('/launch', [ZendyController::class, 'launch'])->name('launch');
+    Route::get('/go', [ZendyController::class, 'go'])->name('go');
+    Route::get('/activity', [ZendyController::class, 'activity'])->name('activity');
+});
+
+Route::middleware(['auth', 'can:isAdmin'])->prefix('zendy')->name('zendy.')->group(function () {
+    Route::get('/logs', [ZendyController::class, 'index'])->name('logs');
+    Route::get('/reports', [ZendyReportController::class, 'index'])->name('reports');
+
+    Route::get('/users', [ZendyUserController::class, 'index'])->name('users.index');
+    Route::get('/users/create', [ZendyUserController::class, 'create'])->name('users.create');
+    Route::post('/users', [ZendyUserController::class, 'store'])->name('users.store');
+    Route::get('/users/{user}/edit', [ZendyUserController::class, 'edit'])->name('users.edit');
+    Route::put('/users/{user}', [ZendyUserController::class, 'update'])->name('users.update');
+    Route::delete('/users/{user}', [ZendyUserController::class, 'destroy'])->name('users.destroy');
+
+    Route::get('/pending', [ZendyPendingController::class, 'index'])->name('pending.index');
+    Route::post('/pending/{pendingUser}/approve', [ZendyPendingController::class, 'approve'])->name('pending.approve');
+    Route::delete('/pending/{pendingUser}', [ZendyPendingController::class, 'reject'])->name('pending.reject');
+});
 
 // Admin + Staff
 Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {

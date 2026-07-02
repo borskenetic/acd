@@ -14,7 +14,6 @@ class ZendyTrackingService
     public const SESSION_RETURN_LOGGED = 'zendy_return_logged_for';
     public const SESSION_TAB_CLOSE_LOGGED = 'zendy_tab_close_logged_for';
     public const SESSION_EXTERNAL_NAV = 'zendy_external_nav_for';
-    public const SESSION_EXTERNAL_NAV = 'zendy_external_nav_for';
 
     public function logAccess(Request $request, string $action, ?ZendyUser $user = null, array $extra = []): ZendyLog
     {

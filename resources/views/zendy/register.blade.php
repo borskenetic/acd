@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="logo-wrap">
-    <img src="{{ asset('images/d.png') }}" alt="{{ config('app.name') }}">
+    <img src="{{ \App\Support\VersionedAsset::url('images/d.png') }}" alt="{{ config('app.name') }}">
 </div>
 
 <h1>Create account</h1>

@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Zendy Portal') — {{ config('app.name') }}</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/d.png') }}">
-    <link rel="stylesheet" href="{{ asset('css/zendy-app.css') }}?v=1">
+    <link rel="icon" type="image/png" href="{{ \App\Support\VersionedAsset::url('images/d.png') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/zendy-app.css') }}">
     @stack('styles')
     @yield('styles')
 </head>
@@ -21,7 +21,7 @@
 <div class="app-shell" id="appShell">
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
-            <img src="{{ asset('images/d.png') }}" alt="{{ config('app.name') }}">
+            <img src="{{ \App\Support\VersionedAsset::url('images/d.png') }}" alt="{{ config('app.name') }}">
             <div class="sidebar-brand-text">
                 <div class="sidebar-brand-title">Zendy Portal</div>
                 <div class="sidebar-brand-sub">{{ config('app.name') }}</div>
@@ -115,7 +115,7 @@
     </div>
 </div>
 
-<script src="{{ asset('js/sidebar.js') }}?v=1"></script>
+<script src="{{ \App\Support\VersionedAsset::url('js/sidebar.js') }}"></script>
 @stack('scripts')
 @yield('footer')
 </body>

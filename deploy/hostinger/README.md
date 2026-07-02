@@ -110,6 +110,18 @@ If you edit `acd/branding/` (without `public/`), the live site will **not** chan
 
 The app adds `?v=` via `Branding::stylesheetUrl()`. The version is an **MD5 of the file contents** (not the old file-modification timestamp), so when you save new colors the `?v=` value changes automatically. If LiteSpeed still serves stale CSS for the old `?v=`, purge cache once or set `BRANDING_ASSET_VERSION=2` in `.env` and run `php artisan config:clear`.
 
+### Zendy portal (`/zendy`)
+
+The Zendy UI uses **separate** assets (not `branding.css`). They must exist under **`public/`**:
+
+| File | Live URL (example) |
+|------|-------------------|
+| `public/css/zendy-app.css` | `https://acd.pantas.org/css/zendy-app.css?v=…` |
+| `public/js/sidebar.js` | `https://acd.pantas.org/js/sidebar.js?v=…` |
+| `public/images/d.png` | Portal logo (optional; page works without it) |
+
+If `/zendy` loads as plain HTML with no sidebar styling, open the CSS URL in the browser. **404** means the file was not uploaded to `public_html/acd/public/css/` (or document root is not `.../public`). After upload, run `php artisan view:clear` and purge LiteSpeed cache.
+
 ---
 
 ## Checklist after upload
@@ -120,7 +132,9 @@ The app adds `?v=` via `Branding::stylesheetUrl()`. The version is an **MD5 of t
 4. `php artisan migrate --force`.
 5. Permissions: `storage/` and `bootstrap/cache/` writable.
 6. Confirm document root is `.../acd/public`.
-7. Open `https://acd.pantas.org/up` — should return OK (health check).
+7. Upload Zendy assets: `public/css/zendy-app.css`, `public/js/sidebar.js` (see **Zendy portal** under Static files).
+8. Open `https://acd.pantas.org/up` — should return OK (health check).
+9. Open `https://acd.pantas.org/css/zendy-app.css` — should return CSS, not 404.
 
 ---
 

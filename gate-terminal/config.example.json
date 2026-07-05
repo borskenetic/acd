@@ -1,0 +1,6 @@
+{
+  "cloud_url": "http://127.0.0.1:8000",
+  "device_token": "paste_token_from_admin_gate_devices_page",
+  "port": 9173,
+  "sync_interval_seconds": 60
+}

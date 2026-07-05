@@ -97,7 +97,15 @@ class StudentController extends Controller
             'file' => 'required|file|mimes:csv,xlsx,xls|max:10240',
         ]);
 
-        Excel::import(new StudentsImport, $request->file('file'));
+        try {
+            Excel::import(new StudentsImport, $request->file('file'));
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $messages = collect($e->failures())
+                ->map(fn ($failure) => 'Row '.$failure->row().': '.implode(' ', $failure->errors()))
+                ->all();
+
+            return back()->withErrors(['file' => $messages]);
+        }
 
         return back()->with('success', 'Students imported successfully.');
     }

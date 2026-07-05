@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACD Gate Terminal (Offline)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="scan-kiosk-page">
+  <header class="header">
+    <div class="logo-title">
+      <img src="/assets/logo.png" alt="Logo" onerror="this.style.display='none'">
+      <div>
+        <div class="system-title">Library Gate</div>
+        <div id="syncBadge" class="sync-badge sync-badge--loading">Checking sync…</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <aside class="sidebar" id="scanSidebar">
+      <div class="date" id="currentDate"></div>
+      <div class="time" id="currentTime">--:--:--</div>
+      <div class="profile-pic">
+        <img id="profileImg" src="/assets/default-profile.jpg" alt="Profile">
+      </div>
+      <div id="earlyOutAlarm" class="early-out-alarm" hidden>
+        <div class="early-out-alarm__title">Early checkout not allowed</div>
+        <p class="early-out-alarm__message" id="earlyOutAlarmMessage"></p>
+        <p class="early-out-alarm__hint">Allowed after <strong id="earlyOutAlarmTime"></strong></p>
+      </div>
+    </aside>
+
+    <section class="divider" id="scanDivider">
+      <div class="scan-name-display" id="scanNameDisplay" hidden>
+        <div class="scan-name-welcome">Welcome,</div>
+        <div class="scan-name-text" id="scanNameText"></div>
+        <div class="scan-status-badge" id="scanStatusBadge"></div>
+        <div class="scan-name-timestamp" id="scanNameTimestamp"></div>
+      </div>
+    </section>
+
+    <section class="right-content">
+      <textarea id="qrcode" aria-label="Scan input" autofocus autocomplete="off"></textarea>
+      <div class="hint">Scan student ID — works offline. Visitors require the online gate.</div>
+    </section>
+  </main>
+
+  <footer class="footer1">
+    <div class="marquee-container">
+      <div class="marquee">Assumption College of Davao — Offline Gate Terminal</div>
+    </div>
+  </footer>
+
+  <div id="sectionModal" class="section-modal" hidden>
+    <div class="modal-content">
+      <h2>Select library section</h2>
+      <div class="section-buttons" id="sectionButtons"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

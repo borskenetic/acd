@@ -1,0 +1,7 @@
+# Local runtime
+node_modules/
+data/
+config.json
+
+# Logs
+*.log

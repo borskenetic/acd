@@ -2,21 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Console\Commands\NormalizeStudentNames;
-use App\Models\AttendanceLog;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Visitor;
 use App\Models\VisitorLog;
 use App\Services\AttendanceSessionService;
-use App\Services\AttendanceSmsService;
 use App\Services\AttendancePolicyService;
 use App\Services\FaceMatchService;
 use App\Services\StudentDeparturePolicy;
+use App\Services\StudentScanService;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
+    public function __construct(
+        protected StudentScanService $studentScan,
+    ) {}
     public function showScanner()
     {
         return view('attendance.scan', $this->scannerViewData());
@@ -36,20 +37,12 @@ class AttendanceController extends Controller
 
     protected function effectiveLogoutFeedbackEnabled(): bool
     {
-        if (! config('attendance.logout_feedback_enabled')) {
-            return false;
-        }
-
-        return Setting::logoutFeedbackEnabled();
+        return $this->studentScan->logoutFeedbackEnabled();
     }
 
     protected function effectiveSectionPickerEnabled(): bool
     {
-        if (! config('attendance.section_picker_enabled')) {
-            return false;
-        }
-
-        return Setting::sectionPickerEnabled();
+        return $this->studentScan->sectionPickerEnabled();
     }
 
     /** @return array<string, mixed> */
@@ -172,10 +165,10 @@ class AttendanceController extends Controller
     {
         $request->validate(['qrcode' => 'required|string']);
 
-        $student = $this->resolveStudent($request->qrcode);
+        $student = $this->studentScan->resolveStudent($request->qrcode);
 
         if ($student) {
-            return response()->json($this->buildScanResponse($student));
+            return response()->json($this->studentScan->previewScan($student));
         }
 
         $visitor = $this->resolveVisitor($request->qrcode);
@@ -210,53 +203,7 @@ class AttendanceController extends Controller
             ]);
         }
 
-        return response()->json($this->buildScanResponse($match['student']));
-    }
-
-    /** @return array<string, mixed> */
-    protected function buildScanResponse(Student $student): array
-    {
-        app(AttendanceSessionService::class)->closeStaleOpenInForStudent($student);
-
-        $sessions = app(AttendanceSessionService::class);
-        $lastLog = AttendanceLog::where('student_id', $student->id)
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->first();
-
-        $nextStatus = ($lastLog && $sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
-
-        $departure = app(StudentDeparturePolicy::class);
-        if ($nextStatus === 'OUT' && $departure->blocksCheckout($student)) {
-            return [
-                'type' => 'early_out_blocked',
-                'message' => $this->earlyOutMessage($departure),
-                'allowed_after' => $departure->earliestOutLabel(),
-                'student' => [
-                    'id' => $student->id,
-                    'firstname' => $student->firstname,
-                    'lastname' => $student->lastname,
-                    'profile_picture' => $student->profile_picture,
-                    'year' => $student->year,
-                    'educational_level' => $student->educational_level?->label()
-                        ?? $student->educational_level,
-                ],
-            ];
-        }
-
-        return [
-            'type' => 'student',
-            'next_status' => $nextStatus,
-            'student_id' => $student->id,
-            'logout_feedback_enabled' => $this->effectiveLogoutFeedbackEnabled(),
-            'section_picker_enabled' => $this->effectiveSectionPickerEnabled(),
-            'student' => [
-                'id' => $student->id,
-                'firstname' => $student->firstname,
-                'lastname' => $student->lastname,
-                'profile_picture' => $student->profile_picture,
-            ],
-        ];
+        return response()->json($this->studentScan->previewScan($match['student']));
     }
 
     public function processSection(Request $request)
@@ -267,47 +214,23 @@ class AttendanceController extends Controller
         ]);
 
         $section = $request->section ? trim((string) $request->section) : null;
-        if ($section !== null && $section !== '') {
-            $allowed = Setting::attendanceSections();
-            if (! in_array($section, $allowed, true)) {
-                return response()->json(['message' => 'Invalid section selected.'], 422);
-            }
-        } else {
-            $section = null;
-        }
-
         $student = Student::findOrFail($request->student_id);
-        $sessions = app(AttendanceSessionService::class);
-        $sessions->closeStaleOpenInForStudent($student);
 
-        $lastLog = AttendanceLog::where('student_id', $student->id)
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->first();
-
-        $newStatus = ($lastLog && $sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
-
-        $departure = app(StudentDeparturePolicy::class);
-        if ($newStatus === 'OUT' && $departure->blocksCheckout($student)) {
+        try {
+            $result = $this->studentScan->recordScan($student, $section);
+        } catch (\RuntimeException $e) {
             return response()->json([
-                'message' => $this->earlyOutMessage($departure),
-                'allowed_after' => $departure->earliestOutLabel(),
+                'message' => $e->getMessage(),
+                'allowed_after' => app(StudentDeparturePolicy::class)->earliestOutLabel(),
             ], 403);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $log = AttendanceLog::create([
-            'student_id' => $student->id,
-            'section' => $section,
-            'status' => $newStatus,
-            'scanned_at' => now(),
-        ]);
-
-        app(AttendanceSmsService::class)->handleStudentScan($student, $newStatus, $log->scanned_at);
 
         return response()->json([
-            'status' => $newStatus,
-            'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
-            'logout_feedback_enabled' => $this->effectiveLogoutFeedbackEnabled(),
+            'status' => $result['status'],
+            'scanned_at' => $result['scanned_at'],
+            'logout_feedback_enabled' => $this->studentScan->logoutFeedbackEnabled(),
         ]);
     }
 
@@ -394,67 +317,5 @@ class AttendanceController extends Controller
 
         return redirect()->route('attendance.changeVideo')->with('success', 'Video uploaded successfully!');
     }
-
-    private function earlyOutMessage(StudentDeparturePolicy $departure): string
-    {
-        return str_replace(
-            '{time}',
-            $departure->earliestOutLabel(),
-            $departure->blockMessage()
-        );
-    }
-
-    private function resolveStudent(string $raw): ?Student
-    {
-        $token = trim(str_replace("\r", '', $raw));
-        $student = Student::where('qrcode', $token)->first();
-
-        if (! $student && $token !== '') {
-            $student = Student::where('rfid', $token)->first();
-        }
-
-        $parsed = $this->parseQr($raw);
-
-        if (! $student && $parsed['student_no']) {
-            $student = Student::where('student_id', $parsed['student_no'])->first();
-        }
-
-        if (! $student && $parsed['full_name']) {
-            $qrName = NormalizeStudentNames::normalizeFullName($parsed['full_name']);
-            $student = Student::where('normalized_name', $qrName)->first();
-        }
-
-        return $student;
-    }
-
-    private function parseQr(string $raw): array
-    {
-        $raw = trim(str_replace("\r", '', $raw));
-
-        if (str_contains($raw, "\n")) {
-            $lines = array_values(array_filter(array_map('trim', explode("\n", $raw))));
-
-            return [
-                'student_no' => $lines[0] ?? null,
-                'full_name' => $lines[1] ?? null,
-                'course' => $lines[2] ?? null,
-            ];
-        }
-
-        $parts = array_map('trim', explode(',', $raw));
-
-        if (preg_match('/^\d{2}-\d+$/', $parts[0] ?? '')) {
-            return [
-                'student_no' => $parts[0] ?? null,
-                'full_name' => $parts[1] ?? null,
-                'course' => $parts[2] ?? null,
-            ];
-        }
-
-        return [
-            'student_no' => null,
-            'full_name' => $parts[0] ?? null,
-            'course' => $parts[1] ?? null,
-        ];
-    }
 }
+

@@ -68,6 +68,7 @@
     $adminChildren = [
         ['label' => 'School Setup', 'route' => 'school-setup.index', 'patterns' => ['school-setup.*', 'prospectus.*'], 'icon' => 'grid'],
         ['label' => 'Attendance Policy', 'route' => 'attendance.policy.settings', 'patterns' => ['attendance.policy.settings', 'attendance.policy.settings.update'], 'icon' => 'clock'],
+        ['label' => 'Gate Devices', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
         ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'],
         [
             'label'    => 'Accounts',

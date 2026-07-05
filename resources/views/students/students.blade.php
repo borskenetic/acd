@@ -67,13 +67,23 @@
         <a href="{{ route('employees.index') }}" class="sp-tab">Employees</a>
     </nav>
 
-    @if(session('success') || session('error') || session('rfid_import_report'))
+    @if(session('success') || session('error') || session('rfid_import_report') || $errors->any())
         <div class="sp-alerts">
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
             @endif
             @if(session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
+            @endif
+            @if($errors->any())
+                <div class="alert alert-danger text-start mb-0">
+                    <strong>Import failed</strong>
+                    <ul class="small mb-0 mt-2">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
             @if(session('rfid_import_report'))
                 @php $rfidReport = session('rfid_import_report'); @endphp
@@ -284,5 +294,18 @@
             </div>
         </div>
     </div>
+
+    @if($errors->any())
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const modal = document.getElementById('spImportModal');
+                    if (modal) {
+                        bootstrap.Modal.getOrCreateInstance(modal).show();
+                    }
+                });
+            </script>
+        @endpush
+    @endif
 @endcan
 @endsection

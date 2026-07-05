@@ -29,6 +29,7 @@ use App\Http\Controllers\ZendyPendingController;
 use App\Http\Controllers\ZendyRegistrationController;
 use App\Http\Controllers\ZendyReportController;
 use App\Http\Controllers\ZendyUserController;
+use App\Http\Controllers\GateDeviceController;
 use App\Http\Controllers\PlatformActivityLogController;
 use Illuminate\Support\Facades\Route;
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -178,6 +179,10 @@ Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/attendance/policy', [AttendanceController::class, 'policySettings'])->name('attendance.policy.settings');
     Route::post('/attendance/policy', [AttendanceController::class, 'updatePolicySettings'])->name('attendance.policy.settings.update');
+    Route::get('/gate-devices', [GateDeviceController::class, 'index'])->name('gate_devices.index');
+    Route::post('/gate-devices', [GateDeviceController::class, 'store'])->name('gate_devices.store');
+    Route::put('/gate-devices/{gateDevice}', [GateDeviceController::class, 'update'])->name('gate_devices.update');
+    Route::delete('/gate-devices/{gateDevice}', [GateDeviceController::class, 'destroy'])->name('gate_devices.destroy');
 
     Route::get('/register-student', [StudentController::class, 'create'])->name('students.create');
     Route::post('/register-student', [StudentController::class, 'store'])->name('students.store');

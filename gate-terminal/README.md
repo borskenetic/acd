@@ -1,74 +1,68 @@
 # ACD Offline Gate Terminal
 
-Local gate app for student QR/RFID scanning when internet is unavailable. Scans are stored in SQLite and uploaded to the cloud Laravel app when connectivity returns.
+Local gate app for student scanning when internet is down. **Visitors still use the online gate.**
 
-**Visitors are not supported offline** — use the online gate at `/attendance` for visitor passes.
+---
 
-## Prerequisites
+## For guards (daily use)
 
-- Node.js 18+
-- Running ACD online app with gate sync API enabled
-- A gate device token from **Admin → Gate Devices**
+1. Double-click **`Start Gate.bat`** (or desktop shortcut **Start Library Gate**)
+2. For testing without a scanner: **`Start Gate (Test Mode).bat`** or press **F2** on the scan screen
+2. Wait for the scan screen to open
+3. **Minimize** the black window titled **"DO NOT CLOSE"** — do not close it
+4. Scan student IDs as usual
 
-## Setup
+Read **`GUARD INSTRUCTIONS.txt`** for full steps.
 
-1. Copy config:
+---
 
-   ```bash
-   cd gate-terminal
-   copy config.example.json config.json
-   ```
+## For IT (first install on gate PC)
 
-2. Edit `config.json`:
+### Requirements
 
-   ```json
-   {
-     "cloud_url": "https://your-acd-server.example.com",
-     "device_token": "gate_....",
-     "port": 9173,
-     "sync_interval_seconds": 60
-   }
-   ```
+- Windows 10/11
+- [Node.js 18+](https://nodejs.org) (LTS)
+- Gate device token from **Admin → Gate Devices** on the server
 
-3. Install and run:
+### Steps
 
-   ```bash
-   npm install
-   npm start
-   ```
+1. Copy the whole `gate-terminal` folder to the gate PC (e.g. `D:\acd_gate\gate-terminal`)
+2. On the server: `php artisan migrate` (if not done)
+3. Admin → **Gate Devices** → register device → copy token
+4. Double-click **`Setup Gate (First Time).bat`**
+5. Edit `config.json` when Notepad opens (`cloud_url` + `device_token`)
+6. Double-click **`Create Desktop Shortcut (IT).bat`** — puts shortcut + instructions on desktop
 
-4. Open **http://127.0.0.1:9173** full-screen on the gate PC.
+### Daily (guards)
 
-## How it works
+| File | Purpose |
+|------|---------|
+| **Start Gate.bat** | Start gate + open scan screen |
+| **Stop Gate.bat** | Stop server (end of day / troubleshooting) |
+| **Sync Now.bat** | Force upload/download (IT only) |
 
-| Step | Behavior |
-|------|----------|
-| Startup | Pulls student roster + gate settings from `GET /api/gate/roster` |
-| Scan | Looks up student locally, toggles IN/OUT, queues log in SQLite |
-| Online | Pushes queued scans to `POST /api/gate/attendance` every 60s |
-| Offline | Scans still work; badge shows pending upload count |
+---
 
-## Manual sync
+## Manual commands (optional)
 
 ```bash
+npm install
+npm start
 npm run sync
 ```
 
-## Cloud admin
+Scan screen: **http://127.0.0.1:9173**
 
-Register devices at **Admin → Gate Devices**. Copy the one-time token into `config.json`.
+---
 
-Sync API (Bearer token):
+## Troubleshooting
 
-- `GET /api/gate/health`
-- `GET /api/gate/roster?since=ISO8601`
-- `POST /api/gate/attendance`
+| Problem | Fix |
+|---------|-----|
+| "Node.js is not installed" | Install from nodejs.org, restart PC, run Setup again |
+| "Gate is not set up yet" | Run **Setup Gate (First Time).bat** |
+| Scans don't appear | Is the black server window still open? |
+| Unknown student offline | Connect internet; run **Sync Now.bat** |
+| Visitors | Use online gate at `/attendance` |
 
-## Assets (optional)
-
-Place branding assets in `public/assets/`:
-
-- `logo.png`
-- `default-profile.jpg`
-
-If missing, the UI still works with text-only header.
+If `npm install` fails on `better-sqlite3`, install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) → "Desktop development with C++", then run Setup again.

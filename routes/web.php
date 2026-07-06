@@ -84,7 +84,9 @@ Route::middleware(['auth:zendy'])->prefix('zendy')->name('zendy.')->group(functi
 
 Route::middleware(['auth:zendy', 'can:zendyAdmin'])->prefix('zendy')->name('zendy.')->group(function () {
     Route::get('/logs', [ZendyController::class, 'index'])->name('logs');
+    Route::get('/logs/export', [ZendyController::class, 'exportLogs'])->name('logs.export');
     Route::get('/reports', [ZendyReportController::class, 'index'])->name('reports');
+    Route::get('/reports/export', [ZendyReportController::class, 'export'])->name('reports.export');
 
     Route::get('/users', [ZendyUserController::class, 'index'])->name('users.index');
     Route::get('/users/create', [ZendyUserController::class, 'create'])->name('users.create');

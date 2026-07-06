@@ -4,6 +4,10 @@
 @section('page_subtitle', 'Usage analytics and trends')
 
 @section('content')
+<div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+    <a href="{{ route('zendy.reports.export', request()->query()) }}" class="btn-app btn-outline-app">Download CSV</a>
+</div>
+
 <div class="card-grid">
     <div class="stat-card">
         <div class="stat-label">Total Launches</div>

@@ -1,65 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <title>ACD — Gate Terminal (Offline)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ACD Gate Terminal (Offline)</title>
+  <link rel="stylesheet" href="/css/branding.css">
+  <link rel="stylesheet" href="/css/scan.css">
+  <link rel="stylesheet" href="/css/gate-overrides.css">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="scan-kiosk-page">
-  <header class="header">
+
+<div id="syncBadge" class="gate-sync-badge gate-sync-badge--loading" aria-live="polite">Checking connection…</div>
+
+<header>
+  <div class="header">
     <div class="logo-title">
-      <img src="/assets/logo.png" alt="Logo" onerror="this.style.display='none'">
-      <div>
-        <div class="system-title">Library Gate</div>
-        <div id="syncBadge" class="sync-badge sync-badge--loading">Checking sync…</div>
-      </div>
+      <img src="/images/pantasLogo.png" alt="Logo" onerror="this.src='/images/d.png'; this.onerror=null;">
     </div>
-  </header>
+  </div>
+</header>
 
-  <main class="main">
-    <aside class="sidebar" id="scanSidebar">
-      <div class="date" id="currentDate"></div>
-      <div class="time" id="currentTime">--:--:--</div>
-      <div class="profile-pic">
-        <img id="profileImg" src="/assets/default-profile.jpg" alt="Profile">
-      </div>
-      <div id="earlyOutAlarm" class="early-out-alarm" hidden>
-        <div class="early-out-alarm__title">Early checkout not allowed</div>
-        <p class="early-out-alarm__message" id="earlyOutAlarmMessage"></p>
-        <p class="early-out-alarm__hint">Allowed after <strong id="earlyOutAlarmTime"></strong></p>
-      </div>
-    </aside>
-
-    <section class="divider" id="scanDivider">
-      <div class="scan-name-display" id="scanNameDisplay" hidden>
-        <div class="scan-name-welcome">Welcome,</div>
-        <div class="scan-name-text" id="scanNameText"></div>
-        <div class="scan-status-badge" id="scanStatusBadge"></div>
-        <div class="scan-name-timestamp" id="scanNameTimestamp"></div>
-      </div>
-    </section>
-
-    <section class="right-content">
-      <textarea id="qrcode" aria-label="Scan input" autofocus autocomplete="off"></textarea>
-      <div class="hint">Scan student ID — works offline. Visitors require the online gate.</div>
-    </section>
-  </main>
-
-  <footer class="footer1">
-    <div class="marquee-container">
-      <div class="marquee">Assumption College of Davao — Offline Gate Terminal</div>
+<div class="main">
+  <div class="sidebar" id="scanSidebar">
+    <div class="date" id="currentDate">Date</div>
+    <div class="time" id="currentTime">--:--:--</div>
+    <div class="profile-pic">
+      <img src="/images/2x2_undifined_gender.jpg" alt="Default Profile" id="profileImg"
+           onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22%3E%3Crect fill=%22%23e3f4fc%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23125a82%22 font-size=%2218%22%3EPhoto%3C/text%3E%3C/svg%3E'">
     </div>
-  </footer>
-
-  <div id="sectionModal" class="section-modal" hidden>
-    <div class="modal-content">
-      <h2>Select library section</h2>
-      <div class="section-buttons" id="sectionButtons"></div>
+    <div id="earlyOutAlarm" class="early-out-alarm" hidden aria-live="assertive" role="alert">
+      <div class="early-out-alarm__icon">⚠</div>
+      <div class="early-out-alarm__title">Early checkout not allowed</div>
+      <p class="early-out-alarm__message" id="earlyOutAlarmMessage"></p>
+      <p class="early-out-alarm__hint">Allowed after <strong id="earlyOutAlarmTime">4:00 PM</strong></p>
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <div class="sidebar-divider" id="scanDivider">
+    <div class="scan-name-display" id="scanNameDisplay" hidden>
+      <div class="scan-name-welcome">Welcome,</div>
+      <div class="scan-name-text" id="scanNameText"></div>
+      <div class="scan-status-badge" id="scanStatusBadge"></div>
+      <div class="scan-name-timestamp" id="scanNameTimestamp"></div>
+    </div>
+  </div>
+
+  <div class="right-content">
+    <form id="scanForm">
+      <textarea name="qrcode" id="qrcode" style="opacity:0; position:absolute;" autofocus autocomplete="off"></textarea>
+    </form>
+    <video muted autoplay loop playsinline class="ads-vid" id="gateVideo">
+      <source src="/videos/area51_product_slideshow.mp4" type="video/mp4">
+    </video>
+  </div>
+</div>
+
+<footer>
+  <div class="footer1">
+    <div class="footer-logo">
+      <div class="marquee-container">
+        <div class="marquee">
+          <span id="footerAppName">Assumption College of Davao</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div id="sectionModal" class="section-modal" aria-hidden="true" style="display:none;">
+  <div class="modal-content section-picker-modal">
+    <h2>Select library section</h2>
+    <div class="section-buttons" id="sectionButtons"></div>
+  </div>
+</div>
+
+<audio id="scanAlarmSound" src="/sounds/alarm.wav" preload="auto"></audio>
+
+<div id="testPanel" class="gate-test-panel" hidden>
+  <div class="gate-test-panel__inner">
+    <strong>Test mode</strong> (no scanner) — F2 to hide
+    <div class="gate-test-panel__row">
+      <select id="testStudentSelect" class="gate-test-select">
+        <option value="">Pick a student…</option>
+      </select>
+      <input type="text" id="testManualInput" class="gate-test-input" placeholder="Or type QR / school ID / RFID">
+      <button type="button" id="testScanBtn" class="gate-test-btn">Simulate scan</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
 </body>
 </html>

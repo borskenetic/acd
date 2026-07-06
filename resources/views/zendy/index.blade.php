@@ -4,6 +4,10 @@
 @section('page_subtitle', 'Search and filter activity events')
 
 @section('content')
+@php
+    $query = request()->query();
+@endphp
+
 <form action="{{ route('zendy.logs') }}" method="GET" class="card-surface" style="margin-bottom: 20px;">
     <div class="filter-bar">
         <input type="text" name="search_name" class="form-control-app" placeholder="Search name..." value="{{ request('search_name') }}" style="flex: 1; min-width: 140px;">
@@ -22,6 +26,7 @@
         </select>
         <button type="submit" class="btn-app btn-primary-app">Filter</button>
         <a href="{{ route('zendy.logs') }}" class="btn-app btn-outline-app">Reset</a>
+        <a href="{{ route('zendy.logs.export', $query) }}" class="btn-app btn-outline-app">Download Excel</a>
     </div>
 </form>
 

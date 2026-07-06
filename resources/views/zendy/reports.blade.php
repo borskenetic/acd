@@ -1,12 +1,34 @@
 @extends('layouts.zen')
 
 @section('page_title', 'Reports')
-@section('page_subtitle', 'Usage analytics and trends')
+@section('page_subtitle', 'Usage analytics and trends — filter by date, course, campus, or event')
 
 @section('content')
-<div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-    <a href="{{ route('zendy.reports.export', request()->query()) }}" class="btn-app btn-outline-app">Download CSV</a>
-</div>
+@php
+    $query = request()->query();
+@endphp
+
+<form action="{{ route('zendy.reports') }}" method="GET" class="card-surface" style="margin-bottom: 20px;">
+    <div class="filter-bar">
+        <input type="text" name="search_name" class="form-control-app" placeholder="Search name..." value="{{ request('search_name') }}" style="flex: 1; min-width: 140px;">
+        <input type="text" name="search_course" class="form-control-app" placeholder="Course" value="{{ request('search_course') }}" style="flex: 1; min-width: 120px;">
+        <input type="text" name="search_campus" class="form-control-app" placeholder="Campus" value="{{ request('search_campus') }}" style="flex: 1; min-width: 120px;">
+        <input type="date" name="from_date" class="form-control-app" value="{{ request('from_date') }}">
+        <input type="date" name="to_date" class="form-control-app" value="{{ request('to_date') }}">
+        <select name="action" class="form-control-app">
+            <option value="">All events</option>
+            <option value="zendy_launch" {{ request('action') === 'zendy_launch' ? 'selected' : '' }}>Launch</option>
+            <option value="go_to_zendy" {{ request('action') === 'go_to_zendy' ? 'selected' : '' }}>Direct link</option>
+            <option value="zendy_return" {{ request('action') === 'zendy_return' ? 'selected' : '' }}>Return</option>
+            <option value="zendy_tab_close" {{ request('action') === 'zendy_tab_close' ? 'selected' : '' }}>Tab closed</option>
+            <option value="zendy_form_submission" {{ request('action') === 'zendy_form_submission' ? 'selected' : '' }}>Form</option>
+            <option value="zendy_sso" {{ request('action') === 'zendy_sso' ? 'selected' : '' }}>Sign-on</option>
+        </select>
+        <button type="submit" class="btn-app btn-primary-app">Filter</button>
+        <a href="{{ route('zendy.reports') }}" class="btn-app btn-outline-app">Reset</a>
+        <a href="{{ route('zendy.reports.export', $query) }}" class="btn-app btn-outline-app">Download CSV</a>
+    </div>
+</form>
 
 <div class="card-grid">
     <div class="stat-card">

@@ -10,6 +10,26 @@ const {
 
 const TZ = 'Asia/Manila';
 
+/** Philippine local time with +08:00 (avoids UTC offset in cloud uploads). */
+function manilaLocalIso(date = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value])
+  );
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+08:00`;
+}
+
 function isInStatus(status) {
   return status != null && String(status).trim().toLowerCase() === 'in';
 }
@@ -38,7 +58,7 @@ function closeStaleOpenIn(student) {
     return student;
   }
 
-  const outAt = endOfDay(last).toISOString();
+  const outAt = manilaLocalIso(endOfDay(last));
   updateStudentLastLog(student.cloud_id, 'OUT', outAt);
 
   return {
@@ -136,7 +156,7 @@ function recordScan(rawToken, section = null) {
 
   const student = findStudentByToken(rawToken);
   const status = preview.next_status;
-  const scannedAt = new Date().toISOString();
+  const scannedAt = manilaLocalIso();
   const clientUuid = uuidv4();
 
   insertLocalLog({

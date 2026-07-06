@@ -72,7 +72,7 @@ class GateSyncController extends Controller
             }
 
             try {
-                $scannedAt = Carbon::parse($row['scanned_at']);
+                $scannedAt = Carbon::parse($row['scanned_at'])->timezone(config('app.timezone'));
                 $log = $scanService->recordSyncedScan(
                     $student,
                     strtoupper($row['status']),

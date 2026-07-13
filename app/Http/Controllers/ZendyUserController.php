@@ -23,7 +23,12 @@ class ZendyUserController extends Controller
             'role' => ['required', Rule::in(array_keys(ZendyUser::roleOptions()))],
             'campus' => 'nullable|string|max:255',
             'department' => 'nullable|string|max:255',
-            'course' => 'nullable|string|max:255|required_if:role,student',
+            'course' => [
+                Rule::requiredIf(fn () => ZendyUser::isStudentRole(request('role'))),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'password' => $zendyUser ? 'nullable|string|min:6' : 'required|string|min:6',
         ];
     }
@@ -72,7 +77,7 @@ class ZendyUserController extends Controller
             'role' => $validated['role'],
             'campus' => $validated['campus'] ?? null,
             'department' => $validated['department'] ?? null,
-            'course' => $validated['role'] === 'student' ? ($validated['course'] ?? null) : null,
+            'course' => ZendyUser::isStudentRole($validated['role']) ? ($validated['course'] ?? null) : null,
             'password' => Hash::make($validated['password']),
         ]);
 
@@ -98,7 +103,7 @@ class ZendyUserController extends Controller
             'role' => $validated['role'],
             'campus' => $validated['campus'] ?? null,
             'department' => $validated['department'] ?? null,
-            'course' => $validated['role'] === 'student' ? ($validated['course'] ?? null) : null,
+            'course' => ZendyUser::isStudentRole($validated['role']) ? ($validated['course'] ?? null) : null,
         ];
 
         if (! empty($validated['password'])) {

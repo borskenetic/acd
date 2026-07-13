@@ -7,8 +7,8 @@
     <img src="{{ \App\Support\VersionedAsset::url('images/d.png') }}" alt="{{ config('app.name') }}">
 </div>
 
-<h1>Create account</h1>
-<p class="subtitle">Register for Zendy access — pending admin approval</p>
+<h1>Create an account</h1>
+<p class="subtitle">Welcome! Create your account to access publications on the Zendy portal — pending admin approval.</p>
 
 @if ($errors->any())
     <div class="alert-app alert-danger-app">
@@ -20,26 +20,28 @@
     </div>
 @endif
 
-<div class="role-pills">
-    <button type="button" class="role-pill active" data-role="student">Student</button>
-    <button type="button" class="role-pill" data-role="faculty">Faculty</button>
-    <button type="button" class="role-pill" data-role="staff">Staff</button>
-    <button type="button" class="role-pill" data-role="librarian">Librarian</button>
-</div>
-
 <form method="POST" action="{{ route('zendy.register.store') }}">
     @csrf
-    <input type="hidden" name="role" id="inputRole" value="{{ old('role', 'student') }}">
 
     <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div class="form-group-app">
-            <label for="firstname">First name</label>
-            <input type="text" id="firstname" name="firstname" class="form-control-app" value="{{ old('firstname') }}" required>
+            <label for="firstname">First name <span aria-hidden="true">*</span></label>
+            <input type="text" id="firstname" name="firstname" class="form-control-app" value="{{ old('firstname') }}" placeholder="First name" required>
         </div>
         <div class="form-group-app">
-            <label for="lastname">Last name</label>
-            <input type="text" id="lastname" name="lastname" class="form-control-app" value="{{ old('lastname') }}" required>
+            <label for="lastname">Last name <span aria-hidden="true">*</span></label>
+            <input type="text" id="lastname" name="lastname" class="form-control-app" value="{{ old('lastname') }}" placeholder="Last name" required>
         </div>
+    </div>
+
+    <div class="form-group-app">
+        <label for="role">Role <span aria-hidden="true">*</span></label>
+        <select id="role" name="role" class="form-control-app" required>
+            <option value="" disabled {{ old('role') ? '' : 'selected' }}>Select role</option>
+            @foreach (\App\Models\ZendyUser::registerableRoleOptions() as $value => $label)
+                <option value="{{ $value }}" {{ old('role') === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
     </div>
 
     <div class="form-group-app">
@@ -83,29 +85,22 @@
 @push('scripts')
 <script>
 (function () {
-    var roleInput = document.getElementById('inputRole');
+    var roleSelect = document.getElementById('role');
     var wrapCourse = document.getElementById('wrapCourse');
     var courseInput = document.getElementById('course');
+    var studentRoles = @json(\App\Models\ZendyUser::studentRoleKeys());
 
-    function setRole(role) {
-        roleInput.value = role;
-        document.querySelectorAll('.role-pill').forEach(function (btn) {
-            btn.classList.toggle('active', btn.getAttribute('data-role') === role);
-        });
-
-        var isStudent = role === 'student';
+    function syncCourseField() {
+        var isStudent = studentRoles.indexOf(roleSelect.value) !== -1;
         wrapCourse.style.display = isStudent ? '' : 'none';
         courseInput.required = isStudent;
-        if (!isStudent) courseInput.value = '';
+        if (!isStudent) {
+            courseInput.value = '';
+        }
     }
 
-    document.querySelectorAll('.role-pill').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            setRole(btn.getAttribute('data-role'));
-        });
-    });
-
-    setRole(@json(old('role', 'student')));
+    roleSelect.addEventListener('change', syncCourseField);
+    syncCourseField();
 })();
 </script>
 @endpush

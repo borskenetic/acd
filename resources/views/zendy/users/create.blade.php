@@ -85,8 +85,9 @@
     var roleSelect = document.getElementById('role');
     var courseField = document.getElementById('courseField');
     var courseInput = document.getElementById('course');
+    var studentRoles = @json(\App\Models\ZendyUser::studentRoleKeys());
     function sync() {
-        var isStudent = roleSelect.value === 'student';
+        var isStudent = studentRoles.indexOf(roleSelect.value) !== -1;
         courseField.style.display = isStudent ? '' : 'none';
         courseInput.required = isStudent;
     }

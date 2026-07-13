@@ -17,7 +17,7 @@ class ZendyRegistrationController extends Controller
 
     public function store(Request $request)
     {
-        $allowedRoles = array_diff(array_keys(ZendyUser::roleOptions()), ['admin']);
+        $allowedRoles = array_keys(ZendyUser::registerableRoleOptions());
 
         $validated = $request->validate([
             'role' => ['required', Rule::in($allowedRoles)],
@@ -32,7 +32,12 @@ class ZendyRegistrationController extends Controller
             'password' => 'required|min:6',
             'campus' => 'nullable|string|max:255',
             'department' => 'nullable|string|max:255',
-            'course' => 'required_if:role,student|nullable|string|max:255',
+            'course' => [
+                Rule::requiredIf(fn () => ZendyUser::isStudentRole($request->input('role'))),
+                'nullable',
+                'string',
+                'max:255',
+            ],
         ]);
 
         PendingUser::create([
@@ -42,7 +47,7 @@ class ZendyRegistrationController extends Controller
             'password' => Hash::make($validated['password']),
             'campus' => $validated['campus'] ?? null,
             'department' => $validated['department'] ?? null,
-            'course' => $validated['role'] === 'student' ? ($validated['course'] ?? null) : null,
+            'course' => ZendyUser::isStudentRole($validated['role']) ? ($validated['course'] ?? null) : null,
             'role' => $validated['role'],
         ]);
 

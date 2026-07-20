@@ -85,6 +85,12 @@
                             @error('student_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6">
+                            <label for="lrn" class="form-label">LRN</label>
+                            <input type="text" name="lrn" id="lrn" class="form-control @error('lrn') is-invalid @enderror"
+                                   value="{{ old('lrn', $student->lrn) }}" placeholder="Learner Reference Number (optional)">
+                            @error('lrn')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
                             <label for="mobile_number" class="form-label">Mobile number</label>
                             <input type="text" name="mobile_number" id="mobile_number" class="form-control"
                                    value="{{ old('mobile_number', $student->mobile_number) }}">

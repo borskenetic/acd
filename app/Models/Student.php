@@ -11,6 +11,7 @@ class Student extends Model
     protected $fillable = [
         'record_id',
         'student_id',
+        'lrn',
         'firstname',
         'lastname',
         'course',

@@ -60,7 +60,8 @@ class StudentController extends Controller
                     ->orWhere('firstname', 'like', "%{$search}%")
                     ->orWhere('course', 'like', "%{$search}%")
                     ->orWhere('qrcode', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%");
+                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('lrn', 'like', "%{$search}%");
             });
         }
 
@@ -192,6 +193,7 @@ class StudentController extends Controller
         // Validation
         $validated = $request->validate([
             'student_id' => 'required|string|max:255|unique:students,student_id',
+            'lrn' => 'nullable|string|max:32|unique:students,lrn',
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
             'middle_initial' => 'nullable|string|max:255',
@@ -262,6 +264,7 @@ class StudentController extends Controller
         $validated['normalized_name'] = NormalizeStudentNames::normalizeFullName(
             $validated['firstname'].' '.$validated['lastname']
         );
+        $validated['lrn'] = filled($validated['lrn'] ?? null) ? $validated['lrn'] : null;
 
         Student::create($validated);
 
@@ -285,6 +288,7 @@ class StudentController extends Controller
     
         $validated = $request->validate([
             'student_id' => 'required|string|max:255|unique:students,student_id,' . $id,
+            'lrn' => 'nullable|string|max:32|unique:students,lrn,' . $id,
             'lastname' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
             'middle_initial' => 'nullable|string|max:255',
@@ -371,6 +375,7 @@ class StudentController extends Controller
         $validated['normalized_name'] = NormalizeStudentNames::normalizeFullName(
             $validated['firstname'].' '.$validated['lastname']
         );
+        $validated['lrn'] = filled($validated['lrn'] ?? null) ? $validated['lrn'] : null;
 
         $student->update($validated);
     

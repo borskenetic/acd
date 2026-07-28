@@ -112,7 +112,19 @@ class StudentScanService
             ];
         }
 
+        // SHS / College (and unmatched years): still enforce anti-rescan cooldown.
         $lastLog = $this->lastLogForStudent($student);
+        $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog);
+        if ($cooldown !== null) {
+            return [
+                'type' => 'already_scanned',
+                'message' => $cooldown['message'],
+                'session_label' => $cooldown['session_label'] ?? 'current',
+                'last_status' => $cooldown['last_status'] ?? null,
+                'student' => $this->studentPayload($student, detailed: true),
+            ];
+        }
+
         $nextStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
 
         if ($nextStatus === 'OUT' && $this->departure->blocksCheckout($student)) {
@@ -170,6 +182,11 @@ class StudentScanService
             $sessionKeyResolved = $decision['session_key'] ?? null;
         } else {
             $lastLog = $this->lastLogForStudent($student);
+            $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog, $scannedAt);
+            if ($cooldown !== null) {
+                throw new \RuntimeException($cooldown['message'] ?? 'Already scanned.');
+            }
+
             $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
 
             if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {

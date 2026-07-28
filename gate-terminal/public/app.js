@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (isCooldown) return;
     isCooldown = true;
-    setTimeout(() => { isCooldown = false; }, 300);
+    setTimeout(() => { isCooldown = false; }, 2500);
 
     clearDisplay();
 

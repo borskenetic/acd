@@ -270,6 +270,7 @@ function formatDisplayTime(iso) {
 function previewScan(rawToken) {
   const settings = getSettings();
   let student = findStudentByToken(rawToken);
+  const at = new Date();
 
   if (!student) {
     return {
@@ -280,7 +281,7 @@ function previewScan(rawToken) {
 
   student = closeStaleOpenIn(student);
 
-  const sessionDecision = decideSessionScan(student, settings);
+  const sessionDecision = decideSessionScan(student, settings, at);
   if (sessionDecision.type === 'already_scanned') {
     return {
       type: 'already_scanned',
@@ -314,7 +315,23 @@ function previewScan(rawToken) {
     };
   }
 
-  // SHS / College: simple toggle
+  // SHS / College (and unmatched years): simple toggle + anti-rescan cooldown
+  if (student.last_log_scanned_at) {
+    const lastAt = new Date(student.last_log_scanned_at);
+    const sessions = settings?.attendance_sessions || {};
+    const mins = Number(sessions.cooldown_minutes ?? 15);
+    if ((at - lastAt) / 1000 < mins * 60) {
+      const lastStatus = isInStatus(student.last_log_status) ? 'IN' : 'OUT';
+      return {
+        type: 'already_scanned',
+        message: alreadyScannedMessage(lastStatus, 'current'),
+        session_label: 'current',
+        last_status: lastStatus,
+        student: studentPayload(student),
+      };
+    }
+  }
+
   const lastIn = isInStatus(student.last_log_status);
   const nextStatus = lastIn ? 'OUT' : 'IN';
 

@@ -307,7 +307,7 @@
       e.preventDefault();
       if (isCooldown) return;
       isCooldown = true;
-      setTimeout(() => { isCooldown = false; }, 300);
+      setTimeout(() => { isCooldown = false; }, 2500);
 
       const formData = new FormData();
       formData.append('qrcode', input.value.trim().replace(/\r/g, ''));

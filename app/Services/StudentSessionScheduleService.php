@@ -315,10 +315,46 @@ class StudentSessionScheduleService
 
     public function isWithinCooldown(Student $student, AttendanceLog $last, Carbon $at): bool
     {
+        if (! $last->scanned_at) {
+            return false;
+        }
+
         $minutes = $this->cooldownMinutes($student, $at);
         $lastAt = $last->scanned_at->copy()->timezone($this->timezone());
+        $at = $at->copy()->timezone($this->timezone());
 
-        return $lastAt->diffInSeconds($at, false) < ($minutes * 60);
+        // Prefer absolute elapsed seconds so Carbon version quirks can't invert the check.
+        $elapsed = $lastAt->diffInSeconds($at, true);
+
+        return $elapsed < ($minutes * 60);
+    }
+
+    /**
+     * Cooldown check usable for session and non-session students.
+     *
+     * @return array{type: string, message?: string, session_label?: string, last_status?: string}|null
+     */
+    public function cooldownBlockIfNeeded(Student $student, ?AttendanceLog $last, ?Carbon $at = null): ?array
+    {
+        if (! $last || ! $last->scanned_at) {
+            return null;
+        }
+
+        $at ??= Carbon::now($this->timezone());
+        if (! $this->isWithinCooldown($student, $last, $at)) {
+            return null;
+        }
+
+        $lastStatus = strtoupper((string) $last->status);
+        $sameDay = $last->scanned_at->copy()->timezone($this->timezone())->isSameDay($at);
+        $sessionLabel = $sameDay ? 'current' : 'today';
+
+        return [
+            'type' => 'already_scanned',
+            'message' => $this->alreadyScannedMessage($lastStatus, $sessionLabel),
+            'session_label' => $sessionLabel,
+            'last_status' => $lastStatus,
+        ];
     }
 
     public function alreadyScannedMessage(string $status, string $sessionLabel): string

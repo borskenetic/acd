@@ -18,6 +18,16 @@ class Setting extends Model
 
     public const KEY_SCAN_SMS_DEPARTURE = 'scan_sms_departure';
 
+    public const KEY_SCAN_SMS_MORNING_IN = 'scan_sms_morning_in';
+
+    public const KEY_SCAN_SMS_LUNCH_OUT = 'scan_sms_lunch_out';
+
+    public const KEY_SCAN_SMS_AFTERNOON_IN = 'scan_sms_afternoon_in';
+
+    public const KEY_SCAN_SMS_EOD_OUT = 'scan_sms_eod_out';
+
+    public const KEY_SCAN_SMS_MISSED_EOD = 'scan_sms_missed_eod';
+
     public const KEY_SMS_CONSECUTIVE_LATE = 'sms_consecutive_late';
 
     public const KEY_SMS_CONSECUTIVE_ABSENT = 'sms_consecutive_absent';
@@ -115,25 +125,55 @@ class Setting extends Model
     {
         return static::where('key', self::KEY_SCAN_SMS_ARRIVAL)->value('value')
             ?? static::where('key', self::KEY_SCAN_SMS)->value('value')
-            ?? 'Hello {name}, your child checked in at the library at {time} ({status}).';
+            ?? 'Hello {name}, your child checked in at school at {time} ({status}).';
     }
 
     public static function scanSmsDepartureTemplate(): string
     {
         return static::where('key', self::KEY_SCAN_SMS_DEPARTURE)->value('value')
-            ?? 'Hello {name}, your child scanned at the library at {time} ({status}). Have a safe trip home.';
+            ?? 'Hello {name}, your child scanned out at school at {time} ({status}). Have a safe trip home.';
+    }
+
+    public static function scanSmsMorningInTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_MORNING_IN)->value('value')
+            ?? 'Hello {name}, your child checked in this morning at {time}.';
+    }
+
+    public static function scanSmsLunchOutTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_LUNCH_OUT)->value('value')
+            ?? 'Hello {name}, your child scanned out for lunch/break at {time}.';
+    }
+
+    public static function scanSmsAfternoonInTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_AFTERNOON_IN)->value('value')
+            ?? 'Hello {name}, your child checked in for the afternoon session at {time}.';
+    }
+
+    public static function scanSmsEodOutTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_EOD_OUT)->value('value')
+            ?? 'Hello {name}, your child scanned out at the end of the school day at {time}.';
+    }
+
+    public static function scanSmsMissedEodTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_MISSED_EOD)->value('value')
+            ?? 'Hello {name}, your child did not scan out at the end of the school day. An automatic checkout was recorded at {time}.';
     }
 
     public static function smsConsecutiveLateTemplate(): string
     {
         return static::where('key', self::KEY_SMS_CONSECUTIVE_LATE)->value('value')
-            ?? 'Hello, {name} has been late {count} consecutive school days. Please contact the school.';
+            ?? 'Hello {name}, your child has been late {count} consecutive school days. Please contact the school.';
     }
 
     public static function smsConsecutiveAbsentTemplate(): string
     {
         return static::where('key', self::KEY_SMS_CONSECUTIVE_ABSENT)->value('value')
-            ?? 'Hello, {name} has been absent {count} consecutive school days. Please contact the school.';
+            ?? 'Hello {name}, your child has been absent {count} consecutive school days. Please contact the school.';
     }
 
     /** @param  array<string, string>  $templates */
@@ -142,6 +182,11 @@ class Setting extends Model
         $map = [
             'arrival' => self::KEY_SCAN_SMS_ARRIVAL,
             'departure' => self::KEY_SCAN_SMS_DEPARTURE,
+            'morning_in' => self::KEY_SCAN_SMS_MORNING_IN,
+            'lunch_out' => self::KEY_SCAN_SMS_LUNCH_OUT,
+            'afternoon_in' => self::KEY_SCAN_SMS_AFTERNOON_IN,
+            'eod_out' => self::KEY_SCAN_SMS_EOD_OUT,
+            'missed_eod' => self::KEY_SCAN_SMS_MISSED_EOD,
             'consecutive_late' => self::KEY_SMS_CONSECUTIVE_LATE,
             'consecutive_absent' => self::KEY_SMS_CONSECUTIVE_ABSENT,
         ];

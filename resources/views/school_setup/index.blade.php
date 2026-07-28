@@ -138,10 +138,10 @@
 
         <div class="tab-pane fade {{ $activeTab === 'sections' ? 'show active' : '' }}" id="tab-sections">
             <p class="small text-muted mb-3">
-                Use <strong>+ Section</strong> on Kinder 1–Grade 10. For senior high, add strands first, then sections under each strand.
+                Use <strong>+ Section</strong> on Kinder–Grade 10. For senior high, add strands first, then sections under each strand.
             </p>
 
-            <h6 class="fw-semibold mb-2">Kinder 1 – Grade 10</h6>
+            <h6 class="fw-semibold mb-2">Kinder – Grade 10</h6>
             <div class="row g-3 mb-4">
                 @foreach($basicGrades as $grade)
                     @php $sections = $basicSections->get($grade, collect()); @endphp

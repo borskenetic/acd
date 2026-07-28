@@ -3,6 +3,7 @@ const {
   findStudentByToken,
   getSettings,
   updateStudentLastLog,
+  getTodayScans,
   insertLocalLog,
   countPending,
   setSyncState,
@@ -68,6 +69,169 @@ function closeStaleOpenIn(student) {
   };
 }
 
+function normalizeYear(year) {
+  if (!year) return null;
+  const y = String(year).trim().replace(/\s+/g, ' ');
+  if (/^kinder(\s*[12])?$/i.test(y)) return 'Kinder';
+  return y;
+}
+
+function resolveSchedule(student, settings) {
+  const year = normalizeYear(student.year);
+  if (!year) return null;
+  const sessions = settings?.attendance_sessions || {};
+  const schedules = sessions.schedules || {};
+  for (const [key, schedule] of Object.entries(schedules)) {
+    if ((schedule.years || []).includes(year)) {
+      return { ...schedule, key };
+    }
+  }
+  return null;
+}
+
+function isFriday(date = new Date()) {
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' }).format(date);
+  return wd === 'Fri';
+}
+
+function isHalfDayToday(student, schedule, settings, at = new Date()) {
+  if (!schedule) return false;
+  if (schedule.half_day) return true;
+  return Boolean(settings?.attendance_sessions?.friday_half_day ?? true) && isFriday(at);
+}
+
+function todayAtTime(timeHHmm, at = new Date()) {
+  if (!timeHHmm) return null;
+  const [h, m] = String(timeHHmm).split(':').map(Number);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value])
+  );
+  return new Date(`${parts.year}-${parts.month}-${parts.day}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`);
+}
+
+function expectedAction(count, halfDay) {
+  if (count === 0) return { status: 'IN', session_key: 'morning_in', session_label: 'morning' };
+  if (count === 1 && halfDay) return { status: 'OUT', session_key: 'half_day_out', session_label: 'morning' };
+  if (count === 1) return { status: 'OUT', session_key: 'lunch_out', session_label: 'morning' };
+  if (count === 2 && !halfDay) return { status: 'IN', session_key: 'afternoon_in', session_label: 'afternoon' };
+  if (count === 3 && !halfDay) return { status: 'OUT', session_key: 'eod_out', session_label: 'afternoon' };
+  return null;
+}
+
+function outAllowedAt(schedule, sessionKey, halfDay, at = new Date()) {
+  let time = null;
+  if (sessionKey === 'half_day_out') {
+    time = halfDay && !schedule.half_day
+      ? schedule.lunch_out
+      : (schedule.half_day_out || schedule.lunch_out);
+  } else if (sessionKey === 'lunch_out') {
+    time = schedule.lunch_out;
+  } else if (sessionKey === 'eod_out') {
+    time = schedule.eod_out;
+  }
+  return todayAtTime(time, at);
+}
+
+function isWithinLunchWindow(schedule, halfDay, at = new Date()) {
+  if (!schedule || halfDay || !schedule.lunch_out || !schedule.afternoon_in) return false;
+  const lunch = todayAtTime(schedule.lunch_out, at);
+  const afternoon = todayAtTime(schedule.afternoon_in, at);
+  return at >= lunch && at < afternoon;
+}
+
+function cooldownMinutes(settings, schedule, halfDay, at = new Date()) {
+  const sessions = settings?.attendance_sessions || {};
+  if (isWithinLunchWindow(schedule, halfDay, at)) {
+    return Number(sessions.lunch_cooldown_minutes ?? 5);
+  }
+  return Number(sessions.cooldown_minutes ?? 15);
+}
+
+function alreadyScannedMessage(status, sessionLabel) {
+  const s = String(status).toUpperCase() === 'OUT' ? 'OUT' : 'IN';
+  return `You have already scanned ${s} for the ${sessionLabel} session.`;
+}
+
+function decideSessionScan(student, settings, at = new Date()) {
+  const schedule = resolveSchedule(student, settings);
+  if (!schedule) return { type: 'not_session' };
+
+  const halfDay = isHalfDayToday(student, schedule, settings, at);
+  const scans = getTodayScans(student);
+  const count = scans.length;
+  const maxScans = halfDay ? 2 : 4;
+
+  if (count >= maxScans) {
+    const last = scans[scans.length - 1];
+    const lastStatus = String(last?.status || 'OUT').toUpperCase();
+    return {
+      type: 'already_scanned',
+      message: alreadyScannedMessage(lastStatus, halfDay ? 'today' : 'afternoon'),
+      session_label: halfDay ? 'today' : 'afternoon',
+      last_status: lastStatus,
+    };
+  }
+
+  const last = scans[scans.length - 1];
+  if (last?.scanned_at) {
+    const lastAt = new Date(last.scanned_at);
+    const mins = cooldownMinutes(settings, schedule, halfDay, at);
+    if ((at - lastAt) / 1000 < mins * 60) {
+      const lastStatus = String(last.status || 'IN').toUpperCase();
+      const sessionLabel = count <= 2 ? 'morning' : 'afternoon';
+      return {
+        type: 'already_scanned',
+        message: alreadyScannedMessage(lastStatus, sessionLabel),
+        session_label: sessionLabel,
+        last_status: lastStatus,
+      };
+    }
+  }
+
+  const expected = expectedAction(count, halfDay);
+  if (!expected) {
+    return {
+      type: 'already_scanned',
+      message: 'You have already completed scanning for today.',
+      session_label: 'today',
+    };
+  }
+
+  if (expected.status === 'OUT') {
+    const allowedAt = outAllowedAt(schedule, expected.session_key, halfDay, at);
+    if (allowedAt && at < allowedAt) {
+      const label = allowedAt.toLocaleTimeString('en-US', {
+        timeZone: TZ,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return {
+        type: 'early_out_blocked',
+        message: `You are not yet allowed to scan OUT. Please try again after ${label}.`,
+        allowed_after: label,
+        next_status: 'OUT',
+        session_key: expected.session_key,
+        session_label: expected.session_label,
+      };
+    }
+  }
+
+  return {
+    type: 'ok',
+    next_status: expected.status,
+    session_key: expected.session_key,
+    session_label: expected.session_label,
+  };
+}
+
 function getLogoutCutoffToday(settings) {
   const logoutTime = settings?.early_departure?.logout_time || settings?.attendance_policy?.logout_time || '16:00';
   const [hours, minutes] = logoutTime.split(':').map(Number);
@@ -81,7 +245,8 @@ function blocksCheckout(student, settings, at = new Date()) {
   const early = settings?.early_departure || {};
   if (!early.enabled) return false;
 
-  const levels = early.educational_levels || ['grade_school'];
+  const levels = early.educational_levels || [];
+  if (!levels.length) return false;
   if (!student.educational_level || !levels.includes(student.educational_level)) {
     return false;
   }
@@ -115,6 +280,41 @@ function previewScan(rawToken) {
 
   student = closeStaleOpenIn(student);
 
+  const sessionDecision = decideSessionScan(student, settings);
+  if (sessionDecision.type === 'already_scanned') {
+    return {
+      type: 'already_scanned',
+      message: sessionDecision.message,
+      session_label: sessionDecision.session_label,
+      last_status: sessionDecision.last_status,
+      student: studentPayload(student),
+    };
+  }
+
+  if (sessionDecision.type === 'early_out_blocked') {
+    return {
+      type: 'early_out_blocked',
+      message: sessionDecision.message,
+      allowed_after: sessionDecision.allowed_after,
+      student: studentPayload(student),
+    };
+  }
+
+  if (sessionDecision.type === 'ok') {
+    return {
+      type: 'student',
+      next_status: sessionDecision.next_status,
+      session_key: sessionDecision.session_key,
+      session_label: sessionDecision.session_label,
+      student_id: student.cloud_id,
+      section_picker_enabled: Boolean(settings.section_picker_enabled),
+      logout_feedback_enabled: Boolean(settings.logout_feedback_enabled),
+      student: studentPayload(student),
+      attendance_sections: settings.attendance_sections || [],
+    };
+  }
+
+  // SHS / College: simple toggle
   const lastIn = isInStatus(student.last_log_status);
   const nextStatus = lastIn ? 'OUT' : 'IN';
 
@@ -144,6 +344,9 @@ function previewScan(rawToken) {
 
 function recordScan(rawToken, section = null) {
   const preview = previewScan(rawToken);
+  if (preview.type === 'already_scanned' || preview.type === 'early_out_blocked') {
+    throw new Error(preview.message || 'Scan not allowed.');
+  }
   if (preview.type !== 'student') {
     throw new Error(preview.message || 'Scan not allowed.');
   }

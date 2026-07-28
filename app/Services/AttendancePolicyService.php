@@ -123,9 +123,9 @@ class AttendancePolicyService
     public function save(array $data): void
     {
         Setting::setAttendancePolicy([
-            'login_time' => $this->normalizeTimeInput((string) ($data['login_time'] ?? '08:00')),
+            'login_time' => $this->normalizeTimeInput((string) ($data['login_time'] ?? '07:30')),
             'logout_time' => $this->normalizeTimeInput((string) ($data['logout_time'] ?? '16:00')),
-            'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 10),
+            'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 15),
             'consecutive_late_threshold' => (int) ($data['consecutive_late_threshold'] ?? 5),
             'consecutive_absent_threshold' => (int) ($data['consecutive_absent_threshold'] ?? 3),
         ]);
@@ -147,7 +147,7 @@ class AttendancePolicyService
         try {
             return Carbon::parse($time)->format('H:i');
         } catch (\Throwable) {
-            return '08:00';
+            return '07:30';
         }
     }
 }

@@ -156,6 +156,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (earlyOutAlarmTime && data.allowed_after) {
       earlyOutAlarmTime.textContent = data.allowed_after;
     }
+    const hint = earlyOutAlarm?.querySelector('.early-out-alarm__hint');
+    if (hint) hint.hidden = !data.allowed_after;
+    const title = earlyOutAlarm?.querySelector('.early-out-alarm__title');
+    if (title) title.textContent = 'Early checkout not allowed';
 
     profileImg.src = profileUrl(student.profile_picture);
 
@@ -172,6 +176,41 @@ document.addEventListener('DOMContentLoaded', function () {
     scanSidebar?.classList.add('sidebar--alarm');
     playAlarmSound();
     scheduleClear(8000);
+  }
+
+  function showAlreadyScanned(data) {
+    if (!earlyOutAlarm) {
+      showUnknownScanAlarm(data.message || 'Already scanned.');
+      return;
+    }
+    const student = data.student || {};
+    const name = [student.firstname, student.lastname].filter(Boolean).join(' ');
+    const year = student.year ? ` (${student.year})` : '';
+    const status = (data.last_status || 'IN').toUpperCase();
+
+    if (earlyOutAlarmMessage) {
+      earlyOutAlarmMessage.textContent = data.message || `You have already scanned ${status}.`;
+    }
+    const hint = earlyOutAlarm?.querySelector('.early-out-alarm__hint');
+    if (hint) hint.hidden = true;
+    const title = earlyOutAlarm?.querySelector('.early-out-alarm__title');
+    if (title) title.textContent = 'Already scanned';
+
+    profileImg.src = profileUrl(student.profile_picture);
+
+    const div = document.createElement('div');
+    div.classList.add('name-box', 'name-box--blocked');
+    div.innerHTML = `
+      <div class="student-name">${name}${year}</div>
+      <div class="label">Already scanned</div>
+      <div class="status-button status-blocked">ALREADY ${status}</div>
+    `;
+    sidebar.appendChild(div);
+
+    earlyOutAlarm.hidden = false;
+    scanSidebar?.classList.add('sidebar--alarm');
+    playAlarmSound();
+    scheduleClear(5000);
   }
 
   function showUnknownScanAlarm(message) {
@@ -234,6 +273,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (data.type === 'early_out_blocked') {
         showEarlyOutAlarm(data);
+        return;
+      }
+
+      if (data.type === 'already_scanned') {
+        showAlreadyScanned(data);
         return;
       }
 

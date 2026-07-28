@@ -30,6 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('attendance:close-stale-ins')
             ->dailyAt('00:05')
             ->timezone('Asia/Manila');
+        $schedule->command('attendance:autofill-lunch')
+            ->dailyAt(config('attendance_sessions.lunch_autofill_at', '13:00'))
+            ->timezone('Asia/Manila');
+        $schedule->command('attendance:auto-eod-out')
+            ->dailyAt(config('attendance_sessions.eod_auto_out_at', '22:00'))
+            ->timezone('Asia/Manila');
         $schedule->command('attendance:check-consecutive-absences')
             ->dailyAt('16:30')
             ->timezone('Asia/Manila');

@@ -35,8 +35,9 @@ class GateRosterService
             : Student::query()->pluck('id');
 
         $lastLogs = $this->lastLogsForStudents($studentIds);
+        $todayScans = $this->todayScansForStudents($studentIds);
 
-        $roster = $students->map(function (Student $student) use ($lastLogs) {
+        $roster = $students->map(function (Student $student) use ($lastLogs, $todayScans) {
             $payload = $this->scanService->studentPayload($student);
             $last = $lastLogs[$student->id] ?? null;
             $payload['last_log'] = $last ? [
@@ -44,6 +45,7 @@ class GateRosterService
                 'scanned_at' => $last->scanned_at?->toIso8601String(),
                 'section' => $last->section,
             ] : null;
+            $payload['today_scans'] = $todayScans[$student->id] ?? [];
 
             return $payload;
         })->values();
@@ -85,12 +87,13 @@ class GateRosterService
             'attendance_sections' => Setting::attendanceSections(),
             'early_departure' => [
                 'enabled' => $this->departure->isEnabled(),
-                'educational_levels' => config('patron.early_departure.educational_levels', ['grade_school']),
+                'educational_levels' => config('patron.early_departure.educational_levels', []),
                 'message' => config('patron.early_departure.message'),
                 'timezone' => $this->departure->timezone(),
                 'logout_time' => $policy['logout_time'] ?? '16:00',
                 'earliest_out_label' => $this->departure->earliestOutLabel(),
             ],
+            'attendance_sessions' => app(StudentSessionScheduleService::class)->settingsPayload(),
             'attendance_policy' => $policy,
             'timezone' => $this->policy->timezone(),
         ];
@@ -113,5 +116,36 @@ class GateRosterService
             ->keyBy('student_id');
 
         return $logs->all();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int>|iterable<int, int>  $studentIds
+     * @return array<int, list<array{status: string, scanned_at: ?string}>>
+     */
+    protected function todayScansForStudents(iterable $studentIds): array
+    {
+        $ids = collect($studentIds)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $tz = config('attendance_sessions.timezone', 'Asia/Manila');
+        $today = Carbon::now($tz)->toDateString();
+
+        $grouped = [];
+        AttendanceLog::query()
+            ->whereIn('student_id', $ids)
+            ->whereDate('scanned_at', $today)
+            ->orderBy('scanned_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (AttendanceLog $log) use (&$grouped) {
+                $grouped[$log->student_id][] = [
+                    'status' => strtoupper((string) $log->status),
+                    'scanned_at' => $log->scanned_at?->toIso8601String(),
+                ];
+            });
+
+        return $grouped;
     }
 }

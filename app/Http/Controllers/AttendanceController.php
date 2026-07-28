@@ -219,10 +219,15 @@ class AttendanceController extends Controller
         try {
             $result = $this->studentScan->recordScan($student, $section);
         } catch (\RuntimeException $e) {
+            $message = $e->getMessage();
+            $status = str_contains(strtolower($message), 'already scanned') ? 409 : 403;
+
             return response()->json([
-                'message' => $e->getMessage(),
-                'allowed_after' => app(StudentDeparturePolicy::class)->earliestOutLabel(),
-            ], 403);
+                'message' => $message,
+                'allowed_after' => $status === 403
+                    ? app(StudentDeparturePolicy::class)->earliestOutLabel()
+                    : null,
+            ], $status);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

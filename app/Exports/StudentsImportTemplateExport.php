@@ -35,7 +35,7 @@ class StudentsImportTemplateExport implements FromArray, WithHeadings
                 '1000822391',
                 '',
                 '482613207342004',
-                'Kinder 1',
+                'Kinder',
                 'Rose',
             ],
         ];

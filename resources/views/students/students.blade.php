@@ -257,7 +257,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-muted small">Columns: <code>Name</code>, <code>ID Number</code>, <code>LRN</code> (optional), <code>RFID</code>, <code>Year</code> (e.g. Kinder 1, Grade 1–10), <code>Section</code>. <a href="{{ route('students.import.template') }}">Download template</a>.</p>
+                        <p class="text-muted small">Columns: <code>Name</code>, <code>ID Number</code>, <code>LRN</code> (optional), <code>RFID</code>, <code>Year</code> (e.g. Kinder, Grade 1–10), <code>Section</code>. <a href="{{ route('students.import.template') }}">Download template</a>.</p>
                         <div class="sp-file-pick">
                             <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>
                         </div>

@@ -23,7 +23,7 @@ return [
 
     'year_options' => [
         'grade_school' => [
-            'Kinder 1', 'Kinder 2',
+            'Kinder',
             'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
         ],
         'high_school_junior' => [
@@ -42,10 +42,12 @@ return [
     */
     'early_departure' => [
         'enabled' => env('PATRON_EARLY_DEPARTURE_ENABLED', true),
-        'educational_levels' => ['grade_school'],
+        // Session-model grades (Kinder–10) use attendance_sessions schedules instead.
+        // This cutoff still applies to any remaining non-session patrons if configured.
+        'educational_levels' => [],
         'earliest_out' => env('PATRON_EARLIEST_OUT', '16:00'),
         'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
-        'message' => 'Kinder and grade school students cannot leave before 4:00 PM. Please try again after {time}.',
+        'message' => 'You are not yet allowed to scan OUT. Please try again after {time}.',
     ],
 
 ];

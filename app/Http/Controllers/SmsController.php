@@ -28,6 +28,11 @@ class SmsController extends Controller
         return view('sms.scan_message', [
             'arrival' => Setting::scanSmsArrivalTemplate(),
             'departure' => Setting::scanSmsDepartureTemplate(),
+            'morningIn' => Setting::scanSmsMorningInTemplate(),
+            'lunchOut' => Setting::scanSmsLunchOutTemplate(),
+            'afternoonIn' => Setting::scanSmsAfternoonInTemplate(),
+            'eodOut' => Setting::scanSmsEodOutTemplate(),
+            'missedEod' => Setting::scanSmsMissedEodTemplate(),
             'consecutiveLate' => Setting::smsConsecutiveLateTemplate(),
             'consecutiveAbsent' => Setting::smsConsecutiveAbsentTemplate(),
         ]);
@@ -38,6 +43,11 @@ class SmsController extends Controller
         $request->validate([
             'arrival' => 'required|string|max:500',
             'departure' => 'required|string|max:500',
+            'morning_in' => 'required|string|max:500',
+            'lunch_out' => 'required|string|max:500',
+            'afternoon_in' => 'required|string|max:500',
+            'eod_out' => 'required|string|max:500',
+            'missed_eod' => 'required|string|max:500',
             'consecutive_late' => 'required|string|max:500',
             'consecutive_absent' => 'required|string|max:500',
         ]);
@@ -45,6 +55,11 @@ class SmsController extends Controller
         Setting::setSmsTemplates([
             'arrival' => $request->input('arrival'),
             'departure' => $request->input('departure'),
+            'morning_in' => $request->input('morning_in'),
+            'lunch_out' => $request->input('lunch_out'),
+            'afternoon_in' => $request->input('afternoon_in'),
+            'eod_out' => $request->input('eod_out'),
+            'missed_eod' => $request->input('missed_eod'),
             'consecutive_late' => $request->input('consecutive_late'),
             'consecutive_absent' => $request->input('consecutive_absent'),
         ]);

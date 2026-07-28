@@ -69,6 +69,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_local_logs_sync ON local_logs(synced_at);
 `);
 
+try {
+  db.exec('ALTER TABLE students ADD COLUMN today_scans_json TEXT');
+} catch (_) {
+  // column already exists
+}
+
 function getSyncState() {
   return db.prepare('SELECT * FROM sync_state WHERE id = 1').get();
 }
@@ -107,11 +113,11 @@ function upsertStudent(student) {
     INSERT INTO students (
       cloud_id, record_id, student_id, qrcode, rfid, firstname, lastname, middle_initial,
       normalized_name, profile_picture, educational_level, year,
-      last_log_status, last_log_scanned_at, updated_at
+      last_log_status, last_log_scanned_at, today_scans_json, updated_at
     ) VALUES (
       @cloud_id, @record_id, @student_id, @qrcode, @rfid, @firstname, @lastname, @middle_initial,
       @normalized_name, @profile_picture, @educational_level, @year,
-      @last_log_status, @last_log_scanned_at, @updated_at
+      @last_log_status, @last_log_scanned_at, @today_scans_json, @updated_at
     )
     ON CONFLICT(cloud_id) DO UPDATE SET
       record_id = excluded.record_id,
@@ -127,6 +133,7 @@ function upsertStudent(student) {
       year = excluded.year,
       last_log_status = excluded.last_log_status,
       last_log_scanned_at = excluded.last_log_scanned_at,
+      today_scans_json = excluded.today_scans_json,
       updated_at = excluded.updated_at
   `).run({
     cloud_id: student.id,
@@ -143,6 +150,7 @@ function upsertStudent(student) {
     year: student.year ?? null,
     last_log_status: student.last_log?.status ?? null,
     last_log_scanned_at: student.last_log?.scanned_at ?? null,
+    today_scans_json: JSON.stringify(student.today_scans || []),
     updated_at: new Date().toISOString(),
   });
 }
@@ -197,11 +205,45 @@ function normalizeName(name) {
 }
 
 function updateStudentLastLog(cloudId, status, scannedAt) {
+  const student = db.prepare('SELECT * FROM students WHERE cloud_id = ?').get(cloudId);
+  let todayScans = [];
+  try {
+    todayScans = student?.today_scans_json ? JSON.parse(student.today_scans_json) : [];
+  } catch (_) {
+    todayScans = [];
+  }
+
+  const today = manilaDateString(scannedAt);
+  // Drop scans from other days, then append.
+  todayScans = (Array.isArray(todayScans) ? todayScans : []).filter((s) => manilaDateString(s.scanned_at) === today);
+  todayScans.push({ status, scanned_at: scannedAt });
+
   db.prepare(`
     UPDATE students
-    SET last_log_status = ?, last_log_scanned_at = ?, updated_at = ?
+    SET last_log_status = ?, last_log_scanned_at = ?, today_scans_json = ?, updated_at = ?
     WHERE cloud_id = ?
-  `).run(status, scannedAt, new Date().toISOString(), cloudId);
+  `).run(status, scannedAt, JSON.stringify(todayScans), new Date().toISOString(), cloudId);
+}
+
+function manilaDateString(isoOrDate) {
+  const d = isoOrDate ? new Date(isoOrDate) : new Date();
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
+function getTodayScans(student) {
+  let scans = [];
+  try {
+    scans = student?.today_scans_json ? JSON.parse(student.today_scans_json) : [];
+  } catch (_) {
+    scans = [];
+  }
+  const today = manilaDateString();
+  return (Array.isArray(scans) ? scans : []).filter((s) => manilaDateString(s.scanned_at) === today);
 }
 
 function insertLocalLog(entry) {
@@ -252,6 +294,8 @@ module.exports = {
   upsertStudent,
   findStudentByToken,
   updateStudentLastLog,
+  getTodayScans,
+  manilaDateString,
   insertLocalLog,
   countPending,
   getPendingLogs,

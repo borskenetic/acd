@@ -14,10 +14,16 @@ class AttendanceSmsService
     public function __construct(
         protected StudentConsecutiveAttendanceService $consecutive,
         protected AttendancePolicyService $policy,
+        protected StudentSessionScheduleService $sessionSchedule,
     ) {}
 
-    public function handleStudentScan(Student $student, string $status, Carbon $scannedAt): void
-    {
+    public function handleStudentScan(
+        Student $student,
+        string $status,
+        Carbon $scannedAt,
+        ?string $sessionKey = null,
+        ?string $forcedEvent = null,
+    ): void {
         $number = trim((string) ($student->emergency_number ?? ''));
         if ($number === '') {
             return;
@@ -29,26 +35,55 @@ class AttendanceSmsService
 
         $daily = StudentDailySms::firstOrCreate(
             ['student_id' => $student->id, 'log_date' => $date],
-            ['arrival_sent' => false, 'departure_sent' => false]
+            ['arrival_sent' => false, 'departure_sent' => false, 'events_sent' => []]
         );
 
-        $name = trim($student->firstname.' '.$student->lastname);
+        $guardianName = $this->guardianDisplayName($student);
         $time = $scannedAt->format('h:i A');
+        $childName = trim($student->firstname.' '.$student->lastname);
 
-        if (! $daily->arrival_sent) {
-            $this->sendTemplate(
-                $number,
-                Setting::scanSmsArrivalTemplate(),
-                ['name' => $name, 'status' => $status, 'time' => $time]
-            );
-            $daily->update(['arrival_sent' => true]);
-        } elseif (! $daily->departure_sent && $this->isDepartureWindow($scannedAt)) {
-            $this->sendTemplate(
-                $number,
-                Setting::scanSmsDepartureTemplate(),
-                ['name' => $name, 'status' => $status, 'time' => $time]
-            );
-            $daily->update(['departure_sent' => true]);
+        if ($forcedEvent === 'missed_eod') {
+            $this->sendOnce($daily, 'missed_eod', $number, Setting::scanSmsMissedEodTemplate(), [
+                'name' => $guardianName,
+                'child' => $childName,
+                'status' => $status,
+                'time' => $time,
+            ]);
+
+            return;
+        }
+
+        if ($this->sessionSchedule->usesSessionModel($student)) {
+            $event = $forcedEvent ?: ($sessionKey ?: $this->inferSessionEvent($student, $status, $scannedAt));
+            $template = $this->templateForSessionEvent($event);
+
+            $this->sendOnce($daily, $event, $number, $template, [
+                'name' => $guardianName,
+                'child' => $childName,
+                'status' => $status,
+                'time' => $time,
+            ]);
+        } else {
+            // SHS / College: keep arrival + departure (once each), guardian name in {name}.
+            if (! $daily->arrival_sent) {
+                $ok = $this->sendTemplate(
+                    $number,
+                    Setting::scanSmsArrivalTemplate(),
+                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time]
+                );
+                if ($ok) {
+                    $daily->update(['arrival_sent' => true]);
+                }
+            } elseif (! $daily->departure_sent && $this->isDepartureWindow($scannedAt)) {
+                $ok = $this->sendTemplate(
+                    $number,
+                    Setting::scanSmsDepartureTemplate(),
+                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time]
+                );
+                if ($ok) {
+                    $daily->update(['departure_sent' => true]);
+                }
+            }
         }
 
         if (strtoupper($status) === 'IN') {
@@ -84,11 +119,14 @@ class AttendanceSmsService
                 continue;
             }
 
-            $name = trim($student->firstname.' '.$student->lastname);
             $ok = $this->sendTemplate(
                 (string) $student->emergency_number,
                 Setting::smsConsecutiveAbsentTemplate(),
-                ['name' => $name, 'count' => (string) $consecutiveAbsent]
+                [
+                    'name' => $this->guardianDisplayName($student),
+                    'child' => trim($student->firstname.' '.$student->lastname),
+                    'count' => (string) $consecutiveAbsent,
+                ]
             );
 
             if ($ok) {
@@ -123,15 +161,68 @@ class AttendanceSmsService
             return;
         }
 
-        $name = trim($student->firstname.' '.$student->lastname);
         $ok = $this->sendTemplate(
             (string) $student->emergency_number,
             Setting::smsConsecutiveLateTemplate(),
-            ['name' => $name, 'count' => (string) $consecutiveLate]
+            [
+                'name' => $this->guardianDisplayName($student),
+                'child' => trim($student->firstname.' '.$student->lastname),
+                'count' => (string) $consecutiveLate,
+            ]
         );
 
         if ($ok) {
             $state->update(['late_streak_notified' => $consecutiveLate]);
+        }
+    }
+
+    protected function guardianDisplayName(Student $student): string
+    {
+        $guardian = trim((string) ($student->emergency_person ?? ''));
+        if ($guardian !== '') {
+            return $guardian;
+        }
+
+        return 'Parent/Guardian';
+    }
+
+    protected function inferSessionEvent(Student $student, string $status, Carbon $scannedAt): string
+    {
+        $halfDay = $this->sessionSchedule->isHalfDayToday($student, $scannedAt);
+        $count = max(0, $this->sessionSchedule->todayLogs($student, $scannedAt)->count() - 1);
+        $expected = $this->sessionSchedule->expectedAction($count, $halfDay);
+
+        return $expected['session_key'] ?? (strtoupper($status) === 'IN' ? 'morning_in' : 'eod_out');
+    }
+
+    protected function templateForSessionEvent(string $event): string
+    {
+        return match ($event) {
+            StudentSessionScheduleService::SESSION_MORNING_IN => Setting::scanSmsMorningInTemplate(),
+            StudentSessionScheduleService::SESSION_LUNCH_OUT,
+            StudentSessionScheduleService::SESSION_HALF_DAY_OUT => Setting::scanSmsLunchOutTemplate(),
+            StudentSessionScheduleService::SESSION_AFTERNOON_IN => Setting::scanSmsAfternoonInTemplate(),
+            StudentSessionScheduleService::SESSION_EOD_OUT => Setting::scanSmsEodOutTemplate(),
+            'missed_eod' => Setting::scanSmsMissedEodTemplate(),
+            default => Setting::scanSmsArrivalTemplate(),
+        };
+    }
+
+    /** @param  array<string, string>  $vars */
+    protected function sendOnce(StudentDailySms $daily, string $event, string $number, string $template, array $vars): void
+    {
+        $sent = $daily->events_sent ?? [];
+        if (! is_array($sent)) {
+            $sent = [];
+        }
+
+        if (in_array($event, $sent, true)) {
+            return;
+        }
+
+        if ($this->sendTemplate($number, $template, $vars)) {
+            $sent[] = $event;
+            $daily->update(['events_sent' => array_values(array_unique($sent))]);
         }
     }
 
@@ -143,6 +234,11 @@ class AttendanceSmsService
     /** @param  array<string, string>  $vars */
     protected function sendTemplate(string $number, string $template, array $vars): bool
     {
+        $number = trim($number);
+        if ($number === '') {
+            return false;
+        }
+
         $message = $template;
         foreach ($vars as $key => $value) {
             $message = str_replace('{'.$key.'}', $value, $message);

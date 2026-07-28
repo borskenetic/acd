@@ -15,6 +15,7 @@ class StudentScanService
         protected AttendanceSessionService $sessions,
         protected StudentDeparturePolicy $departure,
         protected AttendanceSmsService $sms,
+        protected StudentSessionScheduleService $sessionSchedule,
     ) {}
 
     public function resolveStudent(string $raw): ?Student
@@ -77,6 +78,40 @@ class StudentScanService
     {
         $this->sessions->closeStaleOpenInForStudent($student);
 
+        if ($this->sessionSchedule->usesSessionModel($student)) {
+            $decision = $this->sessionSchedule->decideNextScan($student);
+
+            if ($decision['type'] === 'already_scanned') {
+                return [
+                    'type' => 'already_scanned',
+                    'message' => $decision['message'],
+                    'session_label' => $decision['session_label'] ?? 'today',
+                    'last_status' => $decision['last_status'] ?? null,
+                    'student' => $this->studentPayload($student, detailed: true),
+                ];
+            }
+
+            if ($decision['type'] === 'early_out_blocked') {
+                return [
+                    'type' => 'early_out_blocked',
+                    'message' => $decision['message'],
+                    'allowed_after' => $decision['allowed_after'],
+                    'student' => $this->studentPayload($student, detailed: true),
+                ];
+            }
+
+            return [
+                'type' => 'student',
+                'next_status' => $decision['next_status'],
+                'session_key' => $decision['session_key'] ?? null,
+                'session_label' => $decision['session_label'] ?? null,
+                'student_id' => $student->id,
+                'logout_feedback_enabled' => $this->logoutFeedbackEnabled(),
+                'section_picker_enabled' => $this->sectionPickerEnabled(),
+                'student' => $this->studentPayload($student),
+            ];
+        }
+
         $lastLog = $this->lastLogForStudent($student);
         $nextStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
 
@@ -100,7 +135,7 @@ class StudentScanService
     }
 
     /**
-     * @return array{status: string, scanned_at: string, log: AttendanceLog}
+     * @return array{status: string, scanned_at: string, log: AttendanceLog, session_key?: ?string}
      */
     public function recordScan(
         Student $student,
@@ -110,14 +145,36 @@ class StudentScanService
         ?GateDevice $gateDevice = null,
         string $source = 'web',
         bool $sendSms = true,
+        ?string $forcedStatus = null,
+        ?string $sessionKey = null,
     ): array {
         $this->sessions->closeStaleOpenInForStudent($student);
 
-        $lastLog = $this->lastLogForStudent($student);
-        $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+        $scannedAt ??= now($this->sessionSchedule->timezone());
+        $sessionKeyResolved = $sessionKey;
 
-        if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {
-            throw new \RuntimeException($this->earlyOutMessage());
+        if ($forcedStatus !== null) {
+            $newStatus = strtoupper($forcedStatus);
+        } elseif ($this->sessionSchedule->usesSessionModel($student)) {
+            $decision = $this->sessionSchedule->decideNextScan($student, $scannedAt);
+
+            if ($decision['type'] === 'already_scanned') {
+                throw new \RuntimeException($decision['message'] ?? 'Already scanned.');
+            }
+
+            if ($decision['type'] === 'early_out_blocked') {
+                throw new \RuntimeException($decision['message'] ?? $this->earlyOutMessage());
+            }
+
+            $newStatus = $decision['next_status'];
+            $sessionKeyResolved = $decision['session_key'] ?? null;
+        } else {
+            $lastLog = $this->lastLogForStudent($student);
+            $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+
+            if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {
+                throw new \RuntimeException($this->earlyOutMessage());
+            }
         }
 
         if ($section !== null && $section !== '') {
@@ -128,8 +185,6 @@ class StudentScanService
         } else {
             $section = null;
         }
-
-        $scannedAt ??= now();
 
         $log = AttendanceLog::create([
             'student_id' => $student->id,
@@ -142,13 +197,14 @@ class StudentScanService
         ]);
 
         if ($sendSms) {
-            $this->sms->handleStudentScan($student, $newStatus, $log->scanned_at);
+            $this->sms->handleStudentScan($student, $newStatus, $log->scanned_at, $sessionKeyResolved);
         }
 
         return [
             'status' => $newStatus,
             'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
             'log' => $log,
+            'session_key' => $sessionKeyResolved,
         ];
     }
 
@@ -180,6 +236,14 @@ class StudentScanService
             throw new \InvalidArgumentException('Invalid scan status.');
         }
 
+        $sessionKey = null;
+        if ($this->sessionSchedule->usesSessionModel($student)) {
+            $halfDay = $this->sessionSchedule->isHalfDayToday($student, $scannedAt);
+            $count = $this->sessionSchedule->todayLogs($student, $scannedAt)->count();
+            $expected = $this->sessionSchedule->expectedAction($count, $halfDay);
+            $sessionKey = $expected['session_key'] ?? null;
+        }
+
         $log = AttendanceLog::create([
             'student_id' => $student->id,
             'section' => $section,
@@ -190,7 +254,40 @@ class StudentScanService
             'source' => 'gate_sync',
         ]);
 
-        $this->sms->handleStudentScan($student, $status, $log->scanned_at);
+        $this->sms->handleStudentScan($student, $status, $log->scanned_at, $sessionKey);
+
+        return $log;
+    }
+
+    /**
+     * Create an automatic attendance row (lunch autofill / EOD) and optionally SMS.
+     */
+    public function recordAutomaticScan(
+        Student $student,
+        string $status,
+        Carbon $scannedAt,
+        string $source,
+        ?string $sessionKey = null,
+        bool $sendSms = true,
+        ?string $smsEvent = null,
+    ): AttendanceLog {
+        $log = AttendanceLog::create([
+            'student_id' => $student->id,
+            'section' => null,
+            'status' => strtoupper($status),
+            'scanned_at' => $scannedAt,
+            'source' => $source,
+        ]);
+
+        if ($sendSms) {
+            $this->sms->handleStudentScan(
+                $student,
+                strtoupper($status),
+                $log->scanned_at,
+                $sessionKey,
+                $smsEvent
+            );
+        }
 
         return $log;
     }

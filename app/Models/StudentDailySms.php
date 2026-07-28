@@ -14,12 +14,14 @@ class StudentDailySms extends Model
         'log_date',
         'arrival_sent',
         'departure_sent',
+        'events_sent',
     ];
 
     protected $casts = [
         'log_date' => 'date',
         'arrival_sent' => 'boolean',
         'departure_sent' => 'boolean',
+        'events_sent' => 'array',
     ];
 
     public function student(): BelongsTo

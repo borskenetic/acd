@@ -145,15 +145,15 @@ class StudentsImport implements ToModel, WithHeadingRow, WithMapping, SkipsEmpty
         }
 
         if (preg_match('/\bkinder\s*([12])\b/i', $value, $m)) {
-            return 'Kinder '.$m[1];
+            return 'Kinder';
         }
 
         if (preg_match('/\bgrade\s*(1[0-2]|[1-9])\b/i', $value, $m)) {
             return 'Grade '.$m[1];
         }
 
-        if (preg_match('/\bk\s*([12])\b/i', $value, $m)) {
-            return 'Kinder '.$m[1];
+        if (preg_match('/\bkinder\b/i', $value) || preg_match('/\bk\s*([12])\b/i', $value)) {
+            return 'Kinder';
         }
 
         return null;

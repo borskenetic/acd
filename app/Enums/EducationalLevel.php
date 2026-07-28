@@ -66,12 +66,26 @@ enum EducationalLevel: string
     /** @return list<string> */
     public static function kinderYearLabels(): array
     {
+        return ['Kinder'];
+    }
+
+    /** @return list<string> */
+    public static function legacyKinderYearLabels(): array
+    {
         return ['Kinder 1', 'Kinder 2'];
     }
 
     public static function isKinderYear(?string $year): bool
     {
-        return $year !== null && in_array($year, self::kinderYearLabels(), true);
+        if ($year === null) {
+            return false;
+        }
+
+        $year = trim($year);
+
+        return in_array($year, self::kinderYearLabels(), true)
+            || in_array($year, self::legacyKinderYearLabels(), true)
+            || strcasecmp($year, 'Kinder') === 0;
     }
 }
 

@@ -6,8 +6,7 @@ return [
   | Grade levels for SF2 (Kinder–12; college excluded).
   */
   'grade_levels' => [
-    'Kinder 1',
-    'Kinder 2',
+    'Kinder',
     'Grade 1',
     'Grade 2',
     'Grade 3',
@@ -32,8 +31,8 @@ return [
   /*
   | School-wide gate: first IN after this time (plus grace) counts as tardy.
   */
-  'class_start_time' => env('SF2_CLASS_START_TIME', '08:00'),
-  'tardy_grace_minutes' => (int) env('SF2_TARDY_GRACE_MINUTES', 10),
+  'class_start_time' => env('SF2_CLASS_START_TIME', '07:30'),
+  'tardy_grace_minutes' => (int) env('SF2_TARDY_GRACE_MINUTES', 15),
 
   'month_names' => [
     1 => 'January',

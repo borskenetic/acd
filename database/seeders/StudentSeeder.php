@@ -63,7 +63,7 @@ class StudentSeeder extends Seeder
                 'middle_initial' => 'T',
                 'educational_level' => 'grade_school',
                 'course' => 'Section Dahlia',
-                'year' => 'Kinder 1',
+                'year' => 'Kinder',
                 'mobile_number' => '09160000006',
                 'birth_date' => '2020-02-10',
             ],

@@ -9,6 +9,13 @@
         ->setTimeFromTimeString($policy->loginTime())
         ->addMinutes($policy->tardyGraceMinutes())
         ->format('g:i A');
+    $grade12LoginDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime('Grade 12'))
+        ->format('g:i A');
+    $grade12LateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime('Grade 12'))
+        ->addMinutes($policy->tardyGraceMinutes())
+        ->format('g:i A');
 @endphp
 <div class="container py-4" style="max-width: 820px;">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -41,6 +48,8 @@
                 <p class="text-muted">
                     These times control when a student scan is marked <strong>LATE</strong> on attendance logs,
                     SF2 reports, and when departure SMS may be sent.
+                    <strong>Grade 12</strong> is half-day: expected login is {{ $grade12LoginDisplay }}
+                    (late after {{ $grade12LateCutoffDisplay }}), not the morning time below.
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">

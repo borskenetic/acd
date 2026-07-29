@@ -76,7 +76,8 @@
                 School days are weekdays (Mon–Fri) in the selected month.
                 @unless($report)
                     Use <strong>Load from attendance logs</strong> to fill the roster and marks from school-wide IN scans
-                    (present = scanned IN; absent = no IN; tardy = first IN after {{ config('sf2.class_start_time', '07:30') }} + {{ config('sf2.tardy_grace_minutes', 15) }} min).
+                    (present = scanned IN; absent = no IN; tardy = first IN after expected login + grace —
+                    Grade 12 half-day starts at 12:00 noon).
                     You can still adjust any day on the calendar before saving.
                 @else
                     For each learner, use the <strong>calendar</strong> to click absent or tardy days; unmarked weekdays count as present.

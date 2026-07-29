@@ -61,12 +61,17 @@ class AttendanceLogController extends Controller
     {
         $tz = config('app.timezone', 'Asia/Manila');
         $today = now($tz)->toDateString();
-        $lateCutoff = $policy->lateCutoffTimeString();
 
         return [
             'total' => (clone $query)->count(),
-            'in' => (clone $query)->where('status', 'IN')->whereTime('scanned_at', '<=', $lateCutoff)->count(),
-            'late' => (clone $query)->where('status', 'IN')->whereTime('scanned_at', '>', $lateCutoff)->count(),
+            'in' => $policy->applyLatePredicate(
+                (clone $query)->where('status', 'IN'),
+                late: false
+            )->count(),
+            'late' => $policy->applyLatePredicate(
+                (clone $query)->where('status', 'IN'),
+                late: true
+            )->count(),
             'out' => (clone $query)->where('status', 'OUT')->count(),
             'today' => (clone $query)->whereDate('scanned_at', $today)->count(),
         ];

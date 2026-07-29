@@ -57,7 +57,7 @@ class StudentConsecutiveAttendanceService
 
             $consecutiveAbsent = 0;
 
-            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date))) {
+            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date, $student->year))) {
                 $consecutiveLate++;
             } else {
                 $consecutiveLate = 0;

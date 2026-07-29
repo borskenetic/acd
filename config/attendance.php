@@ -19,6 +19,14 @@ return [
         'login_time' => env('ATTENDANCE_GATE_LOGIN_TIME', '07:30'),
         'logout_time' => env('ATTENDANCE_GATE_LOGOUT_TIME', '16:00'),
         'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 15),
+
+        /*
+        | Per-year login overrides (H:i). Grade 12 is half-day starting at noon.
+        | LATE = first IN after (login + tardy_grace_minutes) for that year.
+        */
+        'login_time_by_year' => [
+            'Grade 12' => env('ATTENDANCE_GATE_LOGIN_TIME_GRADE_12', '12:00'),
+        ],
     ],
 
     /*

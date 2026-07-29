@@ -20,6 +20,10 @@
         ->setTimeFromTimeString($policy->loginTime())
         ->addMinutes($policy->tardyGraceMinutes())
         ->format('g:i A');
+    $grade12LateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime('Grade 12'))
+        ->addMinutes($policy->tardyGraceMinutes())
+        ->format('g:i A');
 
     $filterUrl = function (array $merge = [], array $except = []) use ($query) {
         $params = collect($query)->except(array_merge(['page'], $except))->merge($merge)->filter(fn ($v) => $v !== null && $v !== '')->all();
@@ -40,7 +44,7 @@
     <header class="al-header">
         <div class="al-header__text">
             <h1 class="al-title">Attendance Logs</h1>
-            <p class="al-subtitle">Gate terminal scan history — late after {{ $lateCutoffDisplay }}. Filter by date, grade, section, or status.</p>
+            <p class="al-subtitle">Gate terminal scan history — late after {{ $lateCutoffDisplay }} (Grade 12 half-day: after {{ $grade12LateCutoffDisplay }}). Filter by date, grade, section, or status.</p>
         </div>
         <div class="al-header__actions">
             <a href="{{ route('attendance.scan') }}" target="_blank" rel="noopener" class="al-btn al-btn--primary">

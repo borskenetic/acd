@@ -44,7 +44,7 @@
     <header class="al-header">
         <div class="al-header__text">
             <h1 class="al-title">Attendance Logs</h1>
-            <p class="al-subtitle">Gate terminal scan history — late after {{ $lateCutoffDisplay }} (Grade 12 half-day: after {{ $grade12LateCutoffDisplay }}). Filter by date, grade, section, or status.</p>
+            <p class="al-subtitle">Gate terminal scan history — LATE applies only to each student’s first IN of the day (after {{ $lateCutoffDisplay }}; Grade 12 half-day after {{ $grade12LateCutoffDisplay }}). Afternoon returns stay IN.</p>
         </div>
         <div class="al-header__actions">
             <a href="{{ route('attendance.scan') }}" target="_blank" rel="noopener" class="al-btn al-btn--primary">

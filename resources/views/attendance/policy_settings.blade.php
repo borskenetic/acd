@@ -46,8 +46,9 @@
             <div class="card-header fw-semibold">Gate times</div>
             <div class="card-body">
                 <p class="text-muted">
-                    These times control when a student scan is marked <strong>LATE</strong> on attendance logs,
-                    SF2 reports, and when departure SMS may be sent.
+                    These times control when a student’s <strong>first IN of the day</strong> is marked
+                    <strong>LATE</strong> on attendance logs, SF2 reports, and consecutive-late SMS.
+                    Later same-day INs (e.g. after lunch) stay IN.
                     <strong>Grade 12</strong> is half-day: expected login is {{ $grade12LoginDisplay }}
                     (late after {{ $grade12LateCutoffDisplay }}), not the morning time below.
                 </p>

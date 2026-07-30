@@ -62,16 +62,18 @@ class AttendanceLogController extends Controller
         $tz = config('app.timezone', 'Asia/Manila');
         $today = now($tz)->toDateString();
 
+        $lateQuery = $policy->applyLatePredicate(
+            $policy->restrictToFirstInOfDay((clone $query)->where('status', 'IN')),
+            late: true
+        );
+
+        $lateIdSubquery = (clone $lateQuery)->reorder()->select('attendance_logs.id');
+
         return [
             'total' => (clone $query)->count(),
-            'in' => $policy->applyLatePredicate(
-                (clone $query)->where('status', 'IN'),
-                late: false
-            )->count(),
-            'late' => $policy->applyLatePredicate(
-                (clone $query)->where('status', 'IN'),
-                late: true
-            )->count(),
+            // On-time first IN + any later same-day IN (afternoon return, etc.).
+            'in' => (clone $query)->where('status', 'IN')->whereNotIn('attendance_logs.id', $lateIdSubquery)->count(),
+            'late' => (clone $lateQuery)->count(),
             'out' => (clone $query)->where('status', 'OUT')->count(),
             'today' => (clone $query)->whereDate('scanned_at', $today)->count(),
         ];

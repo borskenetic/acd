@@ -95,6 +95,29 @@ class AttendancePolicyService
     }
 
     /**
+     * True when this row is the student's earliest IN on that calendar day.
+     * Only the first IN can be classified LATE (afternoon returns stay IN).
+     */
+    public function isFirstInOfDay(AttendanceLog $log): bool
+    {
+        if (! $log->student_id || ! $log->scanned_at || ! $log->id) {
+            return true;
+        }
+
+        $day = $log->scanned_at->copy()->timezone($this->timezone())->toDateString();
+
+        $firstId = AttendanceLog::query()
+            ->where('student_id', $log->student_id)
+            ->where('status', 'IN')
+            ->whereDate('scanned_at', $day)
+            ->orderBy('scanned_at')
+            ->orderBy('id')
+            ->value('id');
+
+        return (int) $firstId === (int) $log->id;
+    }
+
+    /**
      * @return 'IN'|'LATE'|'OUT'|null
      */
     public function classifyLog(AttendanceLog $log): ?string
@@ -107,6 +130,10 @@ class AttendancePolicyService
 
         if ($status !== 'IN' || ! $log->scanned_at) {
             return null;
+        }
+
+        if (! $this->isFirstInOfDay($log)) {
+            return 'IN';
         }
 
         $year = $log->relationLoaded('student')
@@ -125,22 +152,68 @@ class AttendancePolicyService
         }
 
         if ($classification === 'LATE') {
-            return $query->where('status', 'IN')->where(function (Builder $outer) {
-                $this->applyLatePredicate($outer, late: true);
-            });
+            return $this->applyLatePredicate(
+                $this->restrictToFirstInOfDay($query->where('status', 'IN')),
+                late: true
+            );
         }
 
         if ($classification === 'IN') {
+            // On-time first arrival, or any later IN the same day (never LATE).
             return $query->where('status', 'IN')->where(function (Builder $outer) {
-                $this->applyLatePredicate($outer, late: false);
+                $outer->where(function (Builder $q) {
+                    $this->applyLatePredicate(
+                        $this->restrictToFirstInOfDay($q),
+                        late: false
+                    );
+                })->orWhere(function (Builder $q) {
+                    $this->excludeFirstInOfDay($q);
+                });
             });
         }
 
         return $query;
     }
 
+    /** Keep only the earliest IN row per student per calendar day. */
+    public function restrictToFirstInOfDay(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->whereRaw(
+            "{$table}.id = (
+                SELECT al2.id
+                FROM {$table} AS al2
+                WHERE al2.student_id = {$table}.student_id
+                  AND DATE(al2.scanned_at) = DATE({$table}.scanned_at)
+                  AND UPPER(TRIM(al2.status)) = 'IN'
+                ORDER BY al2.scanned_at ASC, al2.id ASC
+                LIMIT 1
+            )"
+        );
+    }
+
+    /** Keep IN rows that are not the earliest IN that calendar day. */
+    public function excludeFirstInOfDay(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->whereRaw(
+            "{$table}.id <> (
+                SELECT al2.id
+                FROM {$table} AS al2
+                WHERE al2.student_id = {$table}.student_id
+                  AND DATE(al2.scanned_at) = DATE({$table}.scanned_at)
+                  AND UPPER(TRIM(al2.status)) = 'IN'
+                ORDER BY al2.scanned_at ASC, al2.id ASC
+                LIMIT 1
+            )"
+        );
+    }
+
     /**
      * Restrict an IN-status query to late or on-time rows, honoring per-year login overrides.
+     * Callers that mean "LATE badge" should also {@see restrictToFirstInOfDay()}.
      */
     public function applyLatePredicate(Builder $query, bool $late): Builder
     {

@@ -1,0 +1,554 @@
+{
+    "analysis_date": "2026-07-30",
+    "timezone": "Asia/Manila",
+    "source_file": "c:\\Users\\THIS PC\\Downloads\\attendance_logs (2).xlsx",
+    "scanned_at_format": {
+        "samples": [
+            "2026-07-30 09:29 PM",
+            "2026-07-30 09:29 PM",
+            "2026-07-30 09:29 PM",
+            "2026-07-30 09:29 PM",
+            "2026-07-30 09:28 PM",
+            "2026-07-30 09:26 PM",
+            "2026-07-30 09:26 PM",
+            "2026-07-30 09:17 PM",
+            "2026-07-30 09:17 PM",
+            "2026-07-30 09:17 PM",
+            "2026-07-30 09:17 PM",
+            "2026-07-30 09:17 PM",
+            "2026-07-30 09:16 PM",
+            "2026-07-30 09:16 PM",
+            "2026-07-30 09:16 PM"
+        ],
+        "has_seconds": false,
+        "note": "Timestamps appear minute-precision (Y-m-d h:i A style without seconds); exact :00 matching is still useful but cannot distinguish :00:00 from missing seconds."
+    },
+    "totals": {
+        "excel_rows_parsed": 2455,
+        "parse_fails": 0,
+        "rows_by_date": {
+            "2026-07-30": 2455
+        },
+        "students_on_target_date": 1335,
+        "scan_rows_on_target_date": 2455
+    },
+    "pattern_counts": {
+        "IN_only": 478,
+        "OUT_only": 0,
+        "IN_OUT": 593,
+        "IN_OUT_IN": 32,
+        "IN_OUT_IN_OUT": 11,
+        "other": 221
+    },
+    "heuristic_A_classic_lunch_autofill": {
+        "exact_clock_signature_students": 0,
+        "nearby_humanish_IN_OUT_IN_students": 5,
+        "exact_then_afternoon_OUT_students": 0,
+        "exact_then_exact_EOD_OUT_students": 0,
+        "by_course": [],
+        "examples_exact": [],
+        "examples_nearby": [
+            {
+                "name": "Pintor, James Clark",
+                "course": "Unknown",
+                "in1": "2026-07-30 06:42 AM",
+                "out": "2026-07-30 12:39 PM",
+                "in2": "2026-07-30 01:27 PM"
+            },
+            {
+                "name": "Edejer, Chris Gio Renzo",
+                "course": "Unknown",
+                "in1": "2026-07-30 07:09 AM",
+                "out": "2026-07-30 12:12 PM",
+                "in2": "2026-07-30 01:28 PM"
+            },
+            {
+                "name": "Gravilla, Christian",
+                "course": "Unknown",
+                "in1": "2026-07-30 07:29 AM",
+                "out": "2026-07-30 12:18 PM",
+                "in2": "2026-07-30 01:04 PM"
+            },
+            {
+                "name": "Igot, Cassandra",
+                "course": "Unknown",
+                "in1": "2026-07-30 07:02 AM",
+                "out": "2026-07-30 12:18 PM",
+                "in2": "2026-07-30 01:04 PM"
+            },
+            {
+                "name": "Baay, Calev Jah",
+                "course": "Unknown",
+                "in1": "2026-07-30 07:38 AM",
+                "out": "2026-07-30 12:06 PM",
+                "in2": "2026-07-30 01:02 PM"
+            }
+        ]
+    },
+    "heuristic_B_exact_clock_clusters": {
+        "OUT_exact": {
+            "11:00": 0,
+            "11:15": 0,
+            "12:00": 1,
+            "15:00": 3,
+            "15:15": 0,
+            "16:30": 4
+        },
+        "IN_exact": {
+            "13:00": 0
+        },
+        "comparisons": {
+            "OUT_11:00_exact": 0,
+            "OUT_11xx_other_excl_11:15": 2,
+            "OUT_11:15_exact": 0,
+            "OUT_12:00_exact": 1,
+            "OUT_12:01-12:59": 285,
+            "IN_13:00_exact": 0,
+            "IN_13:01-13:59": 10,
+            "OUT_15:00_exact": 3,
+            "OUT_15xx_other_excl_15:15": 11,
+            "OUT_15:15_exact": 0,
+            "OUT_16:30_exact": 4,
+            "OUT_16xx_other": 215,
+            "OUT_around_22:00_21:30-22:30": 0,
+            "OUT_22:00_exact": 0
+        },
+        "students_with_exact_13:00_IN": 0,
+        "students_with_exact_lunch_OUT": 1,
+        "top_OUT_times": {
+            "12:11": 30,
+            "12:15": 18,
+            "16:57": 18,
+            "16:56": 18,
+            "12:19": 18,
+            "12:18": 16,
+            "16:55": 15,
+            "12:17": 14,
+            "12:23": 13,
+            "12:10": 13,
+            "16:50": 13,
+            "12:09": 13,
+            "12:14": 12,
+            "12:16": 12,
+            "12:13": 11,
+            "12:12": 11,
+            "16:51": 11,
+            "16:31": 11,
+            "12:22": 10,
+            "12:25": 9,
+            "17:40": 9,
+            "17:02": 9,
+            "16:49": 9,
+            "17:01": 8,
+            "12:08": 8
+        },
+        "top_IN_times": {
+            "07:27": 31,
+            "07:15": 29,
+            "07:03": 29,
+            "07:22": 26,
+            "07:29": 26,
+            "07:26": 25,
+            "07:28": 24,
+            "07:23": 22,
+            "07:25": 21,
+            "12:15": 20,
+            "12:13": 20,
+            "07:17": 20,
+            "07:08": 20,
+            "06:47": 19,
+            "07:33": 19,
+            "07:30": 19,
+            "07:24": 18,
+            "07:01": 18,
+            "07:21": 18,
+            "12:01": 17,
+            "07:38": 17,
+            "07:32": 17,
+            "07:31": 17,
+            "07:09": 16,
+            "07:00": 16
+        },
+        "OUT_12xx_histogram_note": "Human lunch OUT cluster peaks at 12:11 (30), 12:15 (18), 12:19 (18); exact 12:00 has only 1. Opposite of autofill spike-at-clock.",
+        "IN_13xx_histogram_note": "Zero scans at exact 13:00; only 10 INs in entire 13:00–13:59 hour, scattered (13:02,13:04,13:09…). Afternoon returns instead cluster ~12:01–12:30."
+    },
+    "heuristic_C_EOD_autofill": {
+        "students_last_OUT_exact_eod_15:00_15:15_16:30": 5,
+        "students_last_OUT_around_22:00": 0,
+        "examples_exact_eod": [
+            {
+                "name": "SeÑoron, Keanne",
+                "course": "Unknown",
+                "out": "2026-07-30 04:30 PM",
+                "seq": "IN→OUT"
+            },
+            {
+                "name": "Enabacan, Cedric James",
+                "course": "Unknown",
+                "out": "2026-07-30 04:30 PM",
+                "seq": "IN→OUT"
+            },
+            {
+                "name": "Bacalla, Flynn Aiden",
+                "course": "Unknown",
+                "out": "2026-07-30 04:30 PM",
+                "seq": "IN→OUT"
+            },
+            {
+                "name": "Mahilum, Zea Xtian",
+                "course": "Unknown",
+                "out": "2026-07-30 04:30 PM",
+                "seq": "IN→IN→OUT"
+            },
+            {
+                "name": "Sarangsang, Lyka",
+                "course": "Unknown",
+                "out": "2026-07-30 03:00 PM",
+                "seq": "IN→OUT→OUT"
+            }
+        ]
+    },
+    "heuristic_D_ending_still_IN": {
+        "count": 662,
+        "ending_OUT": 673,
+        "pct_of_students": 49.6,
+        "examples": [
+            {
+                "name": "Caong, Lj Orleane",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:29 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Dy, Irish Angel",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:17 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Tejedor, Lizette",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:16 PM",
+                "seq": "IN→OUT→IN",
+                "scan_count": 3
+            },
+            {
+                "name": "Limbre, Rhea",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:07 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Sugala, Sophia Kaith",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:07 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Labando, Jeffermark",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:07 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Pajo, Janessa Ayla",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:07 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Caguscos, Karen",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:07 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Libron, Shyra Daeme",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:06 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Espinoza, Atticus Calix",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:02 PM",
+                "seq": "IN",
+                "scan_count": 1
+            },
+            {
+                "name": "Boc, Michael",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:01 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Maonio, Claue Unice",
+                "course": "Unknown",
+                "last_at": "2026-07-30 09:00 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Maceda, Joshua",
+                "course": "Unknown",
+                "last_at": "2026-07-30 08:47 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            },
+            {
+                "name": "Rosano, Jeffzhie",
+                "course": "Unknown",
+                "last_at": "2026-07-30 08:28 PM",
+                "seq": "IN→OUT→IN",
+                "scan_count": 3
+            },
+            {
+                "name": "Tan, Mayumi",
+                "course": "Unknown",
+                "last_at": "2026-07-30 08:24 PM",
+                "seq": "IN→IN",
+                "scan_count": 2
+            }
+        ],
+        "last_IN_by_hour": {
+            "06": 76,
+            "07": 278,
+            "08": 4,
+            "09": 7,
+            "10": 4,
+            "11": 18,
+            "12": 100,
+            "13": 5,
+            "14": 7,
+            "15": 5,
+            "16": 58,
+            "17": 36,
+            "18": 34,
+            "19": 11,
+            "20": 7,
+            "21": 12
+        },
+        "morning_last_IN_before_11": 369,
+        "note": "49.6% of students end on IN. 369 end with a morning IN (06–10h) never followed by OUT — strong evidence neither lunch autofill nor EOD auto-out closed them."
+    },
+    "heuristic_E_unfilled_lunch_candidates": {
+        "single_morning_IN_only": 365,
+        "session_eligible_inferred": null,
+        "by_course": {
+            "Unknown": 365
+        },
+        "examples": [
+            {
+                "name": "Obenza, Nikka",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 10:27 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "SosmeÑa, Mikaella",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 10:24 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Pagalan, Miles Debbie",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 10:02 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Yee, Jillian Jee",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:54 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Laidan, Hosni",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:52 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Apor, Rhaysyl",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:24 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Guyo, Alyssa Nicole",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:21 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Gustilo, Elyza",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:16 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Azarcon, Dutches",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:16 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Gales, Queenie Maries",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 09:00 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Montero, Aleah Cassandra",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 08:47 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Yap, Shawn Kylle",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 08:41 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Gonzales, Francis Mico",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 08:29 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Dichoso, Shandy",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 08:17 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Toledo, Gabriel John B.",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:59 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "De Asis, Rafael Keizer",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:57 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Basas, Jick, Jr.",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:51 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Masucol, Precious Bea",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:49 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Senok, Jorenz",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:47 AM",
+                "inferred_lunch_out": null
+            },
+            {
+                "name": "Agocoy, Johannes Paulos",
+                "course": "Unknown",
+                "section": "—",
+                "at": "2026-07-30 07:46 AM",
+                "inferred_lunch_out": null
+            }
+        ],
+        "session_eligible_note": "Cannot infer grade from Course/Section (all Unknown / —). Treat all 365 single morning-IN-only students as potential lunch-autofill candidates if they use the session model."
+    },
+    "verdict": {
+        "lunch_autofill_ran": false,
+        "lunch_confidence": "high",
+        "lunch_reasons": [
+            "0 students match classic morning-IN → exact lunch OUT (11:00/11:15/12:00) → exact 13:00 IN signature",
+            "0 IN at exact 13:00 vs only 10 human-scattered INs in 13:01–13:59; autofill would spike at 13:00",
+            "OUT at exact lunch clocks: 11:00=0, 11:15=0, 12:00=1 vs 285 OUTs in 12:01–12:59 (human midday cluster)",
+            "365 students remain with only a morning IN and no lunch OUT / afternoon IN (unfilled candidates)",
+            "Only 5 nearby IN→OUT→IN patterns, all with non-clock human times (e.g. OUT 12:39 IN 13:27)"
+        ],
+        "eod_autofill_ran": false,
+        "eod_confidence": "high",
+        "eod_reasons": [
+            "662/1335 students (49.6%) still end the day on IN — cron would have inserted OUT for still-IN session students",
+            "0 OUTs at or around 22:00 (job asOf time); OUT_22:00_exact=0, window 21:30–22:30=0",
+            "Exact grade eod_out clocks are rare and not dominant: 15:00=3, 15:15=0, 16:30=4 vs large human cluster 16:31–17:xx (215 other 16:xx OUTs)",
+            "Only 5 students have last OUT at exact eod clock times — consistent with coincidence, not mass autofill"
+        ],
+        "best_guess": "Neither attendance:autofill-lunch nor attendance:auto-eod-out left detectable traces in the 2026-07-30 Excel export. Both appear not to have run (or failed before writing scans)."
+    },
+    "header_detected": {
+        "A": "Last Name",
+        "B": "First Name",
+        "C": "Course",
+        "D": "Section",
+        "E": "Status",
+        "F": "Scanned At"
+    },
+    "export_limitations": {
+        "course_column": "All 2455 rows have Course=\"Unknown\" — cannot grade-filter lunch_out/eod_out expectations from Excel.",
+        "section_column": "All rows have Section=\"—\" (em dash) — no section/grade signal in export.",
+        "source_tags": "Excel export has no auto_lunch_out / auto_afternoon_in / auto_eod_out source column; detection is timestamp-pattern only.",
+        "timestamp_format": "Y-m-d h:i A (minute precision, no seconds). Exact :00 matching remains meaningful for cron-inserted scheduled times."
+    },
+    "concrete_counts": {
+        "total_students": 1335,
+        "total_scan_rows": 2455,
+        "patterns": {
+            "IN_only": 478,
+            "OUT_only": 0,
+            "IN_OUT": 593,
+            "IN_OUT_IN": 32,
+            "IN_OUT_IN_OUT": 11,
+            "other": 221
+        },
+        "classic_lunch_exact": 0,
+        "classic_lunch_nearby": 5,
+        "exact_IN_13:00": 0,
+        "exact_OUT_11:00": 0,
+        "exact_OUT_11:15": 0,
+        "exact_OUT_12:00": 1,
+        "OUT_12:01_to_12:59": 285,
+        "IN_13:01_to_13:59": 10,
+        "exact_OUT_15:00": 3,
+        "exact_OUT_15:15": 0,
+        "exact_OUT_16:30": 4,
+        "OUT_around_22:00": 0,
+        "students_ending_on_IN": 662,
+        "students_ending_on_OUT": 673,
+        "single_morning_IN_only_unfilled_candidates": 365
+    }
+}

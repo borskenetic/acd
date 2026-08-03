@@ -146,3 +146,41 @@ Hostinger may show:
 - SSH: `~/domains/pantas.org/public_html/acd/` or similar
 
 They are the same folder; only the prefix differs.
+
+---
+
+## Cron (Laravel scheduler)
+
+Attendance autos (lunch fill, EOD OUT, stale IN close, consecutive-absence SMS) run through **one** Hostinger cron that calls `schedule:run` every minute. Laravel then fires the due jobs at Asia/Manila times.
+
+### Recommended ACD command
+
+In **hPanel → Advanced → Cron Jobs**, use **every minute** (`* * * * *`) and:
+
+```bash
+cd /home/u537625773/domains/pantas.org/public_html/acd && /usr/bin/php artisan schedule:run >> /home/u537625773/domains/pantas.org/public_html/acd/storage/logs/cron.log 2>&1
+```
+
+Notes:
+
+1. Prefer `cd … && php artisan` (same style as the UAP job). A bare path to `artisan` often works, but cwd-related failures are easier to avoid this way.
+2. If the site needs PHP 8.2/8.3 and `/usr/bin/php` is too old, switch the binary to the matching Hostinger path, e.g. `/opt/alt/php82/usr/bin/php` or `/opt/alt/php83/usr/bin/php` (confirm under **PHP Configuration** / SSH `ls /opt/alt`).
+3. Ensure `storage/logs/` is writable so `cron.log` and `scheduler.log` can be created.
+4. Deploy must include the schedule in `bootstrap/app.php` (lunch ~13:00, EOD ~22:00, Asia/Manila).
+
+### Verify
+
+1. Click **View Output** on the ACD cron — you should see either `No scheduled commands are ready to run.` (most minutes) or a job result near 13:00 / 22:00 Manila.
+2. File Manager: open `public_html/acd/storage/logs/cron.log` — if the file is missing or never grows, the cron entry is not executing.
+3. After deploy: `public_html/acd/storage/logs/scheduler.log` gets lines when lunch/EOD jobs actually run.
+4. SSH (optional):
+
+```bash
+cd ~/domains/pantas.org/public_html/acd
+/usr/bin/php -v
+/usr/bin/php artisan schedule:list
+/usr/bin/php artisan attendance:autofill-lunch
+/usr/bin/php artisan attendance:auto-eod-out
+```
+
+If those artisan commands error, fix PHP version / `.env` / permissions first — the Hostinger cron will hit the same error every minute.

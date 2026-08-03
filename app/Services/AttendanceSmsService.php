@@ -74,7 +74,7 @@ class AttendanceSmsService
                 if ($ok) {
                     $daily->update(['arrival_sent' => true]);
                 }
-            } elseif (! $daily->departure_sent && $this->isDepartureWindow($scannedAt)) {
+            } elseif (! $daily->departure_sent && $this->isDepartureWindow($scannedAt, $student)) {
                 $ok = $this->sendTemplate(
                     $number,
                     Setting::scanSmsDepartureTemplate(),
@@ -226,9 +226,13 @@ class AttendanceSmsService
         }
     }
 
-    protected function isDepartureWindow(Carbon $scannedAt): bool
+    protected function isDepartureWindow(Carbon $scannedAt, ?Student $student = null): bool
     {
-        return $this->policy->isDepartureWindow($scannedAt);
+        return $this->policy->isDepartureWindow(
+            $scannedAt,
+            is_string($student?->year) ? $student->year : null,
+            is_string($student?->section) ? $student->section : null,
+        );
     }
 
     /** @param  array<string, string>  $vars */

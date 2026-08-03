@@ -16,6 +16,16 @@
         ->setTimeFromTimeString($policy->loginTime('Grade 12'))
         ->addMinutes($policy->tardyGraceMinutes())
         ->format('g:i A');
+    $nightLoginDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime('Grade 11', 'Abigail'))
+        ->format('g:i A');
+    $nightLogoutDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->logoutTime('Grade 11', 'Abigail'))
+        ->format('g:i A');
+    $nightLateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($policy->loginTime('Grade 11', 'Abigail'))
+        ->addMinutes($policy->tardyGraceMinutes())
+        ->format('g:i A');
 @endphp
 <div class="container py-4" style="max-width: 820px;">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -49,8 +59,10 @@
                     These times control when a student’s <strong>first IN of the day</strong> is marked
                     <strong>LATE</strong> on attendance logs, SF2 reports, and consecutive-late SMS.
                     Later same-day INs (e.g. after lunch) stay IN.
-                    <strong>Grade 12</strong> is half-day: expected login is {{ $grade12LoginDisplay }}
-                    (late after {{ $grade12LateCutoffDisplay }}), not the morning time below.
+                    <strong>Grade 12</strong> day classes: login {{ $grade12LoginDisplay }}
+                    (late after {{ $grade12LateCutoffDisplay }}).
+                    <strong>Night shift</strong> (Grade 11 Abigail, Grade 12 Dignity): login {{ $nightLoginDisplay }}
+                    – out {{ $nightLogoutDisplay }} (late after {{ $nightLateCutoffDisplay }}).
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">

@@ -14,9 +14,17 @@ class AttendancePolicyService
         return (string) config('sf2.timezone', config('app.timezone', 'Asia/Manila'));
     }
 
-    public function loginTime(?string $year = null): string
+    /**
+     * Expected login (H:i). Section schedule > year override > gate default.
+     */
+    public function loginTime(?string $year = null, ?string $section = null): string
     {
-        $year = $this->normalizeYear($year);
+        $schedule = $this->scheduleFor($year, $section);
+        if ($schedule !== null) {
+            return $schedule['login_time'];
+        }
+
+        $year = $this->normalizeLabel($year);
         if ($year !== null) {
             $overrides = $this->loginTimeOverrides();
             if (isset($overrides[$year])) {
@@ -25,6 +33,19 @@ class AttendancePolicyService
         }
 
         return (string) ($this->policy()['login_time'] ?? config('attendance.gate.login_time', '08:00'));
+    }
+
+    /**
+     * Expected logout (H:i). Section schedule > gate default.
+     */
+    public function logoutTime(?string $year = null, ?string $section = null): string
+    {
+        $schedule = $this->scheduleFor($year, $section);
+        if ($schedule !== null && ! empty($schedule['logout_time'])) {
+            return $schedule['logout_time'];
+        }
+
+        return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
     }
 
     /**
@@ -41,7 +62,7 @@ class AttendancePolicyService
 
         $out = [];
         foreach ($raw as $year => $time) {
-            $year = $this->normalizeYear(is_string($year) ? $year : null);
+            $year = $this->normalizeLabel(is_string($year) ? $year : null);
             if ($year === null || ! is_string($time) || trim($time) === '') {
                 continue;
             }
@@ -51,9 +72,90 @@ class AttendancePolicyService
         return $out;
     }
 
-    public function logoutTime(): string
+    /**
+     * Configured year+section evening/special schedules.
+     *
+     * @return list<array{years: list<string>, sections: list<string>, login_time: string, logout_time: string}>
+     */
+    public function sectionSchedules(): array
     {
-        return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
+        $raw = config('attendance.gate.schedules_by_year_section', []);
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $years = [];
+            foreach ((array) ($row['years'] ?? []) as $year) {
+                $year = $this->normalizeLabel(is_string($year) ? $year : null);
+                if ($year !== null) {
+                    $years[] = $year;
+                }
+            }
+
+            $sections = [];
+            foreach ((array) ($row['sections'] ?? []) as $section) {
+                $section = $this->normalizeLabel(is_string($section) ? $section : null);
+                if ($section !== null) {
+                    $sections[] = $section;
+                }
+            }
+
+            if ($years === [] || $sections === []) {
+                continue;
+            }
+
+            $login = is_string($row['login_time'] ?? null) ? $this->normalizeTimeInput($row['login_time']) : null;
+            $logout = is_string($row['logout_time'] ?? null) ? $this->normalizeTimeInput($row['logout_time']) : null;
+            if ($login === null) {
+                continue;
+            }
+
+            $out[] = [
+                'years' => $years,
+                'sections' => $sections,
+                'login_time' => $login,
+                'logout_time' => $logout ?? $this->logoutTime(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{login_time: string, logout_time: string}|null
+     */
+    public function scheduleFor(?string $year, ?string $section): ?array
+    {
+        $year = $this->normalizeLabel($year);
+        $section = $this->normalizeLabel($section);
+        if ($year === null || $section === null) {
+            return null;
+        }
+
+        $sectionKey = mb_strtolower($section);
+
+        foreach ($this->sectionSchedules() as $sched) {
+            if (! in_array($year, $sched['years'], true)) {
+                continue;
+            }
+
+            foreach ($sched['sections'] as $name) {
+                if (mb_strtolower($name) === $sectionKey) {
+                    return [
+                        'login_time' => $sched['login_time'],
+                        'logout_time' => $sched['logout_time'],
+                    ];
+                }
+            }
+        }
+
+        return null;
     }
 
     public function tardyGraceMinutes(): int
@@ -71,27 +173,28 @@ class AttendancePolicyService
         return (int) ($this->policy()['consecutive_absent_threshold'] ?? config('attendance.sms.consecutive_absent_threshold', 3));
     }
 
-    public function tardyCutoffForDate(string $date, ?string $year = null): Carbon
+    public function tardyCutoffForDate(string $date, ?string $year = null, ?string $section = null): Carbon
     {
         $tz = $this->timezone();
 
-        return Carbon::parse($date.' '.$this->loginTime($year), $tz)->addMinutes($this->tardyGraceMinutes());
+        return Carbon::parse($date.' '.$this->loginTime($year, $section), $tz)
+            ->addMinutes($this->tardyGraceMinutes());
     }
 
     /** Time-of-day after which first IN counts as late (H:i:s). */
-    public function lateCutoffTimeString(?string $year = null): string
+    public function lateCutoffTimeString(?string $year = null, ?string $section = null): string
     {
         return Carbon::today($this->timezone())
-            ->setTimeFromTimeString($this->loginTime($year))
+            ->setTimeFromTimeString($this->loginTime($year, $section))
             ->addMinutes($this->tardyGraceMinutes())
             ->format('H:i:s');
     }
 
-    public function isLateIn(Carbon $scannedAt, ?string $year = null): bool
+    public function isLateIn(Carbon $scannedAt, ?string $year = null, ?string $section = null): bool
     {
         $instant = $scannedAt->copy()->timezone($this->timezone());
 
-        return $instant->gt($this->tardyCutoffForDate($instant->toDateString(), $year));
+        return $instant->gt($this->tardyCutoffForDate($instant->toDateString(), $year, $section));
     }
 
     /**
@@ -136,11 +239,14 @@ class AttendancePolicyService
             return 'IN';
         }
 
-        $year = $log->relationLoaded('student')
-            ? $log->student?->year
-            : $log->student()->value('year');
+        $student = $log->relationLoaded('student')
+            ? $log->student
+            : $log->student()->first(['year', 'section']);
 
-        return $this->isLateIn($log->scanned_at, is_string($year) ? $year : null) ? 'LATE' : 'IN';
+        $year = is_string($student?->year ?? null) ? $student->year : null;
+        $section = is_string($student?->section ?? null) ? $student->section : null;
+
+        return $this->isLateIn($log->scanned_at, $year, $section) ? 'LATE' : 'IN';
     }
 
     public function applyClassificationFilter(Builder $query, string $classification): Builder
@@ -159,7 +265,6 @@ class AttendancePolicyService
         }
 
         if ($classification === 'IN') {
-            // On-time first arrival, or any later IN the same day (never LATE).
             return $query->where('status', 'IN')->where(function (Builder $outer) {
                 $outer->where(function (Builder $q) {
                     $this->applyLatePredicate(
@@ -212,46 +317,107 @@ class AttendancePolicyService
     }
 
     /**
-     * Restrict an IN-status query to late or on-time rows, honoring per-year login overrides.
-     * Callers that mean "LATE badge" should also {@see restrictToFirstInOfDay()}.
+     * Restrict an IN-status query to late or on-time rows.
+     * Priority: evening section schedule → year override → default gate time.
      */
     public function applyLatePredicate(Builder $query, bool $late): Builder
     {
-        $defaultCutoff = $this->lateCutoffTimeString();
-        $overrides = $this->loginTimeOverrides();
-        $overrideYears = array_keys($overrides);
         $operator = $late ? '>' : '<=';
+        $grace = $this->tardyGraceMinutes();
+        $tz = $this->timezone();
+        $defaultCutoff = $this->lateCutoffTimeString();
+        $sectionSchedules = $this->sectionSchedules();
+        $yearOverrides = $this->loginTimeOverrides();
 
-        return $query->where(function (Builder $outer) use ($defaultCutoff, $overrides, $overrideYears, $operator) {
-            foreach ($overrides as $year => $loginTime) {
-                $cutoff = Carbon::today($this->timezone())
-                    ->setTimeFromTimeString($loginTime)
-                    ->addMinutes($this->tardyGraceMinutes())
+        return $query->where(function (Builder $outer) use (
+            $operator,
+            $grace,
+            $tz,
+            $defaultCutoff,
+            $sectionSchedules,
+            $yearOverrides
+        ) {
+            foreach ($sectionSchedules as $sched) {
+                $cutoff = Carbon::today($tz)
+                    ->setTimeFromTimeString($sched['login_time'])
+                    ->addMinutes($grace)
                     ->format('H:i:s');
 
-                $outer->orWhere(function (Builder $q) use ($year, $cutoff, $operator) {
-                    $q->whereHas('student', fn (Builder $s) => $s->where('year', $year))
-                        ->whereTime('scanned_at', $operator, $cutoff);
+                $outer->orWhere(function (Builder $q) use ($sched, $cutoff, $operator) {
+                    $q->whereHas('student', function (Builder $s) use ($sched) {
+                        $this->constrainStudentToSectionSchedule($s, $sched);
+                    })->whereTime('scanned_at', $operator, $cutoff);
                 });
             }
 
-            $outer->orWhere(function (Builder $q) use ($defaultCutoff, $overrideYears, $operator) {
-                if ($overrideYears !== []) {
-                    $q->where(function (Builder $yearQ) use ($overrideYears) {
-                        $yearQ->whereDoesntHave('student')
-                            ->orWhereHas('student', fn (Builder $s) => $s->whereNotIn('year', $overrideYears));
-                    });
-                }
+            foreach ($yearOverrides as $year => $loginTime) {
+                $cutoff = Carbon::today($tz)
+                    ->setTimeFromTimeString($loginTime)
+                    ->addMinutes($grace)
+                    ->format('H:i:s');
 
-                $q->whereTime('scanned_at', $operator, $defaultCutoff);
+                $excludedSections = $this->sectionsCoveredForYear($year, $sectionSchedules);
+
+                $outer->orWhere(function (Builder $q) use ($year, $cutoff, $operator, $excludedSections) {
+                    $q->whereHas('student', function (Builder $s) use ($year, $excludedSections) {
+                        $s->where('year', $year);
+                        if ($excludedSections !== []) {
+                            $s->where(function (Builder $notEvening) use ($excludedSections) {
+                                $notEvening->whereNull('section')
+                                    ->orWhere('section', '')
+                                    ->orWhereRaw(
+                                        'LOWER(TRIM(section)) NOT IN ('.implode(',', array_fill(0, count($excludedSections), '?')).')',
+                                        $excludedSections
+                                    );
+                            });
+                        }
+                    })->whereTime('scanned_at', $operator, $cutoff);
+                });
+            }
+
+            $outer->orWhere(function (Builder $q) use (
+                $defaultCutoff,
+                $operator,
+                $yearOverrides,
+                $sectionSchedules
+            ) {
+                $q->where(function (Builder $notSpecial) use ($yearOverrides, $sectionSchedules) {
+                    $notSpecial->whereDoesntHave('student')
+                        ->orWhereHas('student', function (Builder $s) use ($yearOverrides, $sectionSchedules) {
+                            $s->where(function (Builder $studentScope) use ($yearOverrides, $sectionSchedules) {
+                                $overrideYears = array_keys($yearOverrides);
+                                if ($overrideYears !== []) {
+                                    $studentScope->whereNotIn('year', $overrideYears);
+                                }
+
+                                foreach ($sectionSchedules as $sched) {
+                                    $studentScope->where(function (Builder $notSched) use ($sched) {
+                                        $notSched->whereNotIn('year', $sched['years'])
+                                            ->orWhere(function (Builder $wrongSection) use ($sched) {
+                                                $keys = array_map(
+                                                    fn (string $name) => mb_strtolower($name),
+                                                    $sched['sections']
+                                                );
+                                                $wrongSection->whereNull('section')
+                                                    ->orWhere('section', '')
+                                                    ->orWhereRaw(
+                                                        'LOWER(TRIM(section)) NOT IN ('.implode(',', array_fill(0, count($keys), '?')).')',
+                                                        $keys
+                                                    );
+                                            });
+                                    });
+                                }
+                            });
+                        });
+                })->whereTime('scanned_at', $operator, $defaultCutoff);
             });
         });
     }
 
-    public function isDepartureWindow(Carbon $scannedAt): bool
+    public function isDepartureWindow(Carbon $scannedAt, ?string $year = null, ?string $section = null): bool
     {
         $tz = $this->timezone();
-        $cutoff = Carbon::today($tz)->setTimeFromTimeString($this->logoutTime());
+        $cutoff = Carbon::today($tz)->setTimeFromTimeString($this->logoutTime($year, $section));
 
         return $scannedAt->copy()->timezone($tz)->gte($cutoff);
     }
@@ -300,14 +466,47 @@ class AttendancePolicyService
         }
     }
 
-    protected function normalizeYear(?string $year): ?string
+    protected function normalizeLabel(?string $value): ?string
     {
-        if ($year === null) {
+        if ($value === null) {
             return null;
         }
 
-        $year = trim(preg_replace('/\s+/', ' ', $year) ?? '');
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
 
-        return $year !== '' ? $year : null;
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param  array{years: list<string>, sections: list<string>, login_time: string, logout_time: string}  $sched
+     */
+    protected function constrainStudentToSectionSchedule(Builder $studentQuery, array $sched): void
+    {
+        $studentQuery->whereIn('year', $sched['years'])
+            ->where(function (Builder $sectionQ) use ($sched) {
+                foreach ($sched['sections'] as $i => $name) {
+                    $method = $i === 0 ? 'whereRaw' : 'orWhereRaw';
+                    $sectionQ->{$method}('LOWER(TRIM(section)) = ?', [mb_strtolower($name)]);
+                }
+            });
+    }
+
+    /**
+     * @param  list<array{years: list<string>, sections: list<string>, login_time: string, logout_time: string}>  $sectionSchedules
+     * @return list<string> lowercase section names
+     */
+    protected function sectionsCoveredForYear(string $year, array $sectionSchedules): array
+    {
+        $sections = [];
+        foreach ($sectionSchedules as $sched) {
+            if (! in_array($year, $sched['years'], true)) {
+                continue;
+            }
+            foreach ($sched['sections'] as $name) {
+                $sections[] = mb_strtolower($name);
+            }
+        }
+
+        return array_values(array_unique($sections));
     }
 }

@@ -95,7 +95,7 @@ class Sf2AttendanceLogMapper
      * @param  array<string, Carbon>  $firstInByDate
      * @return array{absent_dates: list<string>, tardy_dates: list<string>}
      */
-    public function marksForStudent(array $schoolDays, array $firstInByDate, ?string $year = null): array
+    public function marksForStudent(array $schoolDays, array $firstInByDate, ?string $year = null, ?string $section = null): array
     {
         $absent = [];
         $tardy = [];
@@ -109,7 +109,7 @@ class Sf2AttendanceLogMapper
                 continue;
             }
 
-            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date, $year))) {
+            if ($scannedAt->gt($this->policy->tardyCutoffForDate($date, $year, $section))) {
                 $tardy[] = $date;
             }
         }
@@ -163,7 +163,8 @@ class Sf2AttendanceLogMapper
             $marks = $this->marksForStudent(
                 $schoolDays,
                 $firstInMap[$student->id] ?? [],
-                $student->year
+                $student->year,
+                $student->section
             );
 
             $students[] = [

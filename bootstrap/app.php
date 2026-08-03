@@ -27,18 +27,31 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule) {
+        $schedulerLog = storage_path('logs/scheduler.log');
+
         $schedule->command('attendance:close-stale-ins')
             ->dailyAt('00:05')
-            ->timezone('Asia/Manila');
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
+
         $schedule->command('attendance:autofill-lunch')
             ->dailyAt(config('attendance_sessions.lunch_autofill_at', '13:00'))
-            ->timezone('Asia/Manila');
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
+
         $schedule->command('attendance:auto-eod-out')
             ->dailyAt(config('attendance_sessions.eod_auto_out_at', '22:00'))
-            ->timezone('Asia/Manila');
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
+
         $schedule->command('attendance:check-consecutive-absences')
             ->dailyAt('16:30')
-            ->timezone('Asia/Manila');
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

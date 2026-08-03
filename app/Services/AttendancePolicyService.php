@@ -138,15 +138,13 @@ class AttendancePolicyService
             return null;
         }
 
-        $sectionKey = mb_strtolower($section);
-
         foreach ($this->sectionSchedules() as $sched) {
             if (! in_array($year, $sched['years'], true)) {
                 continue;
             }
 
             foreach ($sched['sections'] as $name) {
-                if (mb_strtolower($name) === $sectionKey) {
+                if ($this->sectionMatches($section, $name)) {
                     return [
                         'login_time' => $sched['login_time'],
                         'logout_time' => $sched['logout_time'],
@@ -156,6 +154,24 @@ class AttendancePolicyService
         }
 
         return null;
+    }
+
+    /**
+     * Case-insensitive section match: exact, or either contains the other
+     * (so "Abigail" matches "Abigail Evening" and vice versa).
+     */
+    public function sectionMatches(string $studentSection, string $configuredSection): bool
+    {
+        $a = mb_strtolower(trim($studentSection));
+        $b = mb_strtolower(trim($configuredSection));
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+
+        return str_contains($a, $b) || str_contains($b, $a);
     }
 
     public function tardyGraceMinutes(): int
@@ -361,16 +377,7 @@ class AttendancePolicyService
                 $outer->orWhere(function (Builder $q) use ($year, $cutoff, $operator, $excludedSections) {
                     $q->whereHas('student', function (Builder $s) use ($year, $excludedSections) {
                         $s->where('year', $year);
-                        if ($excludedSections !== []) {
-                            $s->where(function (Builder $notEvening) use ($excludedSections) {
-                                $notEvening->whereNull('section')
-                                    ->orWhere('section', '')
-                                    ->orWhereRaw(
-                                        'LOWER(TRIM(section)) NOT IN ('.implode(',', array_fill(0, count($excludedSections), '?')).')',
-                                        $excludedSections
-                                    );
-                            });
-                        }
+                        $this->constrainStudentOutsideSections($s, $excludedSections);
                     })->whereTime('scanned_at', $operator, $cutoff);
                 });
             }
@@ -394,16 +401,7 @@ class AttendancePolicyService
                                     $studentScope->where(function (Builder $notSched) use ($sched) {
                                         $notSched->whereNotIn('year', $sched['years'])
                                             ->orWhere(function (Builder $wrongSection) use ($sched) {
-                                                $keys = array_map(
-                                                    fn (string $name) => mb_strtolower($name),
-                                                    $sched['sections']
-                                                );
-                                                $wrongSection->whereNull('section')
-                                                    ->orWhere('section', '')
-                                                    ->orWhereRaw(
-                                                        'LOWER(TRIM(section)) NOT IN ('.implode(',', array_fill(0, count($keys), '?')).')',
-                                                        $keys
-                                                    );
+                                                $this->constrainStudentOutsideSections($wrongSection, $sched['sections']);
                                             });
                                     });
                                 }
@@ -485,15 +483,45 @@ class AttendancePolicyService
         $studentQuery->whereIn('year', $sched['years'])
             ->where(function (Builder $sectionQ) use ($sched) {
                 foreach ($sched['sections'] as $i => $name) {
-                    $method = $i === 0 ? 'whereRaw' : 'orWhereRaw';
-                    $sectionQ->{$method}('LOWER(TRIM(section)) = ?', [mb_strtolower($name)]);
+                    $needle = mb_strtolower(trim($name));
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $sectionQ->{$method}(function (Builder $one) use ($needle) {
+                        $one->whereRaw('LOWER(TRIM(section)) = ?', [$needle])
+                            ->orWhereRaw('LOWER(TRIM(section)) LIKE ?', ['%'.$needle.'%'])
+                            ->orWhereRaw('? LIKE CONCAT(\'%\', LOWER(TRIM(section)), \'%\')', [$needle]);
+                    });
                 }
             });
     }
 
     /**
+     * Student is NOT on any configured evening/section schedule for their year.
+     *
+     * @param  list<string>  $sectionNames
+     */
+    protected function constrainStudentOutsideSections(Builder $studentQuery, array $sectionNames): void
+    {
+        if ($sectionNames === []) {
+            return;
+        }
+
+        $studentQuery->where(function (Builder $notEvening) use ($sectionNames) {
+            $notEvening->whereNull('section')
+                ->orWhere('section', '')
+                ->orWhere(function (Builder $sec) use ($sectionNames) {
+                    foreach ($sectionNames as $name) {
+                        $needle = mb_strtolower(trim($name));
+                        $sec->whereRaw('LOWER(TRIM(section)) <> ?', [$needle])
+                            ->whereRaw('LOWER(TRIM(section)) NOT LIKE ?', ['%'.$needle.'%'])
+                            ->whereRaw('? NOT LIKE CONCAT(\'%\', LOWER(TRIM(section)), \'%\')', [$needle]);
+                    }
+                });
+        });
+    }
+
+    /**
      * @param  list<array{years: list<string>, sections: list<string>, login_time: string, logout_time: string}>  $sectionSchedules
-     * @return list<string> lowercase section names
+     * @return list<string> section names as configured
      */
     protected function sectionsCoveredForYear(string $year, array $sectionSchedules): array
     {
@@ -503,7 +531,7 @@ class AttendancePolicyService
                 continue;
             }
             foreach ($sched['sections'] as $name) {
-                $sections[] = mb_strtolower($name);
+                $sections[] = $name;
             }
         }
 

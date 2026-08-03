@@ -31,18 +31,18 @@ return [
 
         /*
         | Evening / night-shift sections (year + section name).
-        | Example: Grade 11 Abigail & Grade 12 Dignity — class 4:30 PM–9:00 PM.
+        | Class 4:30 PM–9:00 PM. Section match is case-insensitive and accepts
+        | both "Abigail" and "Abigail Evening" style names.
         */
         'schedules_by_year_section' => [
             [
-                'years' => ['Grade 11'],
-                'sections' => ['Abigail'],
-                'login_time' => env('ATTENDANCE_NIGHT_LOGIN_TIME', '16:30'),
-                'logout_time' => env('ATTENDANCE_NIGHT_LOGOUT_TIME', '21:00'),
-            ],
-            [
-                'years' => ['Grade 12'],
-                'sections' => ['Dignity'],
+                'years' => ['Grade 11', 'Grade 12'],
+                'sections' => [
+                    'Abigail',
+                    'Abigail Evening',
+                    'Dignity',
+                    'Dignity Evening',
+                ],
                 'login_time' => env('ATTENDANCE_NIGHT_LOGIN_TIME', '16:30'),
                 'logout_time' => env('ATTENDANCE_NIGHT_LOGOUT_TIME', '21:00'),
             ],

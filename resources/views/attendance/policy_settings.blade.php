@@ -61,7 +61,7 @@
                     Later same-day INs (e.g. after lunch) stay IN.
                     <strong>Grade 12</strong> day classes: login {{ $grade12LoginDisplay }}
                     (late after {{ $grade12LateCutoffDisplay }}).
-                    <strong>Night shift</strong> (Grade 11 Abigail, Grade 12 Dignity): login {{ $nightLoginDisplay }}
+                    <strong>Night shift</strong> (Abigail/Dignity + Evening sections, Grade 11–12): login {{ $nightLoginDisplay }}
                     – out {{ $nightLogoutDisplay }} (late after {{ $nightLateCutoffDisplay }}).
                 </p>
                 <div class="row g-3">

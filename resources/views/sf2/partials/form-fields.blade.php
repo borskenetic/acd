@@ -169,6 +169,7 @@
                         }
                     }
 
+                    gradeSelect.dataset.sf2SectionBound = '1';
                     gradeSelect.addEventListener('change', function () {
                         fillSections(this.value, '');
                     });

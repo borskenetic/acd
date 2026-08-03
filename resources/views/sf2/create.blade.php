@@ -58,13 +58,122 @@
 </form>
 
 @include('sf2.partials.student-row-template')
-@endsection
 
-@push('scripts')
 <script>
-    window.SF2_SECTIONS_BY_GRADE = @json($rosterData['sections_by_grade'] ?? []);
+    window.SF2_SECTIONS_BY_GRADE = @json($rosterData['sections_by_grade'] ?? new \stdClass());
+    if (Array.isArray(window.SF2_SECTIONS_BY_GRADE)) {
+        window.SF2_SECTIONS_BY_GRADE = {};
+    }
     window.SF2_PREVIEW_URL = @json(route('sf2.preview'));
+
+    // Claim the load button before external form.js so it does not also bind a click.
+    (function () {
+        var b = document.getElementById('sf2-load-from-logs');
+        if (b) {
+            b.dataset.sf2Bound = '1';
+            b.dataset.sf2InlineBound = '1';
+        }
+    })();
 </script>
 <script src="{{ \App\Support\VersionedAsset::url('js/sf2-calendar.js') }}"></script>
 <script src="{{ \App\Support\VersionedAsset::url('js/sf2-form.js') }}"></script>
-@endpush
+<script>
+(function () {
+    var btn = document.getElementById('sf2-load-from-logs');
+    if (!btn || btn.dataset.sf2ClickWired === '1') {
+        return;
+    }
+    btn.dataset.sf2ClickWired = '1';
+
+    function selectedSection() {
+        if (window.Sf2Form && typeof window.Sf2Form.selectedSection === 'function') {
+            return window.Sf2Form.selectedSection();
+        }
+        var manual = document.getElementById('sf2-section-manual');
+        if (manual && manual.getAttribute('name') === 'section' && !manual.classList.contains('d-none')) {
+            return String(manual.value || '').trim();
+        }
+        var sel = document.getElementById('sf2-section-select');
+        if (sel) {
+            return String(sel.value || '').trim();
+        }
+        var any = document.querySelector('[name="section"]');
+        return any ? String(any.value || '').trim() : '';
+    }
+
+    async function loadFromLogs() {
+        if (window.Sf2Form && typeof window.Sf2Form.loadFromLogs === 'function') {
+            return window.Sf2Form.loadFromLogs();
+        }
+
+        var gradeEl = document.getElementById('sf2-grade-select');
+        var grade = gradeEl ? String(gradeEl.value || '').trim() : '';
+        var section = selectedSection();
+        var monthEl = document.querySelector('[name="report_month"]');
+        var yearEl = document.querySelector('[name="report_year"]');
+        var month = monthEl ? monthEl.value : '';
+        var year = yearEl ? yearEl.value : '';
+
+        if (!grade || !section || !month || !year) {
+            alert('Select grade level, section, report month, and year first.');
+            return;
+        }
+        if (!window.SF2_PREVIEW_URL) {
+            alert('SF2 preview URL is missing. Refresh the page.');
+            return;
+        }
+
+        var url = new URL(window.SF2_PREVIEW_URL, window.location.origin);
+        url.searchParams.set('grade_level', grade);
+        url.searchParams.set('section', section);
+        url.searchParams.set('report_month', month);
+        url.searchParams.set('report_year', year);
+
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+
+        try {
+            var response = await fetch(url.toString(), {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            var contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                throw new Error('Could not load attendance data (HTTP ' + response.status + ').');
+            }
+            if (contentType.indexOf('application/json') === -1) {
+                throw new Error('Server did not return JSON (session expired?). Refresh and sign in again.');
+            }
+            var data = await response.json();
+            if (data.warnings && data.warnings.length) {
+                alert(data.warnings.join('\n'));
+            }
+            if (!data.students || !data.students.length) {
+                alert('No learners loaded. Check that students have grade, section, and sex (male/female) set.');
+                return;
+            }
+            if (window.Sf2Form && typeof window.Sf2Form.replaceAllStudents === 'function') {
+                window.Sf2Form.replaceAllStudents(data.students);
+            } else {
+                alert('Loaded ' + data.students.length + ' learner(s), but public/js/sf2-form.js is missing so rows could not be filled.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert(err.message || 'Failed to load from attendance logs.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Load from attendance logs';
+        }
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        loadFromLogs();
+    });
+})();
+</script>
+@endsection

@@ -17,6 +17,77 @@ class Sf2AttendanceLogMapper
     ) {}
 
     /**
+     * Canonical K–12 label used by SF2 config (e.g. "9" / "G9" → "Grade 9").
+     */
+    public function canonicalizeYear(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        $value = trim(preg_replace('/\s+/', ' ', $raw) ?? '');
+        if ($value === '') {
+            return null;
+        }
+
+        $allowed = config('sf2.grade_levels', []);
+        $compact = strtolower(preg_replace('/\s+/', '', $value) ?? '');
+
+        foreach ($allowed as $option) {
+            if (strtolower(preg_replace('/\s+/', '', $option) ?? '') === $compact) {
+                return $option;
+            }
+        }
+
+        if (preg_match('/\bkinder(?:garten)?\s*([12])?\b/i', $value) || preg_match('/^k\s*([12])?$/i', $value)) {
+            return in_array('Kinder', $allowed, true) ? 'Kinder' : null;
+        }
+
+        if (preg_match('/^(?:grade|g)?\s*(1[0-2]|[1-9])$/i', $value, $m)
+            || preg_match('/\bgrade\s*(1[0-2]|[1-9])\b/i', $value, $m)) {
+            $label = 'Grade '.$m[1];
+
+            return in_array($label, $allowed, true) ? $label : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function yearAliases(string $gradeLevel): array
+    {
+        $canonical = $this->canonicalizeYear($gradeLevel) ?? trim($gradeLevel);
+        $aliases = [$canonical, trim($gradeLevel)];
+
+        if (preg_match('/^Grade\s+(1[0-2]|[1-9])$/i', $canonical, $m)) {
+            $n = $m[1];
+            $aliases = array_merge($aliases, [
+                (string) $n,
+                'G'.$n,
+                'g'.$n,
+                'Grade'.$n,
+                'GRADE '.$n,
+                'grade '.$n,
+            ]);
+        }
+
+        if (strcasecmp($canonical, 'Kinder') === 0) {
+            $aliases = array_merge($aliases, [
+                'Kindergarten',
+                'Kinder 1',
+                'Kinder 2',
+                'K',
+                'K1',
+                'K2',
+            ]);
+        }
+
+        return array_values(array_unique(array_filter($aliases, fn ($v) => $v !== '')));
+    }
+
+    /**
      * Grades that have either enrolled students or school-setup sections.
      *
      * @return list<string>
@@ -28,9 +99,13 @@ class Sf2AttendanceLogMapper
 
         $fromStudents = Student::query()
             ->whereNotNull('year')
-            ->whereIn('year', $allowed)
+            ->where('year', '!=', '')
             ->distinct()
             ->pluck('year')
+            ->map(fn ($year) => $this->canonicalizeYear((string) $year))
+            ->filter()
+            ->unique()
+            ->values()
             ->all();
 
         $fromSetup = Schema::hasTable('grade_sections')
@@ -38,6 +113,10 @@ class Sf2AttendanceLogMapper
                 ->whereIn('grade_level', $allowed)
                 ->distinct()
                 ->pluck('grade_level')
+                ->map(fn ($year) => $this->canonicalizeYear((string) $year) ?? $year)
+                ->filter(fn ($year) => in_array($year, $allowed, true))
+                ->unique()
+                ->values()
                 ->all()
             : [];
 
@@ -54,9 +133,11 @@ class Sf2AttendanceLogMapper
      */
     public function sectionsForGrade(string $gradeLevel): array
     {
+        $aliases = $this->yearAliases($gradeLevel);
+
         $fromSetup = Schema::hasTable('grade_sections')
             ? GradeSection::query()
-                ->where('grade_level', $gradeLevel)
+                ->whereIn('grade_level', $aliases)
                 ->orderBy('section')
                 ->pluck('section')
                 ->unique()
@@ -65,7 +146,7 @@ class Sf2AttendanceLogMapper
             : [];
 
         $fromStudents = Student::query()
-            ->where('year', $gradeLevel)
+            ->whereIn('year', $aliases)
             ->whereNotNull('section')
             ->where('section', '!=', '')
             ->distinct()
@@ -87,15 +168,16 @@ class Sf2AttendanceLogMapper
         // Keep setup in sync so SF2 / registration share one section catalog.
         GradeSection::syncFromStudents();
 
-        $grades = $this->gradeLevelsFromStudents();
+        $allGrades = config('sf2.grade_levels', []);
         $sectionsByGrade = [];
 
-        foreach ($grades as $grade) {
+        // Always build a map for every SF2 grade so the UI is never half-populated.
+        foreach ($allGrades as $grade) {
             $sectionsByGrade[$grade] = $this->sectionsForGrade($grade);
         }
 
         return [
-            'grades' => $grades,
+            'grades' => $allGrades,
             'sections_by_grade' => $sectionsByGrade,
         ];
     }
@@ -103,7 +185,7 @@ class Sf2AttendanceLogMapper
     public function roster(string $gradeLevel, string $section): Collection
     {
         return Student::query()
-            ->where('year', $gradeLevel)
+            ->whereIn('year', $this->yearAliases($gradeLevel))
             ->where('section', $section)
             ->orderByRaw("CASE WHEN sex = 'male' THEN 0 WHEN sex = 'female' THEN 1 ELSE 2 END")
             ->orderBy('lastname')

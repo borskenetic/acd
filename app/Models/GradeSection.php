@@ -51,15 +51,20 @@ class GradeSection extends Model
             ->where('year', '!=', '')
             ->whereNotNull('section')
             ->where('section', '!=', '')
-            ->when($allowed !== [], fn ($q) => $q->whereIn('year', $allowed))
             ->select('year', 'section', 'course')
             ->distinct()
             ->get();
 
+        $mapper = app(\App\Services\Sf2AttendanceLogMapper::class);
+
         foreach ($pairs as $row) {
-            $grade = trim((string) $row->year);
+            $grade = $mapper->canonicalizeYear(trim((string) $row->year)) ?? trim((string) $row->year);
             $section = trim((string) $row->section);
             if ($grade === '' || $section === '') {
+                continue;
+            }
+
+            if ($allowed !== [] && ! in_array($grade, $allowed, true)) {
                 continue;
             }
 

@@ -153,34 +153,37 @@ They are the same folder; only the prefix differs.
 
 Attendance autos (lunch fill, EOD OUT, stale IN close, consecutive-absence SMS) run through **one** Hostinger cron that calls `schedule:run` every minute. Laravel then fires the due jobs at Asia/Manila times.
 
-### Recommended ACD command
+### Recommended ACD command (PHP 8.2)
 
-In **hPanel → Advanced → Cron Jobs**, use **every minute** (`* * * * *`) and:
+In **hPanel → Advanced → Cron Jobs**, **every minute** (`* * * * *`):
 
 ```bash
 cd /home/u537625773/domains/pantas.org/public_html/acd && /usr/bin/php artisan schedule:run >> /home/u537625773/domains/pantas.org/public_html/acd/storage/logs/cron.log 2>&1
 ```
 
-Notes:
+If `/usr/bin/php` is the wrong version, use the Hostinger 8.2 binary (confirm with SSH `which php` / `ls /opt/alt`):
 
-1. Prefer `cd … && php artisan` (same style as the UAP job). A bare path to `artisan` often works, but cwd-related failures are easier to avoid this way.
-2. If the site needs PHP 8.2/8.3 and `/usr/bin/php` is too old, switch the binary to the matching Hostinger path, e.g. `/opt/alt/php82/usr/bin/php` or `/opt/alt/php83/usr/bin/php` (confirm under **PHP Configuration** / SSH `ls /opt/alt`).
-3. Ensure `storage/logs/` is writable so `cron.log` and `scheduler.log` can be created.
-4. Deploy must include the schedule in `bootstrap/app.php` (lunch ~13:00, EOD ~22:00, Asia/Manila).
+```bash
+cd /home/u537625773/domains/pantas.org/public_html/acd && /opt/alt/php82/usr/bin/php artisan schedule:run >> /home/u537625773/domains/pantas.org/public_html/acd/storage/logs/cron.log 2>&1
+```
 
-### Verify
+SSH on this account already reports **PHP 8.2.30** for `php`. After deploy, `php artisan schedule:list` should show `attendance:scheduler-ping` every minute.
 
-1. Click **View Output** on the ACD cron — you should see either `No scheduled commands are ready to run.` (most minutes) or a job result near 13:00 / 22:00 Manila.
-2. File Manager: open `public_html/acd/storage/logs/cron.log` — if the file is missing or never grows, the cron entry is not executing.
-3. After deploy: `public_html/acd/storage/logs/scheduler.log` gets lines when lunch/EOD jobs actually run.
-4. SSH (optional):
+### Quick test (no wait until 22:00)
+
+1. Deploy latest code (includes `attendance:scheduler-ping`).
+2. Fix Hostinger cron command as above.
+3. Wait **2 minutes**, then check:
 
 ```bash
 cd ~/domains/pantas.org/public_html/acd
-/usr/bin/php -v
-/usr/bin/php artisan schedule:list
-/usr/bin/php artisan attendance:autofill-lunch
-/usr/bin/php artisan attendance:auto-eod-out
+tail -20 storage/logs/cron.log
+tail -20 storage/logs/scheduler.log
+php artisan schedule:list
 ```
 
-If those artisan commands error, fix PHP version / `.env` / permissions first — the Hostinger cron will hit the same error every minute.
+- `scheduler.log` gains a line each minute: `[… ] scheduler-ping OK` → **cron works**.
+- File never appears / never grows → Hostinger cron command is wrong or not running.
+- Manual pulse (does not test Hostinger cron): `php artisan attendance:scheduler-ping`
+
+**Do not** run `attendance:auto-eod-out` as a “test” — it marks all open INs OUT (use the ping instead).

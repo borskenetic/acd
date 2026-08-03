@@ -29,6 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule) {
         $schedulerLog = storage_path('logs/scheduler.log');
 
+        // Heartbeat: proves Hostinger cron is calling schedule:run (every minute).
+        $schedule->command('attendance:scheduler-ping')
+            ->everyMinute()
+            ->timezone('Asia/Manila')
+            ->appendOutputTo($schedulerLog);
+
         $schedule->command('attendance:close-stale-ins')
             ->dailyAt('00:05')
             ->timezone('Asia/Manila')

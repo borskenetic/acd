@@ -17,6 +17,8 @@ class Sf2AttendanceLogMapper
     ) {}
 
     /**
+     * Grades that have either enrolled students or school-setup sections.
+     *
      * @return list<string>
      */
     public function gradeLevelsFromStudents(): array
@@ -24,11 +26,24 @@ class Sf2AttendanceLogMapper
         $allowed = config('sf2.grade_levels', []);
         $order = array_flip($allowed);
 
-        return Student::query()
+        $fromStudents = Student::query()
             ->whereNotNull('year')
             ->whereIn('year', $allowed)
             ->distinct()
             ->pluck('year')
+            ->all();
+
+        $fromSetup = Schema::hasTable('grade_sections')
+            ? GradeSection::query()
+                ->whereIn('grade_level', $allowed)
+                ->distinct()
+                ->pluck('grade_level')
+                ->all()
+            : [];
+
+        return collect($fromStudents)
+            ->merge($fromSetup)
+            ->unique()
             ->sortBy(fn (string $year) => $order[$year] ?? 999)
             ->values()
             ->all();
@@ -58,7 +73,10 @@ class Sf2AttendanceLogMapper
             ->pluck('section')
             ->all();
 
-        return array_values(array_unique(array_merge($fromSetup, $fromStudents)));
+        $merged = array_values(array_unique(array_merge($fromSetup, $fromStudents)));
+        sort($merged, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $merged;
     }
 
     /**
@@ -66,6 +84,9 @@ class Sf2AttendanceLogMapper
      */
     public function rosterDropdownData(): array
     {
+        // Keep setup in sync so SF2 / registration share one section catalog.
+        GradeSection::syncFromStudents();
+
         $grades = $this->gradeLevelsFromStudents();
         $sectionsByGrade = [];
 

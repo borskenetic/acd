@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Student;
 use App\Models\PendingStudent;
 use App\Models\Program;
+use App\Models\GradeSection;
 use App\Models\StudentEditRequest;
 use App\Console\Commands\NormalizeStudentNames;
 use App\Exports\StudentsImportTemplateExport;
@@ -108,7 +109,13 @@ class StudentController extends Controller
             return back()->withErrors(['file' => $messages]);
         }
 
-        return back()->with('success', 'Students imported successfully.');
+        $sectionsAdded = GradeSection::syncFromStudents();
+        $message = 'Students imported successfully.';
+        if ($sectionsAdded > 0) {
+            $message .= " {$sectionsAdded} grade section(s) added to school setup.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function downloadRfidTemplate()

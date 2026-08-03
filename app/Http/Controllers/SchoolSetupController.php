@@ -12,6 +12,8 @@ class SchoolSetupController extends Controller
 {
     public function index()
     {
+        GradeSection::syncFromStudents();
+
         $programs = Program::with(['courses' => fn ($q) => $q->orderBy('course_name')])->orderBy('program_name')->get();
         $gradeLevels = config('sf2.grade_levels', []);
         $seniorHighGrades = GradeSection::seniorHighGrades();

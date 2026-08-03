@@ -153,37 +153,52 @@ They are the same folder; only the prefix differs.
 
 Attendance autos (lunch fill, EOD OUT, stale IN close, consecutive-absence SMS) run through **one** Hostinger cron that calls `schedule:run` every minute. Laravel then fires the due jobs at Asia/Manila times.
 
-### Recommended ACD command (PHP 8.2)
+### Recommended ACD command (PHP 8.2) — use the shell wrapper
 
 In **hPanel → Advanced → Cron Jobs**, **every minute** (`* * * * *`):
 
 ```bash
-cd /home/u537625773/domains/pantas.org/public_html/acd && /usr/bin/php artisan schedule:run >> /home/u537625773/domains/pantas.org/public_html/acd/storage/logs/cron.log 2>&1
+/bin/bash /home/u537625773/domains/pantas.org/public_html/acd/bin/hostinger-cron.sh
 ```
 
-If `/usr/bin/php` is the wrong version, use the Hostinger 8.2 binary (confirm with SSH `which php` / `ls /opt/alt`):
+That script always appends to `storage/logs/cron-heartbeat.log` when Hostinger fires it, then runs `artisan schedule:run` and logs to `storage/logs/cron.log`.
+
+Make it executable once (SSH):
 
 ```bash
-cd /home/u537625773/domains/pantas.org/public_html/acd && /opt/alt/php82/usr/bin/php artisan schedule:run >> /home/u537625773/domains/pantas.org/public_html/acd/storage/logs/cron.log 2>&1
+chmod +x ~/domains/pantas.org/public_html/acd/bin/hostinger-cron.sh
 ```
 
-SSH on this account already reports **PHP 8.2.30** for `php`. After deploy, `php artisan schedule:list` should show `attendance:scheduler-ping` every minute.
+Do **not** rely on bare `php` in the panel — cron has a different PATH than SSH.
 
-### Quick test (no wait until 22:00)
+### Diagnose if `scheduler.log` stays at 1 line
 
-1. Deploy latest code (includes `attendance:scheduler-ping`).
-2. Fix Hostinger cron command as above.
-3. Wait **2 minutes**, then check:
+That one line is almost always from a **manual** `php artisan attendance:scheduler-ping`. Hostinger is not driving the scheduler.
+
+After 2 minutes, check:
 
 ```bash
 cd ~/domains/pantas.org/public_html/acd
-tail -20 storage/logs/cron.log
-tail -20 storage/logs/scheduler.log
-php artisan schedule:list
+ls -la storage/logs/cron-heartbeat.log storage/logs/cron.log storage/logs/scheduler.log
+tail -20 storage/logs/cron-heartbeat.log
+tail -40 storage/logs/cron.log
+tail -10 storage/logs/scheduler.log
 ```
 
-- `scheduler.log` gains a line each minute: `[… ] scheduler-ping OK` → **cron works**.
-- File never appears / never grows → Hostinger cron command is wrong or not running.
-- Manual pulse (does not test Hostinger cron): `php artisan attendance:scheduler-ping`
+| Result | Meaning |
+|--------|---------|
+| `cron-heartbeat.log` never appears / never grows | Hostinger cron is wrong or not enabled |
+| Heartbeat grows, but `cron.log` shows PHP/artisan errors | Fix path/PHP/`APP_KEY`/permissions from that error |
+| Heartbeat + cron.log OK, `scheduler-ping OK` every minute in `scheduler.log` | Fully working |
+| Heartbeat grows, cron.log says no/few commands, no ping | Deploy/list: `php artisan schedule:list` must show `* * * * * attendance:scheduler-ping` |
 
-**Do not** run `attendance:auto-eod-out` as a “test” — it marks all open INs OUT (use the ping instead).
+Manual check that the script works (same as Hostinger would):
+
+```bash
+/bin/bash ~/domains/pantas.org/public_html/acd/bin/hostinger-cron.sh
+tail -5 storage/logs/cron-heartbeat.log
+tail -15 storage/logs/cron.log
+tail -5 storage/logs/scheduler.log
+```
+
+**Do not** run `attendance:auto-eod-out` as a cron test — it force-OUTs open INs.

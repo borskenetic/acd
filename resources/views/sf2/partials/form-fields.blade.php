@@ -53,10 +53,22 @@
                 <input type="text" name="section" class="form-control" required maxlength="64"
                        value="{{ old('section', $report->section ?? '') }}" placeholder="e.g. St. Francis">
             @else
-                <select name="section" id="sf2-section-select" class="form-select" required>
+                <select name="section" id="sf2-section-select" class="form-select" required
+                        data-initial="{{ old('section', '') }}">
                     <option value="">— Select grade first —</option>
-                    @if(old('section') && old('grade_level'))
-                        <option value="{{ old('section') }}" selected>{{ old('section') }}</option>
+                    @php
+                        $rosterData = $rosterData ?? ['sections_by_grade' => []];
+                        $oldGrade = old('grade_level');
+                        $oldSection = old('section');
+                        $oldGradeSections = ($oldGrade && isset($rosterData['sections_by_grade'][$oldGrade]))
+                            ? $rosterData['sections_by_grade'][$oldGrade]
+                            : [];
+                    @endphp
+                    @foreach($oldGradeSections as $secName)
+                        <option value="{{ $secName }}" @selected($oldSection === $secName)>{{ $secName }}</option>
+                    @endforeach
+                    @if($oldSection && $oldGrade && ! in_array($oldSection, $oldGradeSections, true))
+                        <option value="{{ $oldSection }}" selected>{{ $oldSection }} (current)</option>
                     @endif
                 </select>
             @endif

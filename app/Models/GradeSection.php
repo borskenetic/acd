@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class GradeSection extends Model
 {
@@ -27,6 +28,62 @@ class GradeSection extends Model
     public static function knownStrands(): array
     {
         return SchoolStrand::orderedNames();
+    }
+
+    /**
+     * Ensure school-setup grade_sections includes every grade/section present on student rows.
+     * Import-only values otherwise never appear in setup-driven dropdowns.
+     *
+     * @return int Number of newly created rows
+     */
+    public static function syncFromStudents(): int
+    {
+        if (! Schema::hasTable('grade_sections') || ! Schema::hasTable('students')) {
+            return 0;
+        }
+
+        $allowed = config('sf2.grade_levels', []);
+        $senior = self::seniorHighGrades();
+        $created = 0;
+
+        $pairs = Student::query()
+            ->whereNotNull('year')
+            ->where('year', '!=', '')
+            ->whereNotNull('section')
+            ->where('section', '!=', '')
+            ->when($allowed !== [], fn ($q) => $q->whereIn('year', $allowed))
+            ->select('year', 'section', 'course')
+            ->distinct()
+            ->get();
+
+        foreach ($pairs as $row) {
+            $grade = trim((string) $row->year);
+            $section = trim((string) $row->section);
+            if ($grade === '' || $section === '') {
+                continue;
+            }
+
+            $strand = '';
+            if (self::isSeniorHighGrade($grade)) {
+                $strand = trim((string) ($row->course ?? ''));
+                if ($strand === '') {
+                    // Senior sections without strand stay on the student only until strand is set.
+                    continue;
+                }
+            }
+
+            $model = self::firstOrCreate([
+                'grade_level' => $grade,
+                'strand' => $strand,
+                'section' => $section,
+            ]);
+
+            if ($model->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        return $created;
     }
 
     /** @return array<string, list<string>> K–10: grade => sections (no strand) */

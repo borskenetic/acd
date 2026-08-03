@@ -8,6 +8,57 @@
   const loadLogsBtn = document.getElementById('sf2-load-from-logs');
   const sectionsByGrade = window.SF2_SECTIONS_BY_GRADE || {};
 
+  function populateSectionOptions(grade, selected) {
+    if (!sectionSelect) {
+      return;
+    }
+
+    const sections = (grade && sectionsByGrade[grade]) ? sectionsByGrade[grade] : [];
+    const current = selected || sectionSelect.value;
+
+    sectionSelect.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    if (!grade) {
+      placeholder.textContent = '— Select grade first —';
+    } else if (sections.length) {
+      placeholder.textContent = '— Select section —';
+    } else {
+      placeholder.textContent = '— No sections for this grade —';
+    }
+    sectionSelect.appendChild(placeholder);
+
+    let found = false;
+    sections.forEach((name) => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (current && current === name) {
+        opt.selected = true;
+        found = true;
+      }
+      sectionSelect.appendChild(opt);
+    });
+
+    if (current && !found) {
+      const extra = document.createElement('option');
+      extra.value = current;
+      extra.textContent = current + ' (current)';
+      extra.selected = true;
+      sectionSelect.appendChild(extra);
+    }
+  }
+
+  // Section dropdown must work even if the learner grid markup is missing.
+  if (gradeSelect && sectionSelect) {
+    gradeSelect.addEventListener('change', function () {
+      populateSectionOptions(this.value, '');
+    });
+
+    populateSectionOptions(gradeSelect.value, sectionSelect.dataset.initial || sectionSelect.value);
+  }
+
   if (!container || !template) {
     return;
   }
@@ -71,50 +122,6 @@
     }
 
     rows.forEach((row) => addRow(row));
-  }
-
-  function populateSectionOptions(grade, selected) {
-    if (!sectionSelect) {
-      return;
-    }
-
-    const sections = sectionsByGrade[grade] || [];
-    const current = selected || sectionSelect.value;
-
-    sectionSelect.innerHTML = '';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = sections.length ? '— Select section —' : '— No sections for this grade —';
-    sectionSelect.appendChild(placeholder);
-
-    let found = false;
-    sections.forEach((name) => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      if (current && current === name) {
-        opt.selected = true;
-        found = true;
-      }
-      sectionSelect.appendChild(opt);
-    });
-
-    if (current && !found) {
-      const extra = document.createElement('option');
-      extra.value = current;
-      extra.textContent = current + ' (current)';
-      extra.selected = true;
-      sectionSelect.appendChild(extra);
-    }
-  }
-
-  if (gradeSelect && sectionSelect) {
-    gradeSelect.addEventListener('change', function () {
-      populateSectionOptions(this.value, '');
-    });
-
-    populateSectionOptions(gradeSelect.value, sectionSelect.value);
   }
 
   if (loadLogsBtn) {
@@ -202,5 +209,6 @@
   window.Sf2Form = {
     addRow,
     replaceAllStudents,
+    populateSectionOptions,
   };
 })();

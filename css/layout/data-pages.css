@@ -919,6 +919,16 @@
     border-top: 1px solid #f1f5f9;
 }
 
+.act-pagination .pagination {
+    margin-bottom: 0;
+}
+
+.act-pagination svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
     .act-search-row { flex-direction: column; }
     .act-table thead { display: none; }

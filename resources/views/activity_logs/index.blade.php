@@ -155,7 +155,9 @@
         </div>
 
         @if($logs->hasPages())
-            <div class="act-pagination">{{ $logs->links() }}</div>
+            <div class="act-pagination">
+                {{ $logs->links('pagination::bootstrap-5') }}
+            </div>
         @endif
     </section>
 </div>

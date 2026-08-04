@@ -192,6 +192,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
     Route::get('/students/rfid-template', [StudentController::class, 'downloadRfidTemplate'])->name('students.rfid.template');
     Route::post('/students/rfid-import', [StudentController::class, 'importRfid'])->name('students.rfid.import');
+    Route::get('/students/sex-template', [StudentController::class, 'downloadSexTemplate'])->name('students.sex.template');
+    Route::post('/students/sex-import', [StudentController::class, 'importSex'])->name('students.sex.import');
     Route::get('/employees/import-template', [EmployeeController::class, 'downloadImportTemplate'])->name('employees.import.template');
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
     Route::get('/students/{id}/edit', [StudentController::class, 'edit'])->name('students.edit');

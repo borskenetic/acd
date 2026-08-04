@@ -41,6 +41,10 @@
                         <li><h6 class="dropdown-header">RFID cards</h6></li>
                         <li><a class="dropdown-item" href="{{ route('students.rfid.template') }}">Download RFID template</a></li>
                         <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#spRfidModal">Upload RFID update</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Gender (sex)</h6></li>
+                        <li><a class="dropdown-item" href="{{ route('students.sex.template') }}">Download gender template</a></li>
+                        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#spSexModal">Upload gender update</button></li>
                     </ul>
                 </div>
             @endcan
@@ -67,7 +71,7 @@
         <a href="{{ route('employees.index') }}" class="sp-tab">Employees</a>
     </nav>
 
-    @if(session('success') || session('error') || session('rfid_import_report') || $errors->any())
+    @if(session('success') || session('error') || session('rfid_import_report') || session('sex_import_report') || $errors->any())
         <div class="sp-alerts">
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
@@ -100,6 +104,38 @@
                         @if(!empty($rfidReport['conflicts']))
                             <ul class="small mb-0">
                                 @foreach($rfidReport['conflicts'] as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                @endif
+            @endif
+            @if(session('sex_import_report'))
+                @php $sexReport = session('sex_import_report'); @endphp
+                @if(!empty($sexReport['not_found']) || !empty($sexReport['ambiguous']) || !empty($sexReport['invalid']))
+                    <div class="alert alert-warning text-start mb-0">
+                        <strong>Gender update details</strong>
+                        @if(!empty($sexReport['invalid']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($sexReport['invalid'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        @if(!empty($sexReport['not_found']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($sexReport['not_found'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($sexReport['not_found']) > 30)
+                                    <li>… and {{ count($sexReport['not_found']) - 30 }} more not found</li>
+                                @endif
+                            </ul>
+                        @endif
+                        @if(!empty($sexReport['ambiguous']))
+                            <ul class="small mb-0">
+                                @foreach(array_slice($sexReport['ambiguous'], 0, 20) as $line)
                                     <li>{{ $line }}</li>
                                 @endforeach
                             </ul>
@@ -282,6 +318,37 @@
                     </div>
                     <div class="modal-body">
                         <p class="text-muted small">Match by IDNum, RecordID, or QR code. Use the <a href="{{ route('students.rfid.template') }}">RFID template</a>. Blank RFID rows are skipped.</p>
+                        <div class="sp-file-pick">
+                            <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade sp-modal" id="spSexModal" tabindex="-1" aria-labelledby="spSexModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('students.sex.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="spSexModalLabel">Update student gender</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-2">
+                            Updates <code>sex</code> on existing students only. Does not create or delete records.
+                        </p>
+                        <p class="text-muted small">
+                            Match order: <strong>ID Number</strong> → LRN → RFID → Name (+ Year/Section if needed).
+                            Gender values: <code>Male</code>/<code>Female</code> (or male/female).
+                            Your gendered roster CSV works as-is.
+                        </p>
                         <div class="sp-file-pick">
                             <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>
                         </div>

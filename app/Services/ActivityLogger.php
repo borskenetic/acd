@@ -248,6 +248,7 @@ class ActivityLogger
             'students.reject' => 'Rejected pending student #:id',
             'students.import' => 'Imported students from spreadsheet',
             'students.rfid.import' => 'Imported student RFID tags',
+            'students.sex.import' => 'Updated student genders from spreadsheet',
             'students.face.store' => 'Enrolled face for student #:student',
             'students.face.destroy' => 'Removed face enrollment for student #:student',
             'employees.store' => 'Created employee',

@@ -16,8 +16,10 @@ use App\Console\Commands\NormalizeStudentNames;
 use App\Exports\StudentsImportTemplateExport;
 use App\Exports\StudentsListExport;
 use App\Exports\StudentsRfidTemplateExport;
+use App\Exports\StudentsSexTemplateExport;
 use App\Imports\StudentsImport;
 use App\Imports\StudentsRfidImport;
+use App\Imports\StudentsSexImport;
 use App\Services\BulkIdCardService;
 use App\Support\PatronOptions;
 use App\Support\SchoolSetupOptions;
@@ -145,6 +147,38 @@ class StudentController extends Controller
         return back()
             ->with('success', $message)
             ->with('rfid_import_report', $report);
+    }
+
+    public function downloadSexTemplate()
+    {
+        return Excel::download(
+            new StudentsSexTemplateExport,
+            'students_sex_update_template.xlsx'
+        );
+    }
+
+    public function importSex(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:10240',
+        ]);
+
+        $import = new StudentsSexImport;
+        Excel::import($import, $request->file('file'));
+
+        $report = $import->report();
+        $message = 'Gender update complete: '.$report['updated'].' student(s) updated.';
+
+        if ($report['unchanged'] > 0) {
+            $message .= ' '.$report['unchanged'].' already correct.';
+        }
+        if ($report['skipped'] > 0) {
+            $message .= ' '.$report['skipped'].' row(s) skipped.';
+        }
+
+        return back()
+            ->with('success', $message)
+            ->with('sex_import_report', $report);
     }
 
     public function bulkDownloadIds(Request $request, BulkIdCardService $bulkIds)

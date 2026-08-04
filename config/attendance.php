@@ -18,21 +18,21 @@ return [
     'gate' => [
         'login_time' => env('ATTENDANCE_GATE_LOGIN_TIME', '07:30'),
         'logout_time' => env('ATTENDANCE_GATE_LOGOUT_TIME', '16:00'),
-        'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 15),
+        'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 5),
 
         /*
-        | Per-year login overrides (H:i). Grade 12 day/half-day starts at noon.
+        | Per-year login overrides (H:i). Grade 12 day/half-day starts at 12:30.
         | LATE = first IN after (login + tardy_grace_minutes) for that year.
         | Section schedules below take priority over this map.
         */
         'login_time_by_year' => [
-            'Grade 12' => env('ATTENDANCE_GATE_LOGIN_TIME_GRADE_12', '12:00'),
+            'Grade 12' => env('ATTENDANCE_GATE_LOGIN_TIME_GRADE_12', '12:30'),
         ],
 
         /*
         | Evening / night-shift sections (year + section name).
-        | Class 4:30 PM–9:00 PM. Section match is case-insensitive and accepts
-        | both "Abigail" and "Abigail Evening" style names.
+        | Grade 11 evening: class 4:30 PM–9:00 PM. Section match is case-insensitive
+        | and accepts both "Abigail" and "Abigail Evening" style names.
         */
         'schedules_by_year_section' => [
             [

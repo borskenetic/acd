@@ -438,7 +438,7 @@ class AttendancePolicyService
         Setting::setAttendancePolicy([
             'login_time' => $this->normalizeTimeInput((string) ($data['login_time'] ?? '07:30')),
             'logout_time' => $this->normalizeTimeInput((string) ($data['logout_time'] ?? '16:00')),
-            'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 15),
+            'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 5),
             'consecutive_late_threshold' => (int) ($data['consecutive_late_threshold'] ?? 5),
             'consecutive_absent_threshold' => (int) ($data['consecutive_absent_threshold'] ?? 3),
         ]);

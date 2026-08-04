@@ -32,7 +32,7 @@ return [
   | School-wide gate: first IN after this time (plus grace) counts as tardy.
   */
   'class_start_time' => env('SF2_CLASS_START_TIME', '07:30'),
-  'tardy_grace_minutes' => (int) env('SF2_TARDY_GRACE_MINUTES', 15),
+  'tardy_grace_minutes' => (int) env('SF2_TARDY_GRACE_MINUTES', 5),
 
   'month_names' => [
     1 => 'January',

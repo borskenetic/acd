@@ -40,13 +40,12 @@
             </div>
 
             <div class="col-md-4">
-                <label for="yearFilter">Filter by Year</label>
+                <label for="yearFilter">Filter by Year / Grade</label>
                 <select name="year" id="yearFilter" class="form-control">
-                    <option value="">All Years</option>
-                    <option value="1" @selected(old('year') === '1')>1st Year</option>
-                    <option value="2" @selected(old('year') === '2')>2nd Year</option>
-                    <option value="3" @selected(old('year') === '3')>3rd Year</option>
-                    <option value="4" @selected(old('year') === '4')>4th Year</option>
+                    <option value="">All years / grades</option>
+                    @foreach($yearOptions as $year)
+                        <option value="{{ $year }}" @selected(old('year') === $year)>{{ $year }}</option>
+                    @endforeach
                 </select>
             </div>
 

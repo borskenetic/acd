@@ -63,6 +63,7 @@
                     (late after {{ $grade12LateCutoffDisplay }}).
                     <strong>Night shift</strong> (Abigail/Dignity + Evening sections, Grade 11–12): login {{ $nightLoginDisplay }}
                     – out {{ $nightLogoutDisplay }} (late after {{ $nightLateCutoffDisplay }}).
+                    Morning grades (Kinder–Grade 11 day classes) use the expected login below.
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">

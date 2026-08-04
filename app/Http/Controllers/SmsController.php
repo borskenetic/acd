@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Support\PatronOptions;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 class SmsController extends Controller
@@ -12,14 +13,15 @@ class SmsController extends Controller
 
     public function index()
     {
-        $courses = \App\Models\Student::select('course')
+        $courses = Student::select('course')
             ->whereNotNull('course')
             ->distinct()
             ->orderBy('course')
             ->pluck('course');
-    
+
         return view('sms.blast', [
-            'courses' => $courses
+            'courses' => $courses,
+            'yearOptions' => PatronOptions::allYearOptions(),
         ]);
     }
 

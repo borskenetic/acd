@@ -194,7 +194,7 @@
                 @unless($report)
                     Use <strong>Load from attendance logs</strong> to fill the roster and marks from school-wide IN scans
                     (present = scanned IN; absent = no IN; tardy = first IN after expected login + grace —
-                    Grade 12 half-day starts at 12:00 noon).
+                    Kinder–Grade 11 morning at 7:30, Grade 12 at 12:30, Grade 11 evening at 4:30; grace 5 minutes).
                     You can still adjust any day on the calendar before saving.
                 @else
                     For each learner, use the <strong>calendar</strong> to click absent or tardy days; unmarked weekdays count as present.

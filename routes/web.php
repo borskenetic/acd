@@ -158,6 +158,7 @@ Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
         Route::get('/sms-blast', [SmsController::class, 'index'])->name('sms.page');
         Route::post('/sms/send', [SmsController::class, 'send'])->name('sms.send');
         Route::get('/sms/count', [SmsController::class, 'count'])->name('sms.count');
+        Route::post('/sms/sim-load', [SmsController::class, 'updateSimLoad'])->name('sms.simLoad.update');
     });
 
     Route::get('/attendance-logs', [AttendanceLogController::class, 'index'])->name('attendance_logs.index');

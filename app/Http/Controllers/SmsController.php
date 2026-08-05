@@ -59,7 +59,31 @@ class SmsController extends Controller
             'sectionsByGrade' => $sectionsByGrade,
             'facultyLocked' => $facultyLocked,
             'facultyClasses' => $facultyLocked ? AdvisoryScope::managePairs($user) : [],
+            'simLoad' => Setting::smsSimLoadStatus(),
+            'canManageSimLoad' => $user && in_array($user->role, ['admin', 'staff'], true),
         ]);
+    }
+
+    public function updateSimLoad(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+            abort(403, 'Only admin or staff can update SIM load.');
+        }
+
+        $validated = $request->validate([
+            'loaded_on' => 'required|date',
+            'days' => 'required|integer|min:1|max:365',
+            'warn_days' => 'nullable|integer|min:1|max:30',
+        ]);
+
+        Setting::setSmsSimLoad(
+            $validated['loaded_on'],
+            (int) $validated['days'],
+            (int) ($validated['warn_days'] ?? 3),
+        );
+
+        return back()->with('success', 'SIM load saved. You’ll see a warning here when it’s about to expire.');
     }
 
     public function scanMessage()

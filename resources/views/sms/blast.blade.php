@@ -2,6 +2,17 @@
 
 @section('content')
 
+@php
+    $simLoad = $simLoad ?? ['status' => 'unset', 'label' => 'No SIM load recorded yet.', 'set' => false];
+    $canManageSimLoad = $canManageSimLoad ?? false;
+    $simAlertClass = match ($simLoad['status'] ?? 'unset') {
+        'expired' => 'alert-danger',
+        'warning' => 'alert-warning',
+        'ok' => 'alert-success',
+        default => 'alert-secondary',
+    };
+@endphp
+
 <div class="container mt-4">
 
     <h3>SMS Blast</h3>
@@ -15,6 +26,64 @@
     @if(session('error'))
     <div class="alert alert-danger">
         {{ session('error') }}
+    </div>
+    @endif
+
+    {{-- SIM load expiry notice --}}
+    <div class="alert {{ $simAlertClass }} d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+            <strong>SIM load</strong>
+            <div class="mb-0">{{ $simLoad['label'] ?? 'No SIM load recorded yet.' }}</div>
+            @if(!empty($simLoad['set']))
+                <div class="small mt-1 opacity-75">
+                    Loaded {{ $simLoad['loaded_on'] }} · {{ $simLoad['days'] }} day(s) validity
+                    @if(!empty($simLoad['expires_on']))
+                        · expires {{ $simLoad['expires_on'] }}
+                    @endif
+                </div>
+            @endif
+        </div>
+        @if($canManageSimLoad)
+            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#simLoadForm" aria-expanded="{{ ($simLoad['status'] ?? '') !== 'ok' ? 'true' : 'false' }}">
+                {{ !empty($simLoad['set']) ? 'Update load' : 'Record load' }}
+            </button>
+        @endif
+    </div>
+
+    @if($canManageSimLoad)
+    <div class="collapse {{ in_array($simLoad['status'] ?? '', ['unset', 'warning', 'expired'], true) ? 'show' : '' }} mb-4" id="simLoadForm">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title mb-1">Record SIM load</h6>
+                <p class="small text-muted mb-3">
+                    When you top up the modem SIM, set the date and how many days the load should last.
+                    This page will warn everyone who uses the blaster before it runs out.
+                </p>
+                <form method="POST" action="{{ route('sms.simLoad.update') }}" class="row g-3 align-items-end">
+                    @csrf
+                    <div class="col-md-3">
+                        <label for="simLoadedOn" class="form-label">Loaded on</label>
+                        <input type="date" name="loaded_on" id="simLoadedOn" class="form-control" required
+                               value="{{ old('loaded_on', $simLoad['loaded_on'] ?? now()->toDateString()) }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="simDays" class="form-label">Valid for (days)</label>
+                        <input type="number" name="days" id="simDays" class="form-control" required min="1" max="365"
+                               value="{{ old('days', $simLoad['days'] ?? 30) }}" placeholder="e.g. 30">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="simWarnDays" class="form-label">Warn this many days before</label>
+                        <input type="number" name="warn_days" id="simWarnDays" class="form-control" min="1" max="30"
+                               value="{{ old('warn_days', $simLoad['warn_days'] ?? 3) }}">
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">Save load</button>
+                    </div>
+                </form>
+                @error('loaded_on') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
+                @error('days') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
+            </div>
+        </div>
     </div>
     @endif
 
@@ -98,9 +167,11 @@
             Send SMS
         </button>
 
+        @can('isAdminOrStaff')
         <a href="{{ route('sms.scanMessage') }}" class="btn btn-outline-secondary ms-2">
             Gate SMS settings
         </a>
+        @endcan
     </form>
 
 </div>

@@ -34,6 +34,8 @@ class Setting extends Model
 
     public const KEY_ATTENDANCE_POLICY = 'attendance_policy';
 
+    public const KEY_SMS_SIM_LOAD = 'sms_sim_load';
+
     public const DEFAULT_ATTENDANCE_SECTIONS = [
         'Circulation Section',
         'Reference Section',
@@ -218,6 +220,103 @@ class Setting extends Model
         static::updateOrCreate(
             ['key' => self::KEY_ATTENDANCE_POLICY],
             ['value' => json_encode($policy, JSON_UNESCAPED_UNICODE)]
+        );
+    }
+
+    /**
+     * SMS modem SIM load tracker (loaded_on + validity days).
+     *
+     * @return array{
+     *   set: bool,
+     *   status: 'unset'|'ok'|'warning'|'expired',
+     *   loaded_on: ?string,
+     *   days: ?int,
+     *   warn_days: int,
+     *   expires_on: ?string,
+     *   days_left: ?int,
+     *   label: string,
+     * }
+     */
+    public static function smsSimLoadStatus(): array
+    {
+        $raw = static::where('key', self::KEY_SMS_SIM_LOAD)->value('value');
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+        $warnDays = 3;
+
+        if (! is_array($data) || empty($data['loaded_on']) || empty($data['days'])) {
+            return [
+                'set' => false,
+                'status' => 'unset',
+                'loaded_on' => null,
+                'days' => null,
+                'warn_days' => $warnDays,
+                'expires_on' => null,
+                'days_left' => null,
+                'label' => 'No SIM load recorded yet.',
+            ];
+        }
+
+        $loadedOn = (string) $data['loaded_on'];
+        $days = max(1, (int) $data['days']);
+        $warnDays = max(1, (int) ($data['warn_days'] ?? 3));
+        $tz = config('app.timezone', 'Asia/Manila');
+
+        try {
+            $loaded = \Carbon\Carbon::parse($loadedOn, $tz)->startOfDay();
+        } catch (\Throwable) {
+            return [
+                'set' => false,
+                'status' => 'unset',
+                'loaded_on' => null,
+                'days' => null,
+                'warn_days' => $warnDays,
+                'expires_on' => null,
+                'days_left' => null,
+                'label' => 'No SIM load recorded yet.',
+            ];
+        }
+
+        // Expires at end of (loaded_on + days - 1) calendar days? Usually load for N days
+        // means expires after N full days from load day: loaded Aug 5 + 30 days = expires Sep 4.
+        $expires = $loaded->copy()->addDays($days);
+        $today = now($tz)->startOfDay();
+        $daysLeft = (int) $today->diffInDays($expires, false);
+
+        if ($daysLeft < 0) {
+            $status = 'expired';
+            $label = 'SIM load expired '.abs($daysLeft).' day(s) ago (ended '.$expires->toDateString().'). Reload the SIM.';
+        } elseif ($daysLeft <= $warnDays) {
+            $status = 'warning';
+            $label = $daysLeft === 0
+                ? 'SIM load expires today ('.$expires->toDateString().'). Reload soon.'
+                : 'SIM load expires in '.$daysLeft.' day(s) ('.$expires->toDateString().').';
+        } else {
+            $status = 'ok';
+            $label = 'SIM load OK — '.$daysLeft.' day(s) left (until '.$expires->toDateString().').';
+        }
+
+        return [
+            'set' => true,
+            'status' => $status,
+            'loaded_on' => $loaded->toDateString(),
+            'days' => $days,
+            'warn_days' => $warnDays,
+            'expires_on' => $expires->toDateString(),
+            'days_left' => $daysLeft,
+            'label' => $label,
+        ];
+    }
+
+    public static function setSmsSimLoad(string $loadedOn, int $days, int $warnDays = 3): void
+    {
+        static::updateOrCreate(
+            ['key' => self::KEY_SMS_SIM_LOAD],
+            ['value' => json_encode([
+                'loaded_on' => $loadedOn,
+                'days' => max(1, $days),
+                'warn_days' => max(1, $warnDays),
+                'updated_at' => now()->toIso8601String(),
+            ], JSON_UNESCAPED_UNICODE)]
         );
     }
 }

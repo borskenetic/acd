@@ -10,7 +10,7 @@
         <div class="col-md-4">
             <label class="form-label">School ID</label>
             <input type="text" name="school_id" class="form-control" maxlength="50"
-                   value="{{ old('school_id', $report->school_id ?? '') }}" placeholder="DepEd School ID">
+                   value="{{ old('school_id', $report->school_id ?? $defaults['school_id'] ?? '') }}" placeholder="DepEd School ID">
         </div>
         <div class="col-md-8">
             <label class="form-label">Name of school <span class="text-danger">*</span></label>
@@ -21,7 +21,23 @@
             <label class="form-label">School year <span class="text-danger">*</span></label>
             <input type="text" name="school_year" class="form-control" required maxlength="16"
                    value="{{ old('school_year', $report->school_year ?? $defaults['school_year'] ?? '') }}"
-                   placeholder="2025-2026">
+                   placeholder="2026-2027">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Semester</label>
+            <input type="text" name="semester" class="form-control" maxlength="64"
+                   value="{{ old('semester', $report->semester ?? $defaults['semester'] ?? '') }}"
+                   placeholder="FIRST SEMESTER">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Division</label>
+            <input type="text" name="division" class="form-control" maxlength="120"
+                   value="{{ old('division', $report->division ?? $defaults['division'] ?? '') }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Region</label>
+            <input type="text" name="region" class="form-control" maxlength="32"
+                   value="{{ old('region', $report->region ?? $defaults['region'] ?? '') }}">
         </div>
         <div class="col-md-4">
             <label class="form-label">Report month <span class="text-danger">*</span></label>
@@ -37,6 +53,17 @@
             <label class="form-label">Report year <span class="text-danger">*</span></label>
             <input type="number" name="report_year" class="form-control" required min="2000" max="2100"
                    value="{{ old('report_year', $report->report_year ?? $defaults['report_year'] ?? '') }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Track and Strand</label>
+            <input type="text" name="track_and_strand" class="form-control" maxlength="255"
+                   value="{{ old('track_and_strand', $report->track_and_strand ?? $defaults['track_and_strand'] ?? '') }}"
+                   placeholder="ARTS, SOCIAL SCIENCES, AND HUMANITIES">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Courses (TVL only)</label>
+            <input type="text" name="tvl_courses" class="form-control" maxlength="255"
+                   value="{{ old('tvl_courses', $report->tvl_courses ?? $defaults['tvl_courses'] ?? '') }}">
         </div>
         <div class="col-md-4">
             <label class="form-label">Grade level <span class="text-danger">*</span></label>

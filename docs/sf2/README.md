@@ -1,36 +1,34 @@
-# Official SF2 Excel template
+# Official SF2 Excel template (ACD)
 
-The file `resources/templates/sf2/sf2-template.xlsx` is the DepEd **School Form 2** workbook. The app fills this template and downloads `.xlsx` — the closest match to the paper form.
+The file `resources/templates/sf2/sf2-template.xlsx` is Assumption College of Davao’s
+**School Form 2 – Senior High School (SF2-SHS)** workbook (provided by the school).
+
+Sheets: **REMINDERS** + **JUNE…APRIL** (school-year month tabs).
+
+## Codes (see REMINDERS sheet)
+
+| Mark | Meaning |
+|------|---------|
+| *(blank)* | Present |
+| **X** | Absent |
+| **T** | Tardiness |
 
 ## For teachers
 
 1. Save your SF2 report in the app.
-2. **Download Excel** — official `.xlsx` template filled with your data.
-3. For a print-ready PDF, open the `.xlsx` in Excel or LibreOffice and use **Save as PDF** or **Print**.
-4. Optional: use **Download PDF** in the app for a quick HTML-based preview (not identical to the Excel layout).
+2. **Download Excel** — official multi-month template; only the report month + REMINDERS are kept, filled with class data.
+3. For a print-ready PDF, open the `.xlsx` in Excel and use **Save as PDF** / **Print**.
+4. Optional: **Download PDF** in the app is an HTML preview (not identical to Excel).
 
-## Updating the template
-
-If your division releases a newer SF2 `.xlsx`, replace `sf2-template.xlsx` and run:
-
-```bash
-php scripts/inspect-sf2-template.php
-```
-
-Adjust cell coordinates in `config/sf2.php` under `excel` if the layout changed.
-
-## Reference files
-
-Optional copies for comparison:
-
-- `docs/sf2/filled-example.pdf` — filled sample
-- Official blank from DepEd downloads
-
-## Row limits (current template)
+## Capacity (current workbook)
 
 | Block | Rows | Max learners |
 |-------|------|----------------|
-| Male | 14–34 | 21 |
-| Female | 36–60 | 25 |
+| Male | 14–27 | 14 |
+| Female | 29–64 | 36 |
 
-If a class is larger, split across two reports or ask for a template with more rows.
+If a class is larger, split across two reports.
+
+## Updating the template
+
+Replace `resources/templates/sf2/sf2-template.xlsx` with a newer school workbook and keep the same sheet names (month in ALL CAPS). Cell detection is mostly label-based so small column shifts are OK.

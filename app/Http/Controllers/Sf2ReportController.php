@@ -59,9 +59,16 @@ class Sf2ReportController extends Controller
             $defaultSection = null;
         }
 
+        $school = config('sf2.school', []);
         $defaults = [
-            'school_name' => config('app.name'),
+            'school_name' => $school['name'] ?? config('app.name'),
+            'school_id' => $school['school_id'] ?? '',
             'school_year' => $this->defaultSchoolYear(),
+            'semester' => $school['semester'] ?? 'FIRST SEMESTER',
+            'division' => $school['division'] ?? 'DAVAO CITY',
+            'region' => $school['region'] ?? 'XI',
+            'track_and_strand' => $school['track_and_strand'] ?? '',
+            'tvl_courses' => $school['tvl_courses'] ?? '',
             'report_month' => (int) now(config('sf2.timezone', 'Asia/Manila'))->format('n'),
             'report_year' => (int) now(config('sf2.timezone', 'Asia/Manila'))->format('Y'),
             'grade_level' => $defaultGrade,
@@ -196,10 +203,15 @@ class Sf2ReportController extends Controller
             'school_id' => 'nullable|string|max:50',
             'school_name' => 'required|string|max:255',
             'school_year' => 'required|string|max:16',
+            'semester' => 'nullable|string|max:64',
+            'division' => 'nullable|string|max:120',
+            'region' => 'nullable|string|max:32',
             'report_month' => 'required|integer|min:1|max:12',
             'report_year' => 'required|integer|min:2000|max:2100',
             'grade_level' => 'required|string|max:64',
             'section' => 'required|string|max:64',
+            'track_and_strand' => 'nullable|string|max:255',
+            'tvl_courses' => 'nullable|string|max:255',
             'teacher_name' => 'nullable|string|max:255',
             'school_head_name' => 'nullable|string|max:255',
             'students' => 'required|array|min:1',
@@ -223,21 +235,27 @@ class Sf2ReportController extends Controller
             $validated['teacher_name'] = $user->fullName();
         }
 
+        $schoolDefaults = config('sf2.school', []);
         $schoolDays = $this->calendar->schoolDaysInMonth(
             (int) $validated['report_year'],
             (int) $validated['report_month']
         );
 
-        return DB::transaction(function () use ($request, $report, $validated, $schoolDays) {
+        return DB::transaction(function () use ($request, $report, $validated, $schoolDays, $schoolDefaults) {
             $report->fill([
                 'user_id' => $request->user()?->id,
-                'school_id' => $validated['school_id'] ?? null,
+                'school_id' => $validated['school_id'] ?? ($schoolDefaults['school_id'] ?? null),
                 'school_name' => $validated['school_name'],
                 'school_year' => $validated['school_year'],
+                'semester' => $validated['semester'] ?? ($schoolDefaults['semester'] ?? null),
+                'division' => $validated['division'] ?? ($schoolDefaults['division'] ?? null),
+                'region' => $validated['region'] ?? ($schoolDefaults['region'] ?? null),
                 'report_month' => (int) $validated['report_month'],
                 'report_year' => (int) $validated['report_year'],
                 'grade_level' => $validated['grade_level'],
                 'section' => $validated['section'],
+                'track_and_strand' => $validated['track_and_strand'] ?? ($schoolDefaults['track_and_strand'] ?? null),
+                'tvl_courses' => $validated['tvl_courses'] ?? ($schoolDefaults['tvl_courses'] ?? null),
                 'school_days' => $schoolDays,
                 'teacher_name' => $validated['teacher_name'] ?? null,
                 'school_head_name' => $validated['school_head_name'] ?? null,

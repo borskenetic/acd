@@ -22,9 +22,9 @@ return [
   ],
 
   /*
-  | DepEd SF2 daily grid uses up to 25 school-day columns.
+  | School-day columns on older DepEd grids; SHS template uses full calendar months.
   */
-  'max_day_columns' => 25,
+  'max_day_columns' => 31,
 
   'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
 
@@ -50,45 +50,49 @@ return [
   ],
 
   /*
-  | Official DepEd Excel template (resources/templates/sf2/sf2-template.xlsx).
-  | Cell map derived from the division SF2 workbook layout.
+  | Defaults for SF2-SHS header (Assumption College of Davao).
+  */
+  'school' => [
+    'name' => env('SF2_SCHOOL_NAME', 'ASSUMPTION COLLEGE OF DAVAO'),
+    'school_id' => env('SF2_SCHOOL_ID', '405431'),
+    'division' => env('SF2_DIVISION', 'DAVAO CITY'),
+    'region' => env('SF2_REGION', 'XI'),
+    'semester' => env('SF2_SEMESTER', 'FIRST SEMESTER'),
+    'track_and_strand' => env('SF2_TRACK_STRAND', 'ARTS, SOCIAL SCIENCES, AND HUMANITIES'),
+    'tvl_courses' => env('SF2_TVL_COURSES', ''),
+  ],
+
+  /*
+  | Official ACD SF2-SHS multi-month workbook (user-provided SF2.xlsx).
+  | Sheets: REMINDERS + JUNE…APRIL. Marks: blank=present, X=absent, T=tardy.
   */
   'excel' => [
     'template' => resource_path('templates/sf2/sf2-template.xlsx'),
-    'header' => [
-      'school_id' => 'C6',
-      'school_year' => 'K6',
-      'report_month' => 'X6',
-      'school_name' => 'C8',
-      'grade_level' => 'X8',
-      'section' => 'AC8',
+    'month_sheets' => [
+      1 => 'JANUARY',
+      2 => 'FEBRUARY',
+      3 => 'MARCH',
+      4 => 'APRIL',
+      5 => 'MAY',
+      6 => 'JUNE',
+      7 => 'JULY',
+      8 => 'AUGUST',
+      9 => 'SEPTEMBER',
+      10 => 'OCTOBER',
+      11 => 'NOVEMBER',
+      12 => 'DECEMBER',
     ],
-    'date_header_row' => 11,
-    'dow_header_row' => 12,
-    'first_day_col' => 'D',
-    'day_column_count' => 25,
-    'absent_col' => 'AC',
-    'tardy_col' => 'AD',
-    'remarks_col' => 'AE',
-    'male_first_row' => 14,
-    'male_last_row' => 34,
-    'male_total_row' => 35,
-    'female_first_row' => 36,
-    'female_last_row' => 60,
-    'female_total_row' => 61,
-    'combined_total_row' => 62,
+    'first_day_col' => 'C',
+    'date_header_row' => 12,
+    'dow_header_row' => 13,
     'number_col' => 'A',
     'name_col' => 'B',
-    'summary' => [
-      'month_days_label' => 'AE64',
-      'registered_end_month' => 70,
-      'school_days_row' => 71,
-      'summary_value_cols' => ['AH', 'AI', 'AJ'],
-    ],
-    'signatures' => [
-      'teacher_name' => 'AE88',
-      'school_head_name' => 'AE92',
-    ],
+    'absent_col' => 'AJ',
+    'tardy_col' => 'AK',
+    'male_first_row' => 14,
+    'male_last_row' => 27,
+    'female_first_row' => 29,
+    'female_last_row' => 64,
   ],
 
 ];

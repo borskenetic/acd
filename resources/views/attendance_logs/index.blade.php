@@ -132,7 +132,7 @@
                 </div>
             </div>
 
-            <details class="al-more-filters" {{ request()->hasAny(['from', 'to', 'year', 'homeroom_section']) ? 'open' : '' }}>
+            <details class="al-more-filters" {{ request()->hasAny(['from', 'to', 'year', 'homeroom_section', 'gate_device_id', 'kiosk_name']) ? 'open' : '' }}>
                 <summary>More filters</summary>
                 <div class="al-more-filters__grid">
                     <div class="al-field">
@@ -161,6 +161,28 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="al-field">
+                        <label for="alKiosk">Kiosk</label>
+                        <select id="alKiosk" name="gate_device_id">
+                            <option value="">All kiosks</option>
+                            @foreach($kiosks ?? [] as $device)
+                                <option value="{{ $device->id }}" @selected((string) request('gate_device_id') === (string) $device->id)>
+                                    {{ $device->name }}{{ $device->is_active ? '' : ' (inactive)' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @if(($kioskNameOptions ?? collect())->isNotEmpty())
+                    <div class="al-field">
+                        <label for="alKioskName">Kiosk name (on log)</label>
+                        <select id="alKioskName" name="kiosk_name">
+                            <option value="">Any name</option>
+                            @foreach($kioskNameOptions as $name)
+                                <option value="{{ $name }}" @selected(request('kiosk_name') === $name)>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
                     <div class="al-field al-field--actions">
                         <button type="submit" class="al-btn al-btn--primary">Apply filters</button>
                         @if($hasFilters)
@@ -192,6 +214,17 @@
                 @if(request('homeroom_section'))
                     <a href="{{ $filterUrl([], ['homeroom_section']) }}" class="al-tag">Section: {{ request('homeroom_section') }} <span aria-hidden="true">×</span></a>
                 @endif
+                @if(request('gate_device_id'))
+                    @php
+                        $activeKiosk = ($kiosks ?? collect())->firstWhere('id', (int) request('gate_device_id'));
+                    @endphp
+                    <a href="{{ $filterUrl([], ['gate_device_id']) }}" class="al-tag">
+                        Kiosk: {{ $activeKiosk?->name ?? '#'.request('gate_device_id') }} <span aria-hidden="true">×</span>
+                    </a>
+                @endif
+                @if(request('kiosk_name'))
+                    <a href="{{ $filterUrl([], ['kiosk_name']) }}" class="al-tag">Name: {{ request('kiosk_name') }} <span aria-hidden="true">×</span></a>
+                @endif
                 @if($currentClassification !== '')
                     <a href="{{ $filterUrl([], ['classification', 'status']) }}" class="al-tag">Status: {{ $currentClassification === 'IN' ? 'On time' : $currentClassification }} <span aria-hidden="true">×</span></a>
                 @endif
@@ -219,6 +252,7 @@
                         <th>Student</th>
                         <th>Grade</th>
                         <th>Section</th>
+                        <th>Kiosk</th>
                         <th>Status</th>
                         <th>Scanned</th>
                     </tr>
@@ -251,6 +285,7 @@
                             </td>
                             <td data-label="Grade">{{ $student?->year ?? '—' }}</td>
                             <td data-label="Section">{{ $student?->section ?? '—' }}</td>
+                            <td data-label="Kiosk">{{ $log->kioskLabel() }}</td>
                             <td data-label="Status">
                                 @if($classification === 'IN')
                                     <span class="al-status al-status--in">IN</span>
@@ -275,7 +310,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <div class="al-empty">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
                                     <p class="al-empty__title">No records found</p>

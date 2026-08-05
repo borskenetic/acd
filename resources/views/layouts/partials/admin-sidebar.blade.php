@@ -1,6 +1,8 @@
 @php
     $isActive = fn (array $patterns) => collect($patterns)->contains(fn ($pattern) => request()->routeIs($pattern));
     $user = Auth::user();
+    $isFaculty = $user && $user->role === 'faculty';
+    $isStaffish = $user && in_array($user->role, ['admin', 'staff'], true);
 
     $attendanceChildren = [
         ['label' => 'Gate Terminal',      'route' => 'attendance.scan',        'patterns' => ['attendance.scan', 'attendance.process'], 'icon' => 'scan', 'target' => '_blank'],
@@ -8,15 +10,19 @@
     if (config('face.enabled')) {
         $attendanceChildren[] = ['label' => 'Face Gate Terminal', 'route' => 'attendance.face', 'patterns' => ['attendance.face', 'attendance.face.identify'], 'icon' => 'scan', 'target' => '_blank'];
     }
-    $attendanceChildren[] = ['label' => 'Manage Video', 'route' => 'attendance.changeVideo', 'patterns' => ['attendance.changeVideo', 'attendance.uploadVideo'], 'icon' => 'settings'];
-    $attendanceChildren[] = ['label' => 'Issue Visitor Pass', 'route' => 'visitors.issue.create', 'patterns' => ['visitors.issue.*'], 'icon' => 'badge'];
+    if ($isStaffish) {
+        $attendanceChildren[] = ['label' => 'Manage Video', 'route' => 'attendance.changeVideo', 'patterns' => ['attendance.changeVideo', 'attendance.uploadVideo'], 'icon' => 'settings'];
+        $attendanceChildren[] = ['label' => 'Issue Visitor Pass', 'route' => 'visitors.issue.create', 'patterns' => ['visitors.issue.*'], 'icon' => 'badge'];
+    }
 
     $reportsChildren = [
         ['label' => 'School Form 2 (SF2)', 'route' => 'sf2.index',                    'patterns' => ['sf2.*'], 'icon' => 'book'],
         ['label' => 'Attendance Logs',     'route' => 'attendance_logs.index',        'patterns' => ['attendance_logs.index', 'attendance_logs.export.*'], 'icon' => 'clock'],
-        ['label' => 'Patron Reports',      'route' => 'attendance_logs.reports.hub',  'patterns' => ['attendance_logs.reports.*'], 'icon' => 'chart'],
-        ['label' => 'Visitor Logs',        'route' => 'visitor_logs.index',           'patterns' => ['visitor_logs.*'],              'icon' => 'clock'],
     ];
+    if ($isStaffish) {
+        $reportsChildren[] = ['label' => 'Patron Reports',      'route' => 'attendance_logs.reports.hub',  'patterns' => ['attendance_logs.reports.*'], 'icon' => 'chart'];
+        $reportsChildren[] = ['label' => 'Visitor Logs',        'route' => 'visitor_logs.index',           'patterns' => ['visitor_logs.*'],              'icon' => 'clock'];
+    }
 
     $navLinks = [
         [
@@ -48,12 +54,15 @@
             'label'    => 'Data',
             'icon'     => 'users',
             'patterns' => ['students.*', 'pending.index', 'students.pending', 'employees.*', 'pending.employees'],
-            'children' => [
+            'children' => array_values(array_filter([
                 ['label' => 'Students',  'route' => 'students.index',  'patterns' => ['students.*', 'pending.index', 'students.pending'], 'icon' => 'users'],
-                ['label' => 'Employees', 'route' => 'employees.index', 'patterns' => ['employees.*', 'pending.employees'],                'icon' => 'badge'],
-            ],
+                $isStaffish ? ['label' => 'Employees', 'route' => 'employees.index', 'patterns' => ['employees.*', 'pending.employees'], 'icon' => 'badge'] : null,
+            ])),
         ],
-        [
+    ];
+
+    if ($isStaffish) {
+        $navLinks[] = [
             'label'    => 'Communication',
             'icon'     => 'message',
             'patterns' => ['feedback.index', 'sms.*'],
@@ -62,13 +71,23 @@
                 ['label' => 'SMS Blast',       'route' => 'sms.page',        'patterns' => ['sms.page', 'sms.send'],                      'icon' => 'send'],
                 ['label' => 'Gate Terminal Message', 'route' => 'sms.scanMessage', 'patterns' => ['sms.scanMessage', 'sms.scanMessage.update'], 'icon' => 'settings'],
             ],
-        ],
-    ];
+        ];
+    } elseif ($user && $user->role === 'faculty' && \App\Support\AdvisoryScope::canManageAnyClass($user)) {
+        $navLinks[] = [
+            'label'    => 'Communication',
+            'icon'     => 'message',
+            'patterns' => ['sms.page', 'sms.send', 'sms.count'],
+            'children' => [
+                ['label' => 'SMS Blast (my classes)', 'route' => 'sms.page', 'patterns' => ['sms.page', 'sms.send'], 'icon' => 'send'],
+            ],
+        ];
+    }
 
     $adminChildren = [
         ['label' => 'School Setup', 'route' => 'school-setup.index', 'patterns' => ['school-setup.*', 'prospectus.*'], 'icon' => 'grid'],
+        ['label' => 'School Calendar', 'route' => 'school_calendar.index', 'patterns' => ['school_calendar.*'], 'icon' => 'calendar-check'],
         ['label' => 'Attendance Policy', 'route' => 'attendance.policy.settings', 'patterns' => ['attendance.policy.settings', 'attendance.policy.settings.update'], 'icon' => 'clock'],
-        ['label' => 'Gate Devices', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
+        ['label' => 'Kiosks', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
         ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'],
         [
             'label'    => 'Accounts',

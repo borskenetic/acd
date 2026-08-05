@@ -15,58 +15,151 @@ class AttendancePolicyService
     }
 
     /**
-     * Expected login (H:i). Section schedule > year override > gate default.
+     * Expected login (H:i). Temporary override > section schedule > year/SHS > gate default.
      */
     public function loginTime(?string $year = null, ?string $section = null): string
     {
+        $temp = $this->activeTemporaryOverride();
         $schedule = $this->scheduleFor($year, $section);
+
         if ($schedule !== null) {
+            if ($temp !== null && ($temp['apply_to_shs_evening'] ?? false)) {
+                return $temp['login_time'];
+            }
+
             return $schedule['login_time'];
         }
 
         $year = $this->normalizeLabel($year);
+        if ($year !== null && $this->isSeniorHighYear($year)) {
+            if ($temp !== null && ($temp['apply_to_shs'] ?? false)) {
+                return $temp['login_time'];
+            }
+
+            return $this->shsLoginTime();
+        }
+
         if ($year !== null) {
             $overrides = $this->loginTimeOverrides();
             if (isset($overrides[$year])) {
+                if ($temp !== null && ($temp['apply_to_default'] ?? true)) {
+                    return $temp['login_time'];
+                }
+
                 return $overrides[$year];
             }
+        }
+
+        if ($temp !== null && ($temp['apply_to_default'] ?? true)) {
+            return $temp['login_time'];
         }
 
         return (string) ($this->policy()['login_time'] ?? config('attendance.gate.login_time', '08:00'));
     }
 
     /**
-     * Expected logout (H:i). Section schedule > gate default.
+     * Expected logout (H:i). Temporary override > section schedule > SHS > gate default.
      */
     public function logoutTime(?string $year = null, ?string $section = null): string
     {
+        $temp = $this->activeTemporaryOverride();
         $schedule = $this->scheduleFor($year, $section);
-        if ($schedule !== null && ! empty($schedule['logout_time'])) {
+
+        if ($schedule !== null) {
+            if ($temp !== null && ($temp['apply_to_shs_evening'] ?? false)) {
+                return $temp['logout_time'];
+            }
+
             return $schedule['logout_time'];
+        }
+
+        $year = $this->normalizeLabel($year);
+        if ($year !== null && $this->isSeniorHighYear($year)) {
+            if ($temp !== null && ($temp['apply_to_shs'] ?? false)) {
+                return $temp['logout_time'];
+            }
+
+            return $this->shsLogoutTime();
+        }
+
+        if ($temp !== null && ($temp['apply_to_default'] ?? true)) {
+            return $temp['logout_time'];
         }
 
         return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
     }
 
+    public function shsLoginTime(): string
+    {
+        return (string) ($this->policy()['shs_login_time']
+            ?? config('attendance.gate.shs_login_time')
+            ?? config('attendance.gate.login_time_by_year.Grade 12')
+            ?? config('attendance.gate.login_time', '07:30'));
+    }
+
+    public function shsLogoutTime(): string
+    {
+        return (string) ($this->policy()['shs_logout_time']
+            ?? config('attendance.gate.shs_logout_time')
+            ?? config('attendance.gate.logout_time', '16:00'));
+    }
+
+    public function shsEveningLoginTime(): string
+    {
+        $cfg = $this->configEveningSchedule();
+
+        return (string) ($this->policy()['shs_evening_login_time']
+            ?? config('attendance.gate.night_login_time')
+            ?? ($cfg['login_time'] ?? null)
+            ?? '16:30');
+    }
+
+    public function shsEveningLogoutTime(): string
+    {
+        $cfg = $this->configEveningSchedule();
+
+        return (string) ($this->policy()['shs_evening_logout_time']
+            ?? config('attendance.gate.night_logout_time')
+            ?? ($cfg['logout_time'] ?? null)
+            ?? '21:00');
+    }
+
+    /**
+     * Permanent base login (ignores temporary override). Used for form display of saved defaults.
+     */
+    public function permanentLoginTime(): string
+    {
+        return (string) ($this->policy()['login_time'] ?? config('attendance.gate.login_time', '07:30'));
+    }
+
+    public function permanentLogoutTime(): string
+    {
+        return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
+    }
+
     /**
      * Year labels with a non-default expected login time (H:i).
+     * SHS years use policy shs_login_time when set.
      *
      * @return array<string, string>
      */
     public function loginTimeOverrides(): array
     {
+        $out = [];
         $raw = config('attendance.gate.login_time_by_year', []);
-        if (! is_array($raw)) {
-            return [];
+        if (is_array($raw)) {
+            foreach ($raw as $year => $time) {
+                $year = $this->normalizeLabel(is_string($year) ? $year : null);
+                if ($year === null || ! is_string($time) || trim($time) === '') {
+                    continue;
+                }
+                $out[$year] = $this->normalizeTimeInput($time);
+            }
         }
 
-        $out = [];
-        foreach ($raw as $year => $time) {
-            $year = $this->normalizeLabel(is_string($year) ? $year : null);
-            if ($year === null || ! is_string($time) || trim($time) === '') {
-                continue;
-            }
-            $out[$year] = $this->normalizeTimeInput($time);
+        $shsLogin = $this->shsLoginTime();
+        foreach ($this->seniorHighYears() as $year) {
+            $out[$year] = $shsLogin;
         }
 
         return $out;
@@ -80,8 +173,15 @@ class AttendancePolicyService
     public function sectionSchedules(): array
     {
         $raw = config('attendance.gate.schedules_by_year_section', []);
-        if (! is_array($raw)) {
-            return [];
+        if (! is_array($raw) || $raw === []) {
+            $raw = [[
+                'years' => $this->seniorHighYears(),
+                'sections' => config('attendance.gate.evening_sections', [
+                    'Abigail', 'Abigail Evening', 'Dignity', 'Dignity Evening',
+                ]),
+                'login_time' => $this->shsEveningLoginTime(),
+                'logout_time' => $this->shsEveningLogoutTime(),
+            ]];
         }
 
         $out = [];
@@ -110,8 +210,16 @@ class AttendancePolicyService
                 continue;
             }
 
+            // Prefer admin-saved evening times over config defaults when years are SHS.
+            $isShsEvening = count(array_intersect($years, $this->seniorHighYears())) > 0;
             $login = is_string($row['login_time'] ?? null) ? $this->normalizeTimeInput($row['login_time']) : null;
             $logout = is_string($row['logout_time'] ?? null) ? $this->normalizeTimeInput($row['logout_time']) : null;
+
+            if ($isShsEvening) {
+                $login = $this->shsEveningLoginTime();
+                $logout = $this->shsEveningLogoutTime();
+            }
+
             if ($login === null) {
                 continue;
             }
@@ -120,7 +228,7 @@ class AttendancePolicyService
                 'years' => $years,
                 'sections' => $sections,
                 'login_time' => $login,
-                'logout_time' => $logout ?? $this->logoutTime(),
+                'logout_time' => $logout ?? $this->permanentLogoutTime(),
             ];
         }
 
@@ -420,34 +528,162 @@ class AttendancePolicyService
         return $scannedAt->copy()->timezone($tz)->gte($cutoff);
     }
 
+    /**
+     * Active temporary time change for "today", or null when none / expired.
+     *
+     * @return array{
+     *   login_time: string,
+     *   logout_time: string,
+     *   starts_on: string,
+     *   ends_on: string,
+     *   apply_to_default: bool,
+     *   apply_to_shs: bool,
+     *   apply_to_shs_evening: bool
+     * }|null
+     */
+    public function activeTemporaryOverride(?Carbon $asOf = null): ?array
+    {
+        $raw = $this->policy()['temporary_override'] ?? null;
+        if (! is_array($raw) || empty($raw['enabled'])) {
+            return null;
+        }
+
+        $starts = is_string($raw['starts_on'] ?? null) ? $raw['starts_on'] : null;
+        $ends = is_string($raw['ends_on'] ?? null) ? $raw['ends_on'] : null;
+        if ($starts === null || $ends === null) {
+            return null;
+        }
+
+        $tz = $this->timezone();
+        $day = ($asOf ?? Carbon::now($tz))->copy()->timezone($tz)->toDateString();
+        if ($day < $starts || $day > $ends) {
+            return null;
+        }
+
+        $login = is_string($raw['login_time'] ?? null) ? $this->normalizeTimeInput($raw['login_time']) : null;
+        $logout = is_string($raw['logout_time'] ?? null) ? $this->normalizeTimeInput($raw['logout_time']) : null;
+        if ($login === null || $logout === null) {
+            return null;
+        }
+
+        return [
+            'login_time' => $login,
+            'logout_time' => $logout,
+            'starts_on' => $starts,
+            'ends_on' => $ends,
+            'apply_to_default' => (bool) ($raw['apply_to_default'] ?? true),
+            'apply_to_shs' => (bool) ($raw['apply_to_shs'] ?? false),
+            'apply_to_shs_evening' => (bool) ($raw['apply_to_shs_evening'] ?? false),
+        ];
+    }
+
     /** @return array<string, mixed> */
     public function toFormValues(): array
     {
+        $temp = is_array($this->policy()['temporary_override'] ?? null)
+            ? $this->policy()['temporary_override']
+            : [];
+
         return [
-            'login_time' => $this->normalizeTimeInput($this->loginTime()),
-            'logout_time' => $this->normalizeTimeInput($this->logoutTime()),
+            'login_time' => $this->normalizeTimeInput($this->permanentLoginTime()),
+            'logout_time' => $this->normalizeTimeInput($this->permanentLogoutTime()),
+            'shs_login_time' => $this->normalizeTimeInput($this->shsLoginTime()),
+            'shs_logout_time' => $this->normalizeTimeInput($this->shsLogoutTime()),
+            'shs_evening_login_time' => $this->normalizeTimeInput($this->shsEveningLoginTime()),
+            'shs_evening_logout_time' => $this->normalizeTimeInput($this->shsEveningLogoutTime()),
             'tardy_grace_minutes' => $this->tardyGraceMinutes(),
             'consecutive_late_threshold' => $this->consecutiveLateThreshold(),
             'consecutive_absent_threshold' => $this->consecutiveAbsentThreshold(),
+            'temp_enabled' => ! empty($temp['enabled']),
+            'temp_login_time' => isset($temp['login_time']) ? $this->normalizeTimeInput((string) $temp['login_time']) : '',
+            'temp_logout_time' => isset($temp['logout_time']) ? $this->normalizeTimeInput((string) $temp['logout_time']) : '',
+            'temp_starts_on' => (string) ($temp['starts_on'] ?? ''),
+            'temp_ends_on' => (string) ($temp['ends_on'] ?? ''),
+            'temp_apply_to_default' => (bool) ($temp['apply_to_default'] ?? true),
+            'temp_apply_to_shs' => (bool) ($temp['apply_to_shs'] ?? false),
+            'temp_apply_to_shs_evening' => (bool) ($temp['apply_to_shs_evening'] ?? false),
         ];
     }
 
     /** @param  array<string, mixed>  $data */
     public function save(array $data): void
     {
-        Setting::setAttendancePolicy([
+        $existing = $this->policy();
+
+        $payload = [
             'login_time' => $this->normalizeTimeInput((string) ($data['login_time'] ?? '07:30')),
             'logout_time' => $this->normalizeTimeInput((string) ($data['logout_time'] ?? '16:00')),
+            'shs_login_time' => $this->normalizeTimeInput((string) ($data['shs_login_time'] ?? $this->shsLoginTime())),
+            'shs_logout_time' => $this->normalizeTimeInput((string) ($data['shs_logout_time'] ?? $this->shsLogoutTime())),
+            'shs_evening_login_time' => $this->normalizeTimeInput((string) ($data['shs_evening_login_time'] ?? $this->shsEveningLoginTime())),
+            'shs_evening_logout_time' => $this->normalizeTimeInput((string) ($data['shs_evening_logout_time'] ?? $this->shsEveningLogoutTime())),
             'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 5),
             'consecutive_late_threshold' => (int) ($data['consecutive_late_threshold'] ?? 5),
             'consecutive_absent_threshold' => (int) ($data['consecutive_absent_threshold'] ?? 3),
-        ]);
+        ];
+
+        $tempEnabled = ! empty($data['temp_enabled']);
+        if ($tempEnabled
+            && ! empty($data['temp_login_time'])
+            && ! empty($data['temp_logout_time'])
+            && ! empty($data['temp_starts_on'])
+            && ! empty($data['temp_ends_on'])) {
+            $payload['temporary_override'] = [
+                'enabled' => true,
+                'login_time' => $this->normalizeTimeInput((string) $data['temp_login_time']),
+                'logout_time' => $this->normalizeTimeInput((string) $data['temp_logout_time']),
+                'starts_on' => (string) $data['temp_starts_on'],
+                'ends_on' => (string) $data['temp_ends_on'],
+                'apply_to_default' => ! empty($data['temp_apply_to_default']),
+                'apply_to_shs' => ! empty($data['temp_apply_to_shs']),
+                'apply_to_shs_evening' => ! empty($data['temp_apply_to_shs_evening']),
+                // Snapshot of permanent times for audit/clarity (auto-revert is lookup-based).
+                'reverts_to' => [
+                    'login_time' => $payload['login_time'],
+                    'logout_time' => $payload['logout_time'],
+                    'shs_login_time' => $payload['shs_login_time'],
+                    'shs_logout_time' => $payload['shs_logout_time'],
+                    'shs_evening_login_time' => $payload['shs_evening_login_time'],
+                    'shs_evening_logout_time' => $payload['shs_evening_logout_time'],
+                ],
+            ];
+        } else {
+            $payload['temporary_override'] = [
+                'enabled' => false,
+            ];
+        }
+
+        // Preserve unknown keys from older policy payloads.
+        Setting::setAttendancePolicy(array_merge($existing, $payload));
     }
 
     /** @return array<string, mixed> */
     protected function policy(): array
     {
         return Setting::attendancePolicy();
+    }
+
+    /** @return list<string> */
+    public function seniorHighYears(): array
+    {
+        $years = config('patron.senior_high_grades', ['Grade 11', 'Grade 12']);
+
+        return is_array($years) ? array_values($years) : ['Grade 11', 'Grade 12'];
+    }
+
+    public function isSeniorHighYear(?string $year): bool
+    {
+        $year = $this->normalizeLabel($year);
+
+        return $year !== null && in_array($year, $this->seniorHighYears(), true);
+    }
+
+    /** @return array{years: list<string>, sections: list<string>, login_time: string, logout_time: string}|null */
+    protected function configEveningSchedule(): ?array
+    {
+        $raw = config('attendance.gate.schedules_by_year_section.0');
+
+        return is_array($raw) ? $raw : null;
     }
 
     protected function normalizeTimeInput(string $time): string

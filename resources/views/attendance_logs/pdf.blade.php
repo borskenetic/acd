@@ -19,6 +19,7 @@
                 <th>First Name</th>
                 <th>Course</th> 
                 <th>Section</th>
+                <th>Kiosk</th>
                 <th>Status</th>
                 <th>Scanned At</th>
             </tr>
@@ -30,6 +31,7 @@
                     <td>{{ $log->student->firstname ?? 'Unknown' }}</td>
                     <td>{{ $log->student->course ?? 'Unknown' }}</td>
                     <td>{{ $log->section ?? '—' }}</td>
+                    <td>{{ $log->kioskLabel() }}</td>
                     <td>{{ strtoupper($log->status) }}</td>
                     <td>
                         {{ $log->scanned_at?->format('Y-m-d h:i A') ?? '—' }}

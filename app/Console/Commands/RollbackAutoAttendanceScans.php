@@ -7,9 +7,9 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 /**
- * Undo automatic attendance rows created by lunch/EOD/stale jobs.
+ * Undo automatic attendance rows created by lunch/EOD/stale/friday jobs.
  *
- * Safe target: source in auto_eod_out, auto_lunch_out, auto_afternoon_in.
+ * Safe target: source in auto_eod_out, auto_lunch_out, auto_afternoon_in, friday_auto.
  * (Manual scans use web/gate_sync and are left alone.)
  */
 class RollbackAutoAttendanceScans extends Command
@@ -25,7 +25,7 @@ class RollbackAutoAttendanceScans extends Command
     public function handle(): int
     {
         $tz = (string) config('attendance_sessions.timezone', 'Asia/Manila');
-        $sources = ['auto_eod_out', 'auto_lunch_out', 'auto_afternoon_in'];
+        $sources = ['auto_eod_out', 'auto_lunch_out', 'auto_afternoon_in', 'friday_auto'];
 
         if ($this->option('hours') !== null) {
             $since = Carbon::now($tz)->subHours(max(1, (int) $this->option('hours')));

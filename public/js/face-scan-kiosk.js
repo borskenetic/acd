@@ -161,14 +161,18 @@
   }
 
   function processSection(section) {
+    const body = { student_id: currentStudentId, section: section };
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': cfg.csrf,
+      Accept: 'application/json',
+    };
     return fetch(cfg.sectionUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': cfg.csrf,
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ student_id: currentStudentId, section: section }),
+      headers: (window.KioskPairing && window.KioskPairing.headers(headers)) || headers,
+      body: JSON.stringify(
+        window.KioskPairing ? window.KioskPairing.attachBody(body) : body
+      ),
     });
   }
 
@@ -276,12 +280,20 @@
     try {
       const res = await fetch(cfg.identifyUrl, {
         method: 'POST',
-        headers: {
+        headers: (window.KioskPairing && window.KioskPairing.headers({
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': cfg.csrf,
+          Accept: 'application/json',
+        })) || {
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': cfg.csrf,
           Accept: 'application/json',
         },
-        body: JSON.stringify({ descriptor }),
+        body: JSON.stringify(
+          window.KioskPairing
+            ? window.KioskPairing.attachBody({ descriptor })
+            : { descriptor }
+        ),
       });
       const data = await res.json();
       handleScanResponse(data);

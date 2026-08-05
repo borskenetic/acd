@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GateDevice;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Visitor;
@@ -145,25 +146,73 @@ class AttendanceController extends Controller
         $request->validate([
             'login_time' => 'required|date_format:H:i',
             'logout_time' => 'required|date_format:H:i',
+            'shs_login_time' => 'required|date_format:H:i',
+            'shs_logout_time' => 'required|date_format:H:i',
+            'shs_evening_login_time' => 'required|date_format:H:i',
+            'shs_evening_logout_time' => 'required|date_format:H:i',
             'tardy_grace_minutes' => 'required|integer|min:0|max:120',
             'consecutive_late_threshold' => 'required|integer|min:1|max:30',
             'consecutive_absent_threshold' => 'required|integer|min:1|max:30',
+            'temp_enabled' => 'nullable|boolean',
+            'temp_login_time' => 'nullable|date_format:H:i',
+            'temp_logout_time' => 'nullable|date_format:H:i',
+            'temp_starts_on' => 'nullable|date',
+            'temp_ends_on' => 'nullable|date|after_or_equal:temp_starts_on',
+            'temp_apply_to_default' => 'nullable|boolean',
+            'temp_apply_to_shs' => 'nullable|boolean',
+            'temp_apply_to_shs_evening' => 'nullable|boolean',
         ]);
 
         $policy->save($request->only([
             'login_time',
             'logout_time',
+            'shs_login_time',
+            'shs_logout_time',
+            'shs_evening_login_time',
+            'shs_evening_logout_time',
             'tardy_grace_minutes',
             'consecutive_late_threshold',
             'consecutive_absent_threshold',
+            'temp_enabled',
+            'temp_login_time',
+            'temp_logout_time',
+            'temp_starts_on',
+            'temp_ends_on',
+            'temp_apply_to_default',
+            'temp_apply_to_shs',
+            'temp_apply_to_shs_evening',
         ]));
 
         return back()->with('success', 'Attendance policy saved. Gate logs, SF2, and SMS alerts will use the new times and thresholds.');
     }
 
+    /**
+     * Confirm this browser is paired as a named kiosk (token in header/body).
+     */
+    public function kioskStatus(Request $request)
+    {
+        $device = GateDevice::resolveFromRequest($request);
+
+        if (! $device) {
+            return response()->json([
+                'paired' => false,
+                'message' => 'No active kiosk for this token.',
+            ], 404);
+        }
+
+        return response()->json([
+            'paired' => true,
+            'id' => $device->id,
+            'name' => $device->name,
+        ]);
+    }
+
     public function scan(Request $request)
     {
         $request->validate(['qrcode' => 'required|string']);
+
+        // Keep last-seen fresh when the paired kiosk is actively scanning.
+        GateDevice::resolveFromRequest($request);
 
         $student = $this->studentScan->resolveStudent($request->qrcode);
 
@@ -196,6 +245,9 @@ class AttendanceController extends Controller
 
         $match = $faces->findBestMatch($request->input('descriptor'));
 
+        // Keep last-seen on the paired named kiosk.
+        GateDevice::resolveFromRequest($request);
+
         if ($match === null) {
             return response()->json([
                 'type' => 'error',
@@ -216,8 +268,15 @@ class AttendanceController extends Controller
         $section = $request->section ? trim((string) $request->section) : null;
         $student = Student::findOrFail($request->student_id);
 
+        $gateDevice = GateDevice::resolveFromRequest($request);
+
         try {
-            $result = $this->studentScan->recordScan($student, $section);
+            $result = $this->studentScan->recordScan(
+                $student,
+                $section,
+                gateDevice: $gateDevice,
+                source: $gateDevice ? 'web_kiosk' : 'web',
+            );
         } catch (\RuntimeException $e) {
             $message = $e->getMessage();
             $status = str_contains(strtolower($message), 'already scanned') ? 409 : 403;

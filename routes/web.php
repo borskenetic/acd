@@ -16,6 +16,7 @@ use App\Http\Controllers\PendingEmployeeController;
 use App\Http\Controllers\PendingStudentController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\SchoolCalendarController;
 use App\Http\Controllers\SchoolSetupController;
 use App\Http\Controllers\Sf2ReportController;
 use App\Http\Controllers\VisitorAdminController;
@@ -55,6 +56,7 @@ Route::get('/index', fn () => redirect()->route('home'));
 // Attendance kiosk (public)
 Route::get('/attendance', [AttendanceController::class, 'showScanner'])->name('attendance.scan');
 Route::get('/attendance/face', [AttendanceController::class, 'showFaceScanner'])->name('attendance.face');
+Route::get('/attendance/kiosk-status', [AttendanceController::class, 'kioskStatus'])->name('attendance.kiosk.status');
 Route::post('/attendance', [AttendanceController::class, 'scan'])->name('attendance.process');
 Route::post('/attendance/face', [AttendanceController::class, 'identifyByFace'])->name('attendance.face.identify');
 Route::post('/attendance/section', [AttendanceController::class, 'processSection'])->name('attendance.section');
@@ -100,18 +102,19 @@ Route::middleware(['auth:zendy', 'can:zendyAdmin'])->prefix('zendy')->name('zend
     Route::delete('/pending/{pendingUser}', [ZendyPendingController::class, 'reject'])->name('pending.reject');
 });
 
-// Admin + Staff
-Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
-    Route::get('/admin/pending', [StudentController::class, 'pending'])->name('students.pending');
-    Route::post('/admin/pending/{id}/approve', [StudentController::class, 'approve'])->name('students.approve');
-    Route::post('/admin/pending/{id}/reject', [StudentController::class, 'reject'])->name('students.reject');
-    Route::get('/pending', [PendingStudentController::class, 'index'])->name('pending.index');
+// Admin + Staff + Faculty (faculty features are scoped in controllers)
+Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
+    // Pending student approvals: admin/staff any; faculty only their adviser classes
+    Route::get('/admin/pending', [StudentController::class, 'pending'])->name('students.pending')->middleware('can:manageStudents');
+    Route::post('/admin/pending/{id}/approve', [StudentController::class, 'approve'])->name('students.approve')->middleware('can:manageStudents');
+    Route::post('/admin/pending/{id}/reject', [StudentController::class, 'reject'])->name('students.reject')->middleware('can:manageStudents');
+    Route::get('/pending', [PendingStudentController::class, 'index'])->name('pending.index')->middleware('can:manageStudents');
 
-    Route::get('/pending/employees', [PendingEmployeeController::class, 'index'])->name('pending.employees');
-    Route::post('/pending/employees/approve/{id}', [PendingEmployeeController::class, 'approve'])->name('employees.approve');
-    Route::post('/pending/employees/reject/{id}', [PendingEmployeeController::class, 'reject'])->name('employees.reject');
+    Route::get('/pending/employees', [PendingEmployeeController::class, 'index'])->name('pending.employees')->middleware('can:isAdminOrStaff');
+    Route::post('/pending/employees/approve/{id}', [PendingEmployeeController::class, 'approve'])->name('employees.approve')->middleware('can:isAdminOrStaff');
+    Route::post('/pending/employees/reject/{id}', [PendingEmployeeController::class, 'reject'])->name('employees.reject')->middleware('can:isAdminOrStaff');
 
-    Route::prefix('employees')->group(function () {
+    Route::middleware('can:isAdminOrStaff')->prefix('employees')->group(function () {
         Route::get('/', [EmployeeController::class, 'index'])->name('employees.index');
         Route::get('/bulk-download-ids', [EmployeeController::class, 'bulkDownloadIds'])->name('employees.bulk.ids');
         Route::get('/export', [EmployeeController::class, 'export'])->name('employees.export');
@@ -125,38 +128,47 @@ Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
         Route::get('/id/download/{id}', [IdCardController::class, 'downloadZip'])->name('employees.id.download');
     });
 
-    Route::prefix('employees/idcard')->group(function () {
+    Route::middleware('can:isAdminOrStaff')->prefix('employees/idcard')->group(function () {
         Route::get('/front/{id}', [EmployeeIdCardController::class, 'front'])->name('employees.idcard.front');
         Route::get('/back/{id}', [EmployeeIdCardController::class, 'back'])->name('employees.idcard.back');
         Route::get('/download/{id}', [EmployeeIdCardController::class, 'download'])->name('employees.idcard.download');
     });
 
-    Route::get('/attendance/change-video', [AttendanceController::class, 'showChangeVideo'])->name('attendance.changeVideo');
-    Route::post('/attendance/upload-video', [AttendanceController::class, 'uploadVideo'])->name('attendance.uploadVideo');
-    Route::get('/attendance/logout-feedback', [AttendanceController::class, 'feedbackSettings'])->name('attendance.feedback.settings');
-    Route::post('/attendance/logout-feedback', [AttendanceController::class, 'updateFeedbackSettings'])->name('attendance.feedback.settings.update');
-    Route::get('/attendance/section-picker', [AttendanceController::class, 'sectionSettings'])->name('attendance.section.settings');
-    Route::post('/attendance/section-picker', [AttendanceController::class, 'updateSectionSettings'])->name('attendance.section.settings.update');
+    Route::middleware('can:isAdminOrStaff')->group(function () {
+        Route::get('/attendance/change-video', [AttendanceController::class, 'showChangeVideo'])->name('attendance.changeVideo');
+        Route::post('/attendance/upload-video', [AttendanceController::class, 'uploadVideo'])->name('attendance.uploadVideo');
+        Route::get('/attendance/logout-feedback', [AttendanceController::class, 'feedbackSettings'])->name('attendance.feedback.settings');
+        Route::post('/attendance/logout-feedback', [AttendanceController::class, 'updateFeedbackSettings'])->name('attendance.feedback.settings.update');
+        Route::get('/attendance/section-picker', [AttendanceController::class, 'sectionSettings'])->name('attendance.section.settings');
+        Route::post('/attendance/section-picker', [AttendanceController::class, 'updateSectionSettings'])->name('attendance.section.settings.update');
 
-    Route::get('/admin/feedbacks', [FeedController::class, 'index'])->name('feedback.index');
+        Route::get('/admin/feedbacks', [FeedController::class, 'index'])->name('feedback.index');
 
-    Route::get('/sms-blast', [SmsController::class, 'index'])->name('sms.page');
-    Route::post('/sms/send', [SmsController::class, 'send'])->name('sms.send');
-    Route::get('/sms/scan-message', [SmsController::class, 'scanMessage'])->name('sms.scanMessage');
-    Route::post('/sms/scan-message', [SmsController::class, 'updateScanMessage'])->name('sms.scanMessage.update');
-    Route::get('/sms/count', [SmsController::class, 'count'])->name('sms.count');
+        Route::get('/sms/scan-message', [SmsController::class, 'scanMessage'])->name('sms.scanMessage');
+        Route::post('/sms/scan-message', [SmsController::class, 'updateScanMessage'])->name('sms.scanMessage.update');
+
+        Route::get('/visitor-logs', [VisitorLogController::class, 'index'])->name('visitor_logs.index');
+        Route::get('/visitors/issue', [VisitorAdminController::class, 'create'])->name('visitors.issue.create');
+        Route::get('/visitors/default-pass', [VisitorAdminController::class, 'defaultPass'])->name('visitors.default-pass');
+        Route::post('/visitors/issue', [VisitorAdminController::class, 'store'])->name('visitors.issue.store');
+    });
+
+    // SMS blast: admin/staff school-wide; faculty advisers only their classes
+    Route::middleware('can:sendSmsBlast')->group(function () {
+        Route::get('/sms-blast', [SmsController::class, 'index'])->name('sms.page');
+        Route::post('/sms/send', [SmsController::class, 'send'])->name('sms.send');
+        Route::get('/sms/count', [SmsController::class, 'count'])->name('sms.count');
+    });
 
     Route::get('/attendance-logs', [AttendanceLogController::class, 'index'])->name('attendance_logs.index');
-    Route::get('/attendance-logs/reports', [AttendanceLogController::class, 'reportsHub'])->name('attendance_logs.reports.hub');
-    Route::get('/attendance-logs/reports/dashboard', [AttendanceLogController::class, 'reportsDashboard'])->name('attendance_logs.reports.dashboard');
-    Route::get('/attendance-logs/reports/export', [AttendanceLogController::class, 'reportsExportCsv'])->name('attendance_logs.reports.export');
     Route::get('/attendance-logs/export/excel', [AttendanceLogController::class, 'exportExcel'])->name('attendance_logs.export.excel');
     Route::get('/attendance-logs/export/pdf', [AttendanceLogController::class, 'exportPdf'])->name('attendance_logs.export.pdf');
 
-    Route::get('/visitor-logs', [VisitorLogController::class, 'index'])->name('visitor_logs.index');
-    Route::get('/visitors/issue', [VisitorAdminController::class, 'create'])->name('visitors.issue.create');
-    Route::get('/visitors/default-pass', [VisitorAdminController::class, 'defaultPass'])->name('visitors.default-pass');
-    Route::post('/visitors/issue', [VisitorAdminController::class, 'store'])->name('visitors.issue.store');
+    Route::middleware('can:isAdminOrStaff')->group(function () {
+        Route::get('/attendance-logs/reports', [AttendanceLogController::class, 'reportsHub'])->name('attendance_logs.reports.hub');
+        Route::get('/attendance-logs/reports/dashboard', [AttendanceLogController::class, 'reportsDashboard'])->name('attendance_logs.reports.dashboard');
+        Route::get('/attendance-logs/reports/export', [AttendanceLogController::class, 'reportsExportCsv'])->name('attendance_logs.reports.export');
+    });
 
     Route::prefix('sf2')->name('sf2.')->group(function () {
         Route::get('/', [Sf2ReportController::class, 'index'])->name('index');
@@ -175,19 +187,30 @@ Route::middleware(['auth', 'can:isAdminOrStaff'])->group(function () {
     Route::get('/students/report', [StudentController::class, 'index'])->name('students.report');
     Route::get('/students/bulk-download-ids', [StudentController::class, 'bulkDownloadIds'])->name('students.bulk.ids');
     Route::get('/students/export', [StudentController::class, 'export'])->name('students.export');
+
+    // Admin, staff, and faculty advisers: student CRUD (faculty scoped)
+    Route::middleware('can:manageStudents')->group(function () {
+        Route::get('/register-student', [StudentController::class, 'create'])->name('students.create');
+        Route::post('/register-student', [StudentController::class, 'store'])->name('students.store');
+        Route::get('/students/{id}/edit', [StudentController::class, 'edit'])->name('students.edit');
+        Route::put('/students/{id}', [StudentController::class, 'update'])->name('students.update');
+        Route::delete('/students/{id}', [StudentController::class, 'destroy'])->name('students.destroy');
+    });
 });
 
 // Admin only
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/attendance/policy', [AttendanceController::class, 'policySettings'])->name('attendance.policy.settings');
     Route::post('/attendance/policy', [AttendanceController::class, 'updatePolicySettings'])->name('attendance.policy.settings.update');
+    Route::get('/school-calendar', [SchoolCalendarController::class, 'index'])->name('school_calendar.index');
+    Route::post('/school-calendar', [SchoolCalendarController::class, 'store'])->name('school_calendar.store');
+    Route::delete('/school-calendar/{schoolCalendar}', [SchoolCalendarController::class, 'destroy'])->name('school_calendar.destroy');
     Route::get('/gate-devices', [GateDeviceController::class, 'index'])->name('gate_devices.index');
     Route::post('/gate-devices', [GateDeviceController::class, 'store'])->name('gate_devices.store');
+    Route::post('/gate-devices/{gateDevice}/reissue', [GateDeviceController::class, 'reissue'])->name('gate_devices.reissue');
     Route::put('/gate-devices/{gateDevice}', [GateDeviceController::class, 'update'])->name('gate_devices.update');
     Route::delete('/gate-devices/{gateDevice}', [GateDeviceController::class, 'destroy'])->name('gate_devices.destroy');
 
-    Route::get('/register-student', [StudentController::class, 'create'])->name('students.create');
-    Route::post('/register-student', [StudentController::class, 'store'])->name('students.store');
     Route::get('/students/import-template', [StudentController::class, 'downloadImportTemplate'])->name('students.import.template');
     Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
     Route::get('/students/rfid-template', [StudentController::class, 'downloadRfidTemplate'])->name('students.rfid.template');
@@ -196,11 +219,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/students/sex-import', [StudentController::class, 'importSex'])->name('students.sex.import');
     Route::get('/employees/import-template', [EmployeeController::class, 'downloadImportTemplate'])->name('employees.import.template');
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
-    Route::get('/students/{id}/edit', [StudentController::class, 'edit'])->name('students.edit');
-    Route::put('/students/{id}', [StudentController::class, 'update'])->name('students.update');
     Route::post('/students/{student}/face', [FaceEnrollmentController::class, 'store'])->name('students.face.store');
     Route::delete('/students/{student}/face', [FaceEnrollmentController::class, 'destroy'])->name('students.face.destroy');
-    Route::delete('/students/{id}', [StudentController::class, 'destroy'])->name('students.destroy');
 
     Route::get('/idcard/download/{id}', [IdCardController::class, 'download'])->name('idcard.download');
     Route::get('/idcard/front/{id}', [IdCardController::class, 'front'])->name('idcard.front');

@@ -17,6 +17,10 @@ class DatabaseSeeder extends Seeder
             ProgramSeeder::class,
             StudentSeeder::class,
             EmployeeSeeder::class,
+            // Optional demos (safe to re-run):
+            // AdminUserSeeder::class,
+            // StreakHighlightDemoSeeder::class,
+            // Sf2TestDataSeeder::class,
         ]);
     }
 }

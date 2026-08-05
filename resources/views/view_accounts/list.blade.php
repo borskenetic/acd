@@ -43,6 +43,7 @@
                             <th scope="col">Last Name</th>
                             <th scope="col">Email</th>
                             <th scope="col">Role</th>
+                            <th scope="col">Advisory</th>
                             <th scope="col">Actions</th>
                         </tr>
                     </thead>
@@ -57,6 +58,7 @@
                                         {{ ucfirst($user->role) }}
                                     </span>
                                 </td>
+                                <td class="small">{{ $user->advisoryLabel() }}</td>
                                 <td>
                                     <div class="d-flex flex-wrap justify-content-center gap-1">
                                         <a href="{{ route('users.edit', $user->id) }}" class="btn btn-warning btn-sm">Edit</a>
@@ -71,7 +73,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-muted py-4">No users found.</td>
+                                <td colspan="6" class="text-muted py-4">No users found.</td>
                             </tr>
                         @endforelse
                     </tbody>

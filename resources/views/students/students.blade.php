@@ -20,15 +20,26 @@
         <div>
             <h1 class="sp-title">Students</h1>
             <p class="sp-subtitle">{{ number_format($students->total()) }} registered — search, filter, and manage records.</p>
+            @if(!empty($advisoryNotice))
+                <p class="small text-muted mb-0">{{ $advisoryNotice }}</p>
+            @endif
+            <p class="small text-muted mb-0 mt-1">
+                <span class="sp-streak-swatch sp-streak-swatch--late"></span>
+                {{ $lateThreshold ?? 5 }}+ consecutive lates
+                <span class="sp-streak-swatch sp-streak-swatch--absent ms-2"></span>
+                {{ $absentThreshold ?? 3 }}+ consecutive absences
+                <span class="text-muted">(absent highlight takes priority)</span>
+            </p>
         </div>
         <div class="sp-header__actions">
-            @can('isAdmin')
+            @can('manageStudents')
                 <a href="{{ route('students.create') }}" class="sp-btn sp-btn--primary">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                     Register
                 </a>
                 <a href="{{ route('pending.index', ['tab' => 'students']) }}" class="sp-btn sp-btn--warn">Pending</a>
-
+            @endcan
+            @can('isAdmin')
                 <div class="dropdown">
                     <button class="sp-btn sp-btn--ghost dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -68,7 +79,9 @@
 
     <nav class="sp-tabs" aria-label="Patron type">
         <a href="{{ route('students.index') }}" class="sp-tab is-active">Students</a>
-        <a href="{{ route('employees.index') }}" class="sp-tab">Employees</a>
+        @can('isAdminOrStaff')
+            <a href="{{ route('employees.index') }}" class="sp-tab">Employees</a>
+        @endcan
     </nav>
 
     @if(session('success') || session('error') || session('rfid_import_report') || session('sex_import_report') || $errors->any())
@@ -204,14 +217,29 @@
                         <th scope="col">Level</th>
                         <th scope="col">Course</th>
                         <th scope="col">Year</th>
-                        @can('isAdmin')
+                        @can('manageStudents')
                             <th scope="col" class="text-end">Actions</th>
+                        @else
+                            @can('isFaculty')
+                                {{-- subject teachers can still open view-only path via logs; no row actions --}}
+                            @endcan
                         @endcan
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($students as $student)
-                        <tr>
+                        @php
+                            $streak = $streakCounts[$student->id] ?? ['consecutive_late' => 0, 'consecutive_absent' => 0];
+                            $lateCount = (int) ($streak['consecutive_late'] ?? 0);
+                            $absentCount = (int) ($streak['consecutive_absent'] ?? 0);
+                            $isAbsentAlert = $absentCount >= (int) ($absentThreshold ?? 3);
+                            $isLateAlert = ! $isAbsentAlert && $lateCount >= (int) ($lateThreshold ?? 5);
+                            $rowClass = $isAbsentAlert ? 'sp-row--absent-alert' : ($isLateAlert ? 'sp-row--late-alert' : '');
+                        @endphp
+                        <tr class="{{ $rowClass }}"
+                            @if($isAbsentAlert || $isLateAlert)
+                                title="{{ $isAbsentAlert ? $absentCount.' consecutive absences' : $lateCount.' consecutive lates' }}"
+                            @endif>
                             <td>
                                 @if($student->profile_picture)
                                     <img src="{{ asset($student->profile_picture) }}" alt="" class="sp-profile">
@@ -222,6 +250,11 @@
                             <td><span class="sp-id-badge">{{ $student->student_id ?? '—' }}</span></td>
                             <td class="text-start">
                                 <strong>{{ $student->lastname }}</strong>, {{ $student->firstname }}
+                                @if($isAbsentAlert)
+                                    <span class="sp-streak-badge sp-streak-badge--absent">{{ $absentCount }} absences</span>
+                                @elseif($isLateAlert)
+                                    <span class="sp-streak-badge sp-streak-badge--late">{{ $lateCount }} lates</span>
+                                @endif
                             </td>
                             <td>
                                 @if($student->educational_level)
@@ -232,8 +265,9 @@
                             </td>
                             <td>{{ $student->course ?: '—' }}</td>
                             <td>{{ $student->year ?: '—' }}</td>
-                            @can('isAdmin')
+                            @can('manageStudents')
                                 <td class="text-end">
+                                    @if(\App\Support\AdvisoryScope::canMutateStudent($student))
                                     <div class="dropdown sp-row-menu">
                                         <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
                                                 data-bs-toggle="dropdown"
@@ -245,11 +279,13 @@
                                         <ul class="dropdown-menu dropdown-menu-end sp-menu">
                                             <li><a class="dropdown-item" href="{{ route('students.edit', $student->id) }}">Edit student</a></li>
                                             @if($idCardsEnabled)
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><h6 class="dropdown-header">ID card</h6></li>
-                                                <li><a class="dropdown-item" href="{{ route('idcard.front', $student->id) }}" target="_blank" rel="noopener">Front</a></li>
-                                                <li><a class="dropdown-item" href="{{ route('idcard.back', $student->id) }}" target="_blank" rel="noopener">Back</a></li>
-                                                <li><a class="dropdown-item" href="{{ route('idcard.download', $student->id) }}">Download ZIP</a></li>
+                                                @can('isAdmin')
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><h6 class="dropdown-header">ID card</h6></li>
+                                                    <li><a class="dropdown-item" href="{{ route('idcard.front', $student->id) }}" target="_blank" rel="noopener">Front</a></li>
+                                                    <li><a class="dropdown-item" href="{{ route('idcard.back', $student->id) }}" target="_blank" rel="noopener">Back</a></li>
+                                                    <li><a class="dropdown-item" href="{{ route('idcard.download', $student->id) }}">Download ZIP</a></li>
+                                                @endcan
                                             @endif
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
@@ -261,12 +297,15 @@
                                             </li>
                                         </ul>
                                     </div>
+                                    @else
+                                        <span class="text-muted small">View only</span>
+                                    @endif
                                 </td>
                             @endcan
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()?->can('isAdmin') ? 7 : 6 }}">
+                            <td colspan="{{ auth()->user()?->can('manageStudents') ? 7 : 6 }}">
                                 <div class="sp-empty">No students match your filters.</div>
                             </td>
                         </tr>

@@ -24,9 +24,22 @@ class GateDeviceController extends Controller
 
         return redirect()
             ->route('gate_devices.index')
-            ->with('success', 'Gate device registered.')
+            ->with('success', 'Kiosk registered.')
             ->with('issued_token', $issued['plain_token'])
-            ->with('issued_device_name', $issued['device']->name);
+            ->with('issued_device_name', $issued['device']->name)
+            ->with('issued_device_id', $issued['device']->id);
+    }
+
+    public function reissue(GateDevice $gateDevice)
+    {
+        $plain = $gateDevice->reissueToken();
+
+        return redirect()
+            ->route('gate_devices.index')
+            ->with('success', 'New kiosk token generated. Old terminal/app tokens stop working.')
+            ->with('issued_token', $plain)
+            ->with('issued_device_name', $gateDevice->name)
+            ->with('issued_device_id', $gateDevice->id);
     }
 
     public function update(Request $request, GateDevice $gateDevice)
@@ -41,13 +54,13 @@ class GateDeviceController extends Controller
             'is_active' => (bool) $validated['is_active'],
         ]);
 
-        return back()->with('success', 'Gate device updated.');
+        return back()->with('success', 'Kiosk updated.');
     }
 
     public function destroy(GateDevice $gateDevice)
     {
         $gateDevice->delete();
 
-        return back()->with('success', 'Gate device removed.');
+        return back()->with('success', 'Kiosk removed.');
     }
 }

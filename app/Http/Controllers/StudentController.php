@@ -24,6 +24,10 @@ use App\Services\BulkIdCardService;
 use App\Support\PatronOptions;
 use App\Support\SchoolSetupOptions;
 use App\Support\TableColumns;
+use App\Support\AdvisoryScope;
+use App\Services\ActivityLogger;
+use App\Services\StudentConsecutiveAttendanceService;
+use App\Services\AttendancePolicyService;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
@@ -41,20 +45,43 @@ class StudentController extends Controller
     }
 
     // Show all students
-    public function index(Request $request)
-    {
+    public function index(
+        Request $request,
+        StudentConsecutiveAttendanceService $streaks,
+        AttendancePolicyService $policy,
+    ) {
         $programs = $this->programList();
         $students = $this->filteredStudentsQuery($request)
             ->orderBy('lastname', 'asc')
             ->paginate(15)
             ->appends($request->all());
 
-        return view('students.students', compact('students', 'programs'));
+        $user = Auth::user();
+        $advisoryNotice = null;
+        if ($user && $user->role === 'faculty') {
+            $advisoryNotice = $user->hasAdvisoryClass()
+                ? 'Your classes: '.$user->advisoryLabel()
+                : 'Your account has no class assignments. Ask an admin to assign grade/section access.';
+        }
+
+        $streakCounts = $streaks->countsForStudents($students->items());
+        $lateThreshold = $policy->consecutiveLateThreshold();
+        $absentThreshold = $policy->consecutiveAbsentThreshold();
+
+        return view('students.students', compact(
+            'students',
+            'programs',
+            'advisoryNotice',
+            'streakCounts',
+            'lateThreshold',
+            'absentThreshold',
+        ));
     }
 
     private function filteredStudentsQuery(Request $request)
     {
         $query = Student::query();
+        AdvisoryScope::applyToStudents($query);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -222,15 +249,30 @@ class StudentController extends Controller
     // Show form to create new student
     public function create()
     {
+        $user = Auth::user();
+        if ($user && $user->role === 'faculty' && ! AdvisoryScope::canManageAnyClass($user)) {
+            return redirect()->route('students.index')
+                ->with('error', 'Only class advisers can register students. Ask an admin for adviser access on a grade/section.');
+        }
+
         $programs = $this->programList();
         $schoolSetup = SchoolSetupOptions::registrationData();
+        $facultyManageClasses = $user && $user->role === 'faculty'
+            ? AdvisoryScope::managePairs($user)
+            : [];
 
-        return view('students.create', compact('programs', 'schoolSetup'));
+        return view('students.create', compact('programs', 'schoolSetup', 'facultyManageClasses'));
     }
 
     // Store new student
-    public function store(Request $request)
+    public function store(Request $request, ActivityLogger $activityLogger)
     {
+        $user = Auth::user();
+        if ($user && $user->role === 'faculty' && ! AdvisoryScope::canManageAnyClass($user)) {
+            return redirect()->route('students.index')
+                ->with('error', 'Only class advisers can register students.');
+        }
+
         // Validation
         $validated = $request->validate([
             'student_id' => 'required|string|max:255|unique:students,student_id',
@@ -259,6 +301,15 @@ class StudentController extends Controller
             'emergency_address' => 'nullable|string',
             'rfid' => 'nullable|string|max:255|unique:students,rfid',
         ]);
+
+        $validated = AdvisoryScope::enforceStudentYearSection($validated, $user);
+
+        if ($user && $user->role === 'faculty'
+            && ! AdvisoryScope::canManageClass((string) $validated['year'], (string) ($validated['section'] ?? ''), $user)) {
+            return back()->withInput()->withErrors([
+                'year' => 'You can only register students for classes where you are the adviser.',
+            ]);
+        }
 
         // Handle profile picture upload
         if ($request->hasFile('profile_picture')) {
@@ -309,6 +360,24 @@ class StudentController extends Controller
 
         Student::create($validated);
 
+        if ($user && in_array($user->role, ['faculty', 'staff'], true)) {
+            $activityLogger->record(
+                action: 'students.store',
+                summary: 'Registered student '.$validated['lastname'].', '.$validated['firstname'].' ('.$validated['year'].' · '.($validated['section'] ?? '—').')',
+                method: 'POST',
+                routeName: 'students.store',
+                url: $request->fullUrl(),
+                user: $user,
+                ipAddress: $request->ip(),
+                userAgent: (string) $request->userAgent(),
+                properties: [
+                    'student_id' => $validated['student_id'],
+                    'year' => $validated['year'] ?? null,
+                    'section' => $validated['section'] ?? null,
+                ],
+            );
+        }
+
         return redirect()->route('students.index')->with('success', 'Student Registered Successfully!');
     }
 
@@ -316,16 +385,26 @@ class StudentController extends Controller
     public function edit($id)
     {
         $student = Student::findOrFail($id);
+        if (! AdvisoryScope::canMutateStudent($student)) {
+            abort(403, 'You do not have permission to edit this student (adviser access required for faculty).');
+        }
+
         $programs = $this->programList();
         $schoolSetup = SchoolSetupOptions::registrationData();
+        $facultyManageClasses = Auth::user() && Auth::user()->role === 'faculty'
+            ? AdvisoryScope::managePairs(Auth::user())
+            : [];
 
-        return view('students.edit', compact('student', 'programs', 'schoolSetup'));
+        return view('students.edit', compact('student', 'programs', 'schoolSetup', 'facultyManageClasses'));
     }
 
     // Update student
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, ActivityLogger $activityLogger)
     {
         $student = Student::findOrFail($id);
+        if (! AdvisoryScope::canMutateStudent($student)) {
+            abort(403, 'You do not have permission to edit this student (adviser access required for faculty).');
+        }
     
         $validated = $request->validate([
             'student_id' => 'required|string|max:255|unique:students,student_id,' . $id,
@@ -356,7 +435,16 @@ class StudentController extends Controller
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'student_signature' => 'nullable|string',
         ]);
+
+        $validated = AdvisoryScope::enforceStudentYearSection($validated);
     
+        if (Auth::user() && Auth::user()->role === 'faculty'
+            && ! AdvisoryScope::canManageClass((string) $validated['year'], (string) ($validated['section'] ?? ''), Auth::user())) {
+            return back()->withInput()->withErrors([
+                'year' => 'You can only keep students in classes where you are the adviser.',
+            ]);
+        }
+
         /*
         |--------------------------------------------------------------------------
         | PROFILE PICTURE
@@ -418,7 +506,27 @@ class StudentController extends Controller
         );
         $validated['lrn'] = filled($validated['lrn'] ?? null) ? $validated['lrn'] : null;
 
+        $before = $student->only(['student_id', 'firstname', 'lastname', 'year', 'section']);
         $student->update($validated);
+
+        $user = Auth::user();
+        if ($user && in_array($user->role, ['faculty', 'staff'], true)) {
+            $activityLogger->record(
+                action: 'students.update',
+                summary: 'Updated student '.$student->lastname.', '.$student->firstname.' (#'.$student->id.')',
+                method: 'PUT',
+                routeName: 'students.update',
+                url: $request->fullUrl(),
+                user: $user,
+                ipAddress: $request->ip(),
+                userAgent: (string) $request->userAgent(),
+                properties: [
+                    'student_db_id' => $student->id,
+                    'before' => $before,
+                    'after' => $student->only(['student_id', 'firstname', 'lastname', 'year', 'section']),
+                ],
+            );
+        }
     
         return redirect()
             ->route('students.index')
@@ -427,15 +535,41 @@ class StudentController extends Controller
 
 
     // Delete student
-    public function destroy($id)
+    public function destroy(Request $request, $id, ActivityLogger $activityLogger)
     {
         $student = Student::findOrFail($id);
+        if (! AdvisoryScope::canMutateStudent($student)) {
+            abort(403, 'You do not have permission to delete this student (adviser access required for faculty).');
+        }
+
+        $snapshot = [
+            'id' => $student->id,
+            'student_id' => $student->student_id,
+            'name' => $student->lastname.', '.$student->firstname,
+            'year' => $student->year,
+            'section' => $student->section,
+        ];
 
         if ($student->profile_picture) {
             Storage::disk('public')->delete($student->profile_picture);
         }
 
         $student->delete();
+
+        $user = Auth::user();
+        if ($user && in_array($user->role, ['faculty', 'staff'], true)) {
+            $activityLogger->record(
+                action: 'students.destroy',
+                summary: 'Deleted student '.$snapshot['name'].' (#'.$snapshot['id'].')',
+                method: 'DELETE',
+                routeName: 'students.destroy',
+                url: $request->fullUrl(),
+                user: $user,
+                ipAddress: $request->ip(),
+                userAgent: (string) $request->userAgent(),
+                properties: $snapshot,
+            );
+        }
 
         return redirect()->route('students.index')->with('success', 'Student Deleted Successfully!');
     }
@@ -449,7 +583,10 @@ class StudentController extends Controller
     // Pending list
     public function pending()
     {
-        $pendingStudents = PendingStudent::orderBy('lastname')->get();
+        $query = PendingStudent::query()->orderBy('lastname');
+        AdvisoryScope::applyToPendingStudents($query);
+        $pendingStudents = $query->get();
+
         return view('students.pending', compact('pendingStudents'));
     }
 
@@ -504,6 +641,14 @@ class StudentController extends Controller
             DB::transaction(function () use ($id) {
                 $pending = PendingStudent::findOrFail($id);
 
+                if (! AdvisoryScope::canManageClass(
+                    (string) ($pending->year ?? ''),
+                    (string) ($pending->section ?? ''),
+                    Auth::user()
+                )) {
+                    throw new \Exception('You can only approve students for your adviser classes.');
+                }
+
                 $last = Student::lockForUpdate()->orderBy('id', 'desc')->first();
                 $nextNumber = 1;
 
@@ -542,6 +687,15 @@ class StudentController extends Controller
     public function reject($id)
     {
         $pending = PendingStudent::findOrFail($id);
+
+        if (! AdvisoryScope::canManageClass(
+            (string) ($pending->year ?? ''),
+            (string) ($pending->section ?? ''),
+            Auth::user()
+        )) {
+            abort(403, 'You can only reject students for your adviser classes.');
+        }
+
         $pending->delete();
 
         return back()->with('success', 'Registration rejected.');

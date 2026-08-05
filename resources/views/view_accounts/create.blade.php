@@ -28,7 +28,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('users.store') }}" method="POST" class="mx-auto" style="max-width: 520px;">
+            <form action="{{ route('users.store') }}" method="POST" class="mx-auto" style="max-width: 640px;">
                 @csrf
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -49,11 +49,25 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Role</label>
-                        <select name="role" class="form-select" required>
+                        <select name="role" id="roleSelect" class="form-select" required>
                             <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                             <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>Staff</option>
                             <option value="faculty" {{ old('role') === 'faculty' ? 'selected' : '' }}>Faculty</option>
                         </select>
+                    </div>
+
+                    <div class="col-12 faculty-advisory-fields border rounded p-3 bg-light" style="{{ old('role') === 'faculty' ? '' : 'display:none' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>Class assignments</strong>
+                                <p class="small text-muted mb-0">
+                                    Add one or more grade/sections. <em>Adviser</em> can manage the roster;
+                                    <em>Subject teacher</em> is view-only.
+                                </p>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="addAdvisoryRow">+ Add class</button>
+                        </div>
+                        <div id="advisoryRows" class="d-flex flex-column gap-2"></div>
                     </div>
                 </div>
                 <div class="mt-4 d-flex flex-wrap gap-2 justify-content-center">
@@ -64,4 +78,8 @@
         </div>
     </div>
 </div>
+
+@include('view_accounts.partials.advisory-rows-script', [
+    'initialRows' => old('advisories', [['year' => '', 'section' => '', 'access_level' => 'adviser']]),
+])
 @endsection

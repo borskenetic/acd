@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\AttendanceLog;
+use App\Models\GateDevice;
 use App\Models\GradeSection;
 use App\Models\Student;
 use Illuminate\Support\Facades\Schema;
@@ -47,12 +48,25 @@ class AttendanceLogController extends Controller
             ->sort()
             ->values();
 
+        $kiosks = GateDevice::query()->orderBy('name')->get(['id', 'name', 'is_active']);
+        $kioskNameOptions = collect();
+        if (Schema::hasColumn('attendance_logs', 'kiosk_name')) {
+            $kioskNameOptions = AttendanceLog::query()
+                ->whereNotNull('kiosk_name')
+                ->where('kiosk_name', '!=', '')
+                ->distinct()
+                ->orderBy('kiosk_name')
+                ->pluck('kiosk_name');
+        }
+
         return view('attendance_logs.index', compact(
             'logs',
             'summary',
             'yearOptions',
             'homeroomSections',
             'policy',
+            'kiosks',
+            'kioskNameOptions',
         ));
     }
 
@@ -83,8 +97,10 @@ class AttendanceLogController extends Controller
     {
         $classification = strtoupper((string) ($request->classification ?: $request->status));
 
-        return AttendanceLog::with('student')
+        $query = AttendanceLog::with(['student', 'gateDevice']);
+        \App\Support\AdvisoryScope::applyToAttendanceLogs($query);
 
+        return $query
             ->when($request->from,
                 fn($q) => $q->whereDate('scanned_at', '>=', $request->from))
 
@@ -100,6 +116,12 @@ class AttendanceLogController extends Controller
                 fn ($q) => $q->whereHas('student',
                     fn ($q2) => $q2->where('section', $request->homeroom_section)
                 ))
+
+            ->when($request->gate_device_id,
+                fn ($q) => $q->where('gate_device_id', $request->gate_device_id))
+
+            ->when($request->kiosk_name,
+                fn ($q) => $q->where('kiosk_name', $request->kiosk_name))
 
             ->when($request->status && ! $request->classification,
                 fn ($q) => $q->where('status', strtoupper((string) $request->status))
@@ -117,7 +139,7 @@ class AttendanceLogController extends Controller
                         $q2->where('firstname', 'like', "%{$search}%")
                             ->orWhere('lastname', 'like', "%{$search}%")
                             ->orWhere('student_id', 'like', "%{$search}%");
-                    });
+                    })->orWhere('kiosk_name', 'like', "%{$search}%");
                 });
             })
 

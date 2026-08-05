@@ -206,6 +206,7 @@ class StudentScanService
         $log = AttendanceLog::create([
             'student_id' => $student->id,
             'section' => $section,
+            'kiosk_name' => $gateDevice?->name,
             'status' => $newStatus,
             'scanned_at' => $scannedAt,
             'client_uuid' => $clientUuid,
@@ -264,6 +265,7 @@ class StudentScanService
         $log = AttendanceLog::create([
             'student_id' => $student->id,
             'section' => $section,
+            'kiosk_name' => $gateDevice->name,
             'status' => $status,
             'scanned_at' => $scannedAt,
             'client_uuid' => $clientUuid,

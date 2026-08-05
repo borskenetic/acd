@@ -202,11 +202,24 @@ class Sf2AttendanceLogMapper
     {
         $absent = [];
         $tardy = [];
+        $tz = config('sf2.timezone', 'Asia/Manila');
+        // Dates from generation day onward default PRESENT (not yet taken).
+        $today = Carbon::now($tz)->toDateString();
 
         foreach ($schoolDays as $date) {
             $scannedAt = $firstInByDate[$date] ?? null;
 
             if ($scannedAt === null) {
+                // Dates after generation day default PRESENT (not yet taken).
+                if ($date > $today) {
+                    continue;
+                }
+
+                // Friday = online classes → auto-present even without a scan yet.
+                if ($this->calendar->isFridayOnlineDay($date)) {
+                    continue;
+                }
+
                 $absent[] = $date;
 
                 continue;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Models\Student;
+use App\Support\AdvisoryScope;
 use App\Support\PatronOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -13,15 +14,51 @@ class SmsController extends Controller
 
     public function index()
     {
-        $courses = Student::select('course')
-            ->whereNotNull('course')
-            ->distinct()
-            ->orderBy('course')
-            ->pluck('course');
+        $user = auth()->user();
+        $facultyLocked = $user && $user->role === 'faculty';
+
+        if ($facultyLocked) {
+            $yearOptions = AdvisoryScope::yearOptions($user);
+            $sectionsByGrade = AdvisoryScope::sectionsByYear($user);
+            $sections = collect($sectionsByGrade)->flatten()->unique()->sort()->values();
+            $courses = Student::query()
+                ->tap(fn ($q) => AdvisoryScope::applyToManageableStudents($q, $user))
+                ->whereNotNull('course')
+                ->where('course', '!=', '')
+                ->distinct()
+                ->orderBy('course')
+                ->pluck('course');
+        } else {
+            $yearOptions = PatronOptions::allYearOptions();
+            $courses = Student::select('course')
+                ->whereNotNull('course')
+                ->distinct()
+                ->orderBy('course')
+                ->pluck('course');
+            $sections = Student::query()
+                ->whereNotNull('section')
+                ->where('section', '!=', '')
+                ->distinct()
+                ->orderBy('section')
+                ->pluck('section');
+            $sectionsByGrade = Student::query()
+                ->whereNotNull('section')
+                ->where('section', '!=', '')
+                ->whereNotNull('year')
+                ->where('year', '!=', '')
+                ->get(['year', 'section'])
+                ->groupBy('year')
+                ->map(fn ($rows) => $rows->pluck('section')->unique()->sort()->values()->all())
+                ->all();
+        }
 
         return view('sms.blast', [
             'courses' => $courses,
-            'yearOptions' => PatronOptions::allYearOptions(),
+            'yearOptions' => $yearOptions,
+            'sections' => $sections,
+            'sectionsByGrade' => $sectionsByGrade,
+            'facultyLocked' => $facultyLocked,
+            'facultyClasses' => $facultyLocked ? AdvisoryScope::managePairs($user) : [],
         ]);
     }
 
@@ -68,7 +105,7 @@ class SmsController extends Controller
 
         return back()->with('success', 'Gate SMS templates saved.');
     }
-    
+
     public function count(Request $request)
     {
         $request->validate([
@@ -87,6 +124,7 @@ class SmsController extends Controller
             'recipient' => 'required|in:student,emergency_contact',
             'year' => 'nullable|string',
             'course' => 'nullable|string',
+            'section' => 'nullable|string',
         ]);
 
         $column = $this->recipientColumn($request->input('recipient'));
@@ -181,10 +219,16 @@ class SmsController extends Controller
     {
         $recipient = $request->input('recipient', 'emergency_contact');
         $column = $this->recipientColumn($recipient);
+        $user = $request->user() ?? auth()->user();
 
         $query = Student::query()
             ->whereNotNull($column)
             ->where($column, '!=', '');
+
+        // Faculty advisers: always limited to their adviser classes.
+        if ($user && $user->role === 'faculty') {
+            AdvisoryScope::applyToManageableStudents($query, $user);
+        }
 
         if ($request->year) {
             $query->where('year', $request->year);
@@ -192,6 +236,10 @@ class SmsController extends Controller
 
         if ($request->course) {
             $query->where('course', $request->course);
+        }
+
+        if ($request->filled('section')) {
+            $query->where('section', $request->section);
         }
 
         return $query;

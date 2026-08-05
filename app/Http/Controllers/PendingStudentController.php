@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Support\PatronOptions;
 use App\Support\SchoolSetupOptions;
 use App\Support\TableColumns;
+use App\Support\AdvisoryScope;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -20,7 +21,7 @@ class PendingStudentController extends Controller
         $search = $request->input('search');
     
         // Students query
-        $pendingStudents = PendingStudent::with('role')
+        $studentsQuery = PendingStudent::with('role')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('firstname', 'like', "%{$search}%")
@@ -28,20 +29,24 @@ class PendingStudentController extends Controller
                       ->orWhere('course', 'like', "%{$search}%")
                       ->orWhere('year', 'like', "%{$search}%");
                 });
-            })
-            ->paginate(10, ['*'], 'students_page');
+            });
+        AdvisoryScope::applyToPendingStudents($studentsQuery);
+        $pendingStudents = $studentsQuery->paginate(10, ['*'], 'students_page');
     
-        // Employees query
-        $pendingEmployees = PendingEmployee::with('role')
-            ->when($search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('firstname', 'like', "%{$search}%")
-                      ->orWhere('lastname', 'like', "%{$search}%")
-                      ->orWhere('department', 'like', "%{$search}%")
-                      ->orWhere('position', 'like', "%{$search}%");
-                });
-            })
-            ->paginate(10, ['*'], 'employees_page');
+        // Employees (faculty do not see employee pending)
+        $pendingEmployees = collect();
+        if (auth()->user()?->can('isAdminOrStaff')) {
+            $pendingEmployees = PendingEmployee::with('role')
+                ->when($search, function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('firstname', 'like', "%{$search}%")
+                          ->orWhere('lastname', 'like', "%{$search}%")
+                          ->orWhere('department', 'like', "%{$search}%")
+                          ->orWhere('position', 'like', "%{$search}%");
+                    });
+                })
+                ->paginate(10, ['*'], 'employees_page');
+        }
     
         return view('pending.index', compact('pendingStudents', 'pendingEmployees', 'search'));
     }

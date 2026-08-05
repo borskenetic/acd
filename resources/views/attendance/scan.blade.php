@@ -20,6 +20,21 @@
   </div>
 </header>
 
+<div id="kioskPairBanner" class="kiosk-pair-banner" hidden>
+  <div class="kiosk-pair-banner__text">
+    <strong data-kiosk-name>Kiosk</strong>
+    <span data-kiosk-status></span>
+  </div>
+  <button type="button" class="kiosk-pair-banner__unpair" data-kiosk-unpair hidden>Unpair</button>
+</div>
+
+<script>
+  window.KIOSK_PAIRING = {
+    statusUrl: @json(route('attendance.kiosk.status')),
+  };
+</script>
+<script src="{{ \App\Support\VersionedAsset::url('js/kiosk-pairing.js') }}"></script>
+
 <div class="main">
   <div class="sidebar" id="scanSidebar">
     <div class="date" id="currentDate">Date</div>
@@ -274,7 +289,11 @@
     function processVisitorLog(visitorId) {
       return fetch("{{ route('attendance.visitor') }}", {
         method: 'POST',
-        headers: {
+        headers: (window.KioskPairing && window.KioskPairing.headers({
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': '{{ csrf_token() }}',
+          'Accept': 'application/json',
+        })) || {
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': '{{ csrf_token() }}',
           'Accept': 'application/json',
@@ -312,8 +331,13 @@
       const formData = new FormData();
       formData.append('qrcode', input.value.trim().replace(/\r/g, ''));
       formData.append('_token', '{{ csrf_token() }}');
+      if (window.KioskPairing) window.KioskPairing.attachFormData(formData);
 
-      fetch("{{ route('attendance.process') }}", { method: 'POST', body: formData })
+      fetch("{{ route('attendance.process') }}", {
+        method: 'POST',
+        body: formData,
+        headers: (window.KioskPairing && window.KioskPairing.headers({ Accept: 'application/json' })) || {},
+      })
         .then(res => res.json())
         .then(data => {
           if (feedbackModal && feedbackModal.style.display === 'flex') {
@@ -355,12 +379,18 @@
             if (data.next_status === 'OUT') {
               fetch("{{ route('attendance.section') }}", {
                 method: 'POST',
-                headers: {
+                headers: (window.KioskPairing && window.KioskPairing.headers({
+                  'Content-Type': 'application/json',
+                  'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                  'Accept': 'application/json',
+                })) || {
                   'Content-Type': 'application/json',
                   'X-CSRF-TOKEN': '{{ csrf_token() }}',
                   'Accept': 'application/json',
                 },
-                body: JSON.stringify({ student_id: currentStudentId, section: null })
+                body: JSON.stringify((window.KioskPairing
+                  ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null })
+                  : { student_id: currentStudentId, section: null }))
               })
               .then(async res => {
                 const response = await res.json();
@@ -406,12 +436,18 @@
               } else {
                 fetch("{{ route('attendance.section') }}", {
                   method: 'POST',
-                  headers: {
+                  headers: (window.KioskPairing && window.KioskPairing.headers({
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                  })) || {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'Accept': 'application/json',
                   },
-                  body: JSON.stringify({ student_id: currentStudentId, section: null })
+                  body: JSON.stringify((window.KioskPairing
+                    ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null })
+                    : { student_id: currentStudentId, section: null }))
                 })
                 .then(res => res.json())
                 .then(response => {
@@ -444,15 +480,24 @@
 
         fetch("{{ route('attendance.section') }}", {
           method: 'POST',
-          headers: {
+          headers: (window.KioskPairing && window.KioskPairing.headers({
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json',
+          })) || {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': '{{ csrf_token() }}',
             'Accept': 'application/json',
           },
-          body: JSON.stringify({
-            student_id: currentStudentId,
-            section: this.dataset.section
-          })
+          body: JSON.stringify((window.KioskPairing
+            ? window.KioskPairing.attachBody({
+                student_id: currentStudentId,
+                section: this.dataset.section
+              })
+            : {
+                student_id: currentStudentId,
+                section: this.dataset.section
+              }))
         })
         .then(res => res.json())
         .then(response => {

@@ -21,18 +21,34 @@ return [
         'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 5),
 
         /*
-        | Per-year login overrides (H:i). Grade 12 day/half-day starts at 12:30.
+        | Senior High day class times (Grade 11–12, non-evening sections).
+        | Editable in Admin → Attendance policy; values here are defaults.
+        */
+        'shs_login_time' => env('ATTENDANCE_SHS_LOGIN_TIME', '12:30'),
+        'shs_logout_time' => env('ATTENDANCE_SHS_LOGOUT_TIME', '18:00'),
+        'night_login_time' => env('ATTENDANCE_NIGHT_LOGIN_TIME', '16:30'),
+        'night_logout_time' => env('ATTENDANCE_NIGHT_LOGOUT_TIME', '21:00'),
+
+        /*
+        | Per-year login overrides (H:i) for non-SHS grades if needed.
+        | SHS years use shs_login_time above (overridable in policy UI).
         | LATE = first IN after (login + tardy_grace_minutes) for that year.
         | Section schedules below take priority over this map.
         */
         'login_time_by_year' => [
-            'Grade 12' => env('ATTENDANCE_GATE_LOGIN_TIME_GRADE_12', '12:30'),
+            // Legacy fallback; SHS is driven by shs_login_time in AttendancePolicyService.
+        ],
+
+        'evening_sections' => [
+            'Abigail',
+            'Abigail Evening',
+            'Dignity',
+            'Dignity Evening',
         ],
 
         /*
         | Evening / night-shift sections (year + section name).
-        | Grade 11 evening: class 4:30 PM–9:00 PM. Section match is case-insensitive
-        | and accepts both "Abigail" and "Abigail Evening" style names.
+        | Login/logout times are overridden by policy SHS evening times when set.
         */
         'schedules_by_year_section' => [
             [

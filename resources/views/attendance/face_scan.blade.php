@@ -20,6 +20,14 @@
   </div>
 </header>
 
+<div id="kioskPairBanner" class="kiosk-pair-banner" hidden>
+  <div class="kiosk-pair-banner__text">
+    <strong data-kiosk-name>Kiosk</strong>
+    <span data-kiosk-status></span>
+  </div>
+  <button type="button" class="kiosk-pair-banner__unpair" data-kiosk-unpair hidden>Unpair</button>
+</div>
+
 <div class="main">
   <div class="sidebar" id="scanSidebar">
     <div class="date" id="currentDate">Date</div>
@@ -62,6 +70,9 @@
 <audio id="scanAlarmSound" src="{{ asset('sounds/alarm.wav') }}" preload="auto"></audio>
 
 <script>
+  window.KIOSK_PAIRING = {
+    statusUrl: @json(route('attendance.kiosk.status')),
+  };
   window.FACE_KIOSK_CONFIG = {
     identifyUrl: @json(route('attendance.face.identify')),
     sectionUrl: @json(route('attendance.section')),
@@ -75,6 +86,7 @@
     alarmSoundUrl: @json(asset('sounds/alarm.wav')),
   };
 </script>
+<script src="{{ \App\Support\VersionedAsset::url('js/kiosk-pairing.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.js"></script>
 <script src="{{ \App\Support\VersionedAsset::url('js/face-api-common.js') }}"></script>
 <script src="{{ \App\Support\VersionedAsset::url('js/face-scan-kiosk.js') }}"></script>

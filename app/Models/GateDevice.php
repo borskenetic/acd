@@ -44,14 +44,51 @@ class GateDevice extends Model
         return ['device' => $device, 'plain_token' => $plain];
     }
 
+    /** Rotate access token (plain returned once — for pairing kiosks / gate-terminal). */
+    public function reissueToken(): string
+    {
+        $plain = 'gate_'.Str::random(48);
+        $this->forceFill(['token_hash' => hash('sha256', $plain)])->save();
+
+        return $plain;
+    }
+
     public static function findByToken(string $plainToken): ?self
     {
+        $plainToken = trim($plainToken);
+        if ($plainToken === '') {
+            return null;
+        }
+
         $hash = hash('sha256', $plainToken);
 
         return static::query()
             ->where('token_hash', $hash)
             ->where('is_active', true)
             ->first();
+    }
+
+    /**
+     * Resolve active kiosk/device from request (X-Gate-Token, X-Kiosk-Token, body, or Bearer).
+     */
+    public static function resolveFromRequest(\Illuminate\Http\Request $request): ?self
+    {
+        $token = $request->header('X-Gate-Token')
+            ?: $request->header('X-Kiosk-Token')
+            ?: $request->input('kiosk_token')
+            ?: $request->input('device_token')
+            ?: $request->bearerToken();
+
+        if (! is_string($token) || trim($token) === '') {
+            return null;
+        }
+
+        $device = static::findByToken($token);
+        if ($device) {
+            $device->touchSeen();
+        }
+
+        return $device;
     }
 
     public function touchSeen(): void

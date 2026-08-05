@@ -943,3 +943,77 @@
         margin-bottom: 0.15rem;
     }
 }
+
+/* ── Student streak alerts (consecutive late / absent) ───────────────────── */
+
+.sp-streak-swatch {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 2px;
+    vertical-align: -1px;
+    margin-right: 0.2rem;
+}
+
+.sp-streak-swatch--late {
+    background: #fdba74;
+    border: 1px solid #f97316;
+}
+
+.sp-streak-swatch--absent {
+    background: #fca5a5;
+    border: 1px solid #ef4444;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--late-alert {
+    background: #fff7ed !important;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--late-alert:hover {
+    background: #ffedd5 !important;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--absent-alert {
+    background: #fef2f2 !important;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--absent-alert:hover {
+    background: #fee2e2 !important;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--late-alert td:first-child,
+.patron-list-page .sp-table tbody tr.sp-row--absent-alert td:first-child {
+    box-shadow: inset 3px 0 0 0 currentColor;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--late-alert td:first-child {
+    color: #ea580c;
+}
+
+.patron-list-page .sp-table tbody tr.sp-row--absent-alert td:first-child {
+    color: #dc2626;
+}
+
+.sp-streak-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.sp-streak-badge--late {
+    background: #ffedd5;
+    color: #c2410c;
+    border: 1px solid #fdba74;
+}
+
+.sp-streak-badge--absent {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}

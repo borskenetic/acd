@@ -7,6 +7,26 @@
 @endpush
 
 @section('content')
+@php
+    $initial = old('advisories');
+    if ($initial === null) {
+        $initial = $user->advisories->map(fn ($a) => [
+            'year' => $a->year,
+            'section' => $a->section,
+            'access_level' => $a->access_level,
+        ])->all();
+        if ($initial === [] && $user->advisory_year && $user->advisory_section) {
+            $initial = [[
+                'year' => $user->advisory_year,
+                'section' => $user->advisory_section,
+                'access_level' => 'adviser',
+            ]];
+        }
+        if ($initial === []) {
+            $initial = [['year' => '', 'section' => '', 'access_level' => 'adviser']];
+        }
+    }
+@endphp
 <div class="data-page accounts-page mt-3">
     <div class="card shadow-sm">
         <div class="card-header text-center py-3">
@@ -24,7 +44,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('users.update', $user->id) }}" method="POST" class="mx-auto" style="max-width: 520px;">
+            <form action="{{ route('users.update', $user->id) }}" method="POST" class="mx-auto" style="max-width: 640px;">
                 @csrf
                 @method('PUT')
 
@@ -44,15 +64,26 @@
                            value="{{ old('email', $user->email) }}" required>
                 </div>
                 <div class="mb-3">
-                    <label for="role" class="form-label">Role</label>
-                    <select name="role" id="role" class="form-select" required>
-                        <option value="admin" {{ $user->role === 'admin' ? 'selected' : '' }}>Admin</option>
-                        <option value="staff" {{ $user->role === 'staff' ? 'selected' : '' }}>Staff</option>
-                        <option value="faculty" {{ $user->role === 'faculty' ? 'selected' : '' }}>Faculty</option>
+                    <label for="roleSelect" class="form-label">Role</label>
+                    <select name="role" id="roleSelect" class="form-select" required>
+                        <option value="admin" {{ old('role', $user->role) === 'admin' ? 'selected' : '' }}>Admin</option>
+                        <option value="staff" {{ old('role', $user->role) === 'staff' ? 'selected' : '' }}>Staff</option>
+                        <option value="faculty" {{ old('role', $user->role) === 'faculty' ? 'selected' : '' }}>Faculty</option>
                         @if($user->role === 'student')
                             <option value="student" selected>Student (legacy)</option>
                         @endif
                     </select>
+                </div>
+
+                <div class="mb-3 faculty-advisory-fields border rounded p-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>Class assignments</strong>
+                            <p class="small text-muted mb-0">Required for faculty. Multiple classes supported.</p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="addAdvisoryRow">+ Add class</button>
+                    </div>
+                    <div id="advisoryRows" class="d-flex flex-column gap-2"></div>
                 </div>
 
                 <div class="d-flex flex-wrap gap-2 justify-content-between mt-4">
@@ -63,4 +94,8 @@
         </div>
     </div>
 </div>
+
+@include('view_accounts.partials.advisory-rows-script', [
+    'initialRows' => $initial,
+])
 @endsection

@@ -24,6 +24,7 @@ class Sf2ReportController extends Controller
     public function index()
     {
         $reports = Sf2Report::query()
+            ->tap(fn ($q) => \App\Support\AdvisoryScope::applyToSf2Reports($q))
             ->withCount('students')
             ->orderByDesc('updated_at')
             ->paginate(20);
@@ -34,14 +35,40 @@ class Sf2ReportController extends Controller
     public function create()
     {
         $rosterData = $this->logMapper->rosterDropdownData();
-        $gradeLevels = $rosterData['grades'] !== []
-            ? $rosterData['grades']
-            : config('sf2.grade_levels', []);
+        $user = auth()->user();
+        $gradeLevels = [];
+        if ($user && $user->role === 'faculty') {
+            $pairs = \App\Support\AdvisoryScope::classPairs($user);
+            $gradeLevels = array_values(array_unique(array_column($pairs, 'year')));
+            $sectionsByGrade = [];
+            foreach ($pairs as $pair) {
+                $sectionsByGrade[$pair['year']] ??= [];
+                if (! in_array($pair['section'], $sectionsByGrade[$pair['year']], true)) {
+                    $sectionsByGrade[$pair['year']][] = $pair['section'];
+                }
+            }
+            $rosterData['grades'] = $gradeLevels;
+            $rosterData['sections_by_grade'] = $sectionsByGrade;
+            $defaultGrade = $pairs[0]['year'] ?? null;
+            $defaultSection = $pairs[0]['section'] ?? null;
+        } else {
+            $gradeLevels = $rosterData['grades'] !== []
+                ? $rosterData['grades']
+                : config('sf2.grade_levels', []);
+            $defaultGrade = null;
+            $defaultSection = null;
+        }
+
         $defaults = [
             'school_name' => config('app.name'),
             'school_year' => $this->defaultSchoolYear(),
             'report_month' => (int) now(config('sf2.timezone', 'Asia/Manila'))->format('n'),
             'report_year' => (int) now(config('sf2.timezone', 'Asia/Manila'))->format('Y'),
+            'grade_level' => $defaultGrade,
+            'section' => $defaultSection,
+            'teacher_name' => ($user && in_array($user->role, ['faculty', 'staff'], true))
+                ? $user->fullName()
+                : null,
         ];
 
         return view('sf2.create', compact('gradeLevels', 'defaults', 'rosterData'));
@@ -55,6 +82,13 @@ class Sf2ReportController extends Controller
             'report_month' => 'required|integer|min:1|max:12',
             'report_year' => 'required|integer|min:2000|max:2100',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->role === 'faculty') {
+            if (! \App\Support\AdvisoryScope::canViewClass($validated['grade_level'], $validated['section'], $user)) {
+                return response()->json(['message' => 'You can only generate SF2 for your assigned classes.'], 403);
+            }
+        }
 
         $preview = $this->logMapper->buildPreview(
             $validated['grade_level'],
@@ -77,6 +111,7 @@ class Sf2ReportController extends Controller
 
     public function show(Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
         $sf2->load('students');
         $grid = $this->grid->build($sf2);
 
@@ -88,6 +123,7 @@ class Sf2ReportController extends Controller
 
     public function edit(Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
         $sf2->load('students');
         $gradeLevels = config('sf2.grade_levels', []);
 
@@ -96,6 +132,7 @@ class Sf2ReportController extends Controller
 
     public function update(Request $request, Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
         $report = $this->persistReport($request, $sf2);
 
         return redirect()
@@ -105,6 +142,7 @@ class Sf2ReportController extends Controller
 
     public function destroy(Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
         $sf2->delete();
 
         return redirect()
@@ -114,6 +152,7 @@ class Sf2ReportController extends Controller
 
     public function pdf(Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
         $sf2->load('students');
         $grid = $this->grid->build($sf2);
 
@@ -136,7 +175,19 @@ class Sf2ReportController extends Controller
 
     public function excel(Sf2Report $sf2)
     {
+        $this->authorizeSf2Access($sf2);
+
         return $this->excel->download($sf2);
+    }
+
+    protected function authorizeSf2Access(Sf2Report $sf2): void
+    {
+        $user = auth()->user();
+        if ($user && $user->role === 'faculty') {
+            if (! \App\Support\AdvisoryScope::canViewClass($sf2->grade_level, $sf2->section, $user)) {
+                abort(403, 'You can only access SF2 reports for your assigned classes.');
+            }
+        }
     }
 
     protected function persistReport(Request $request, Sf2Report $report): Sf2Report
@@ -160,6 +211,17 @@ class Sf2ReportController extends Controller
             'students.*.absent_dates' => 'nullable|string|max:2000',
             'students.*.tardy_dates' => 'nullable|string|max:2000',
         ]);
+
+        $user = $request->user();
+        if ($user && $user->role === 'faculty') {
+            if (! \App\Support\AdvisoryScope::canViewClass($validated['grade_level'], $validated['section'], $user)) {
+                abort(403, 'You can only save SF2 for your assigned classes.');
+            }
+        }
+
+        if (empty($validated['teacher_name']) && $user) {
+            $validated['teacher_name'] = $user->fullName();
+        }
 
         $schoolDays = $this->calendar->schoolDaysInMonth(
             (int) $validated['report_year'],

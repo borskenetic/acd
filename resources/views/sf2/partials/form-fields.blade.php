@@ -181,7 +181,7 @@
         <div class="col-md-4">
             <label class="form-label">Teacher (printed name)</label>
             <input type="text" name="teacher_name" class="form-control" maxlength="255"
-                   value="{{ old('teacher_name', $report->teacher_name ?? '') }}">
+                   value="{{ old('teacher_name', $report->teacher_name ?? ($defaults['teacher_name'] ?? '')) }}">
         </div>
         <div class="col-md-6">
             <label class="form-label">School head (printed name)</label>

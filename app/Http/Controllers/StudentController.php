@@ -16,10 +16,12 @@ use App\Console\Commands\NormalizeStudentNames;
 use App\Exports\StudentsContactTemplateExport;
 use App\Exports\StudentsImportTemplateExport;
 use App\Exports\StudentsListExport;
+use App\Exports\StudentsRecordsTemplateExport;
 use App\Exports\StudentsRfidTemplateExport;
 use App\Exports\StudentsSexTemplateExport;
 use App\Imports\StudentsContactImport;
 use App\Imports\StudentsImport;
+use App\Imports\StudentsRecordsImport;
 use App\Imports\StudentsRfidImport;
 use App\Imports\StudentsSexImport;
 use App\Services\BulkIdCardService;
@@ -240,6 +242,41 @@ class StudentController extends Controller
         return back()
             ->with('success', $message)
             ->with('contact_import_report', $report);
+    }
+
+    public function downloadRecordsTemplate()
+    {
+        return Excel::download(
+            new StudentsRecordsTemplateExport,
+            'students_records_update_template.xlsx'
+        );
+    }
+
+    public function importRecords(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:20480',
+        ]);
+
+        $import = new StudentsRecordsImport;
+        Excel::import($import, $request->file('file'));
+
+        $report = $import->report();
+        $message = 'Records update complete: '.$report['updated'].' student(s) updated.';
+
+        if ($report['photos_synced'] > 0) {
+            $message .= ' '.$report['photos_synced'].' profile photo path(s) set from RecordID.';
+        }
+        if ($report['unchanged'] > 0) {
+            $message .= ' '.$report['unchanged'].' already up to date.';
+        }
+        if ($report['skipped'] > 0) {
+            $message .= ' '.$report['skipped'].' row(s) skipped.';
+        }
+
+        return back()
+            ->with('success', $message)
+            ->with('records_import_report', $report);
     }
 
     public function bulkDownloadIds(Request $request, BulkIdCardService $bulkIds)

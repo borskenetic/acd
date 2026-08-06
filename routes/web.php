@@ -220,6 +220,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/students/sex-import', [StudentController::class, 'importSex'])->name('students.sex.import');
     Route::get('/students/contact-template', [StudentController::class, 'downloadContactTemplate'])->name('students.contact.template');
     Route::post('/students/contact-import', [StudentController::class, 'importContact'])->name('students.contact.import');
+    Route::get('/students/records-template', [StudentController::class, 'downloadRecordsTemplate'])->name('students.records.template');
+    Route::post('/students/records-import', [StudentController::class, 'importRecords'])->name('students.records.import');
     Route::get('/employees/import-template', [EmployeeController::class, 'downloadImportTemplate'])->name('employees.import.template');
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
     Route::post('/students/{student}/face', [FaceEnrollmentController::class, 'store'])->name('students.face.store');

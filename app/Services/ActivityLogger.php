@@ -254,6 +254,7 @@ class ActivityLogger
             'students.rfid.import' => 'Imported student RFID tags',
             'students.sex.import' => 'Updated student genders from spreadsheet',
             'students.contact.import' => 'Updated student contact / emergency info from spreadsheet',
+            'students.records.import' => 'Updated student RecordID / course / guardian fields from spreadsheet',
             'students.face.store' => 'Enrolled face for student #:student',
             'students.face.destroy' => 'Removed face enrollment for student #:student',
             'employees.store' => 'Created employee',
@@ -311,6 +312,7 @@ class ActivityLogger
             'students.import.template' => 'Downloaded student import template',
             'students.rfid.template' => 'Downloaded RFID import template',
             'students.contact.template' => 'Downloaded contact import template',
+            'students.records.template' => 'Downloaded records import template',
             'employees.import.template' => 'Downloaded employee import template',
             'visitors.pass' => 'Viewed visitor pass #:visitor',
         ];

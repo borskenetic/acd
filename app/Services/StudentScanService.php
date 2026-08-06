@@ -226,7 +226,13 @@ class StudentScanService
         ];
     }
 
-    /** Record a scan with status already decided offline (gate sync upload). */
+    /**
+     * Record a scan uploaded from an offline gate terminal.
+     *
+     * Kiosk-supplied IN/OUT is ignored: the server derives status from this student's
+     * existing history so a stale kiosk cannot create a second IN at another gate.
+     * After insert, same-day rows are re-sequenced for out-of-order uploads.
+     */
     public function recordSyncedScan(
         Student $student,
         string $status,
@@ -240,6 +246,12 @@ class StudentScanService
             return $existing;
         }
 
+        // Accept either case from devices; status is recomputed below (not used raw).
+        $status = strtoupper(trim($status));
+        if (! in_array($status, ['IN', 'OUT'], true)) {
+            throw new \InvalidArgumentException('Invalid scan status.');
+        }
+
         if ($section !== null && $section !== '') {
             $allowed = Setting::attendanceSections();
             if (! in_array($section, $allowed, true)) {
@@ -249,18 +261,12 @@ class StudentScanService
             $section = null;
         }
 
-        $status = strtoupper(trim($status));
-        if (! in_array($status, ['IN', 'OUT'], true)) {
-            throw new \InvalidArgumentException('Invalid scan status.');
-        }
+        $this->sessions->closeStaleOpenInForStudent($student);
 
-        $sessionKey = null;
-        if ($this->sessionSchedule->usesSessionModel($student)) {
-            $halfDay = $this->sessionSchedule->isHalfDayToday($student, $scannedAt);
-            $count = $this->sessionSchedule->todayLogs($student, $scannedAt)->count();
-            $expected = $this->sessionSchedule->expectedAction($count, $halfDay);
-            $sessionKey = $expected['session_key'] ?? null;
-        }
+        $scannedAt = $scannedAt->copy()->timezone($this->sessionSchedule->timezone());
+        $resolved = $this->resolveStatusFromHistory($student, $scannedAt);
+        $status = $resolved['status'];
+        $sessionKey = $resolved['session_key'];
 
         $log = AttendanceLog::create([
             'student_id' => $student->id,
@@ -273,9 +279,94 @@ class StudentScanService
             'source' => 'gate_sync',
         ]);
 
+        $this->reconcileStudentDayToggleStatuses($student, $scannedAt);
+
+        $log->refresh();
+        $status = strtoupper((string) $log->status);
+
         $this->sms->handleStudentScan($student, $status, $log->scanned_at, $sessionKey);
 
         return $log;
+    }
+
+    /**
+     * Next IN/OUT from logs strictly before $scannedAt (server history wins).
+     *
+     * @return array{status: string, session_key: ?string}
+     */
+    public function resolveStatusFromHistory(Student $student, Carbon $scannedAt): array
+    {
+        $sessionKey = null;
+
+        if ($this->sessionSchedule->usesSessionModel($student)) {
+            $halfDay = $this->sessionSchedule->isHalfDayToday($student, $scannedAt);
+            $priorToday = AttendanceLog::query()
+                ->where('student_id', $student->id)
+                ->whereDate('scanned_at', $scannedAt->toDateString())
+                ->where('scanned_at', '<', $scannedAt)
+                ->count();
+            $expected = $this->sessionSchedule->expectedAction($priorToday, $halfDay);
+            if ($expected !== null) {
+                return [
+                    'status' => $expected['status'],
+                    'session_key' => $expected['session_key'] ?? null,
+                ];
+            }
+            // Past max session scans for the day — still alternate from prior log.
+        }
+
+        $prev = $this->lastLogBefore($student, $scannedAt);
+        $status = ($prev && $this->sessions->isInStatus($prev->status)) ? 'OUT' : 'IN';
+
+        return [
+            'status' => $status,
+            'session_key' => $sessionKey,
+        ];
+    }
+
+    /**
+     * Re-apply IN/OUT along the calendar day so late-arriving earlier scans stay consistent.
+     * Does not re-send SMS for corrected rows.
+     */
+    public function reconcileStudentDayToggleStatuses(Student $student, Carbon $at): void
+    {
+        $tz = $this->sessionSchedule->timezone();
+        $dayStart = $at->copy()->timezone($tz)->startOfDay();
+        $dayEnd = $dayStart->copy()->endOfDay();
+
+        $prev = AttendanceLog::query()
+            ->where('student_id', $student->id)
+            ->where('scanned_at', '<', $dayStart)
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $open = $prev && $this->sessions->isInStatus($prev->status);
+
+        $logs = AttendanceLog::query()
+            ->where('student_id', $student->id)
+            ->whereBetween('scanned_at', [$dayStart, $dayEnd])
+            ->orderBy('scanned_at')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($logs as $log) {
+            $expected = $open ? 'OUT' : 'IN';
+            if (strtoupper((string) $log->status) !== $expected) {
+                $log->update(['status' => $expected]);
+            }
+            $open = $expected === 'IN';
+        }
+    }
+
+    public function lastLogBefore(Student $student, Carbon $scannedAt): ?AttendanceLog
+    {
+        return AttendanceLog::query()
+            ->where('student_id', $student->id)
+            ->where('scanned_at', '<', $scannedAt)
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**

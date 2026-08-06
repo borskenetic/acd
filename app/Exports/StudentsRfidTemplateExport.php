@@ -10,15 +10,22 @@ class StudentsRfidTemplateExport implements FromArray, WithHeadings
     public function headings(): array
     {
         return [
-            'IDNum',
+            'Name',
+            'ID Number',
+            'LRN',
             'RFID',
+            'Year',
+            'Section',
         ];
     }
 
     public function array(): array
     {
         return [
-            ['2024-00001', '1234567890'],
+            // Prefer ID Number when available
+            ['DOE, Jane A', '2024-00001', '', '1234567890', '', ''],
+            // Name works when ID Number is blank (add Year/Section if names collide)
+            ['SMITH, John B', '', '', '0987654321', 'Grade 1', 'A'],
         ];
     }
 }

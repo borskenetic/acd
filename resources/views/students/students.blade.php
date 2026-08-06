@@ -104,14 +104,27 @@
             @endif
             @if(session('rfid_import_report'))
                 @php $rfidReport = session('rfid_import_report'); @endphp
-                @if(!empty($rfidReport['not_found']) || !empty($rfidReport['conflicts']))
+                @if(!empty($rfidReport['not_found']) || !empty($rfidReport['ambiguous']) || !empty($rfidReport['conflicts']))
                     <div class="alert alert-warning text-start mb-0">
                         <strong>RFID import details</strong>
                         @if(!empty($rfidReport['not_found']))
                             <ul class="small mb-1 mt-2">
-                                @foreach($rfidReport['not_found'] as $line)
+                                @foreach(array_slice($rfidReport['not_found'], 0, 30) as $line)
                                     <li>{{ $line }}</li>
                                 @endforeach
+                                @if(count($rfidReport['not_found']) > 30)
+                                    <li>… and {{ count($rfidReport['not_found']) - 30 }} more not found</li>
+                                @endif
+                            </ul>
+                        @endif
+                        @if(!empty($rfidReport['ambiguous']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($rfidReport['ambiguous'], 0, 20) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($rfidReport['ambiguous']) > 20)
+                                    <li>… and {{ count($rfidReport['ambiguous']) - 20 }} more ambiguous</li>
+                                @endif
                             </ul>
                         @endif
                         @if(!empty($rfidReport['conflicts']))
@@ -356,7 +369,13 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-muted small">Match by IDNum, RecordID, or QR code. Use the <a href="{{ route('students.rfid.template') }}">RFID template</a>. Blank RFID rows are skipped.</p>
+                        <p class="text-muted small mb-2">
+                            Updates RFID on existing students only. Blank RFID rows are skipped.
+                        </p>
+                        <p class="text-muted small">
+                            Match order: <strong>ID Number</strong> → LRN → RecordID → QR → <strong>Name</strong> (+ Year/Section if needed).
+                            Name format: <code>LASTNAME, Given Names</code>. Use the <a href="{{ route('students.rfid.template') }}">RFID template</a>.
+                        </p>
                         <div class="sp-file-pick">
                             <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>
                         </div>

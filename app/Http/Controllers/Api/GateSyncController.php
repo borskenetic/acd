@@ -86,6 +86,9 @@ class GateSyncController extends Controller
                     'client_uuid' => $clientUuid,
                     'accepted' => true,
                     'attendance_log_id' => $log->id,
+                    // Server may correct IN/OUT when the kiosk's local state was stale.
+                    'status' => strtoupper((string) $log->status),
+                    'scanned_at' => $log->scanned_at?->toIso8601String(),
                 ];
             } catch (\Throwable $e) {
                 $results[] = [

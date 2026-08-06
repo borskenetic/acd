@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\ModemSmsService;
 use App\Support\AdvisoryScope;
 use App\Support\PatronOptions;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class SmsController extends Controller
 {
@@ -141,7 +141,7 @@ class SmsController extends Controller
         ]);
     }
 
-    public function send(Request $request)
+    public function send(Request $request, ModemSmsService $modem)
     {
         $request->validate([
             'message' => 'required|string',
@@ -153,85 +153,66 @@ class SmsController extends Controller
 
         $column = $this->recipientColumn($request->input('recipient'));
         $students = $this->blastQuery($request)->get();
-
-        $payload = [];
+        $items = [];
 
         foreach ($students as $student) {
-            $name = $student->firstname.' '.$student->lastname;
+            $name = trim($student->firstname.' '.$student->lastname);
             $message = str_replace('{name}', $name, $request->message);
-            $number = $this->normalizePhilippineMobile((string) $student->{$column});
+            $rawNumber = (string) $student->{$column};
+            $number = $modem->normalizePhilippineMobile($rawNumber);
 
             if ($number === '') {
                 continue;
             }
 
-            $payload[] = [
+            $items[] = [
                 'number' => $number,
                 'message' => $message,
+                'student_id' => $student->id,
+                'recipient_label' => $name,
             ];
         }
 
-        if ($payload === []) {
+        if ($items === []) {
             return back()->with('error', 'No recipients found with a valid number for the selected filters.');
         }
 
-        // send to your local Python server
-        $python_server = "https://cloakedly-ineffective-amara.ngrok-free.dev/send-sms"; // your ngrok URL
-        $api_key = "library123"; // must match Python server
-
-        Http::withHeaders([
-            'X-API-KEY' => $api_key,
-        ])->timeout(300)
-            ->post($python_server, $payload);
+        $result = $modem->sendBatch($items, [
+            'type' => 'blast',
+            'user_id' => $request->user()?->id,
+            'meta' => [
+                'recipient' => $request->input('recipient'),
+                'year' => $request->input('year'),
+                'course' => $request->input('course'),
+                'section' => $request->input('section'),
+            ],
+        ]);
 
         $label = $request->input('recipient') === 'student' ? 'student mobile numbers' : 'emergency contacts';
 
-        return back()->with('success', 'SMS sent to '.count($payload).' '.$label.'.');
+        if ($result['sent'] > 0 && $result['failed'] === 0) {
+            return back()->with('success', 'SMS sent to '.$result['sent'].' '.$label.'.');
+        }
+
+        if ($result['sent'] > 0) {
+            return back()->with('success', 'SMS sent to '.$result['sent'].' of '.count($items).' '.$label.'. '.$result['failed'].' failed — check SMS Logs.');
+        }
+
+        return back()->with('error', 'SMS failed for all '.count($items).' recipients. Check SMS Logs and the modem connection.');
     }
 
-    public function sendDirect(string $number, string $message): bool
+    /**
+     * @param  array{
+     *   type?: string,
+     *   student_id?: int|null,
+     *   user_id?: int|null,
+     *   recipient_label?: string|null,
+     *   meta?: array<string, mixed>|null
+     * }  $context
+     */
+    public function sendDirect(string $number, string $message, array $context = []): bool
     {
-        $number = $this->normalizePhilippineMobile($number);
-
-        if ($number === '') {
-            return false;
-        }
-
-        $url = config('services.sms_modem.url', env('SMS_MODEM_URL'));
-        $apiKey = config('services.sms_modem.key', env('SMS_MODEM_API_KEY'));
-
-        if (! $url) {
-            return false;
-        }
-
-        try {
-            $response = Http::withHeaders(['X-API-KEY' => $apiKey])
-                ->timeout(30)
-                ->post($url, [
-                    ['number' => $number, 'message' => $message],
-                ]);
-
-            return $response->successful();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return false;
-        }
-    }
-
-    private function normalizePhilippineMobile(string $number): string
-    {
-        $number = preg_replace('/\s+/', '', $number);
-
-        if (str_starts_with($number, '0')) {
-            return '+63'.substr($number, 1);
-        }
-
-        if (str_starts_with($number, '63')) {
-            return '+'.$number;
-        }
-
-        return $number;
+        return app(ModemSmsService::class)->send($number, $message, $context);
     }
 
     private function recipientColumn(string $recipient): string

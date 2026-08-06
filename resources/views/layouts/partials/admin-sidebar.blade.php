@@ -69,6 +69,7 @@
             'children' => [
                 ['label' => 'Feedback',        'route' => 'feedback.index',  'patterns' => ['feedback.index'],                            'icon' => 'message'],
                 ['label' => 'SMS Blast',       'route' => 'sms.page',        'patterns' => ['sms.page', 'sms.send'],                      'icon' => 'send'],
+                ['label' => 'SMS Logs',        'route' => 'sms.logs',        'patterns' => ['sms.logs'],                                  'icon' => 'list'],
                 ['label' => 'Gate Terminal Message', 'route' => 'sms.scanMessage', 'patterns' => ['sms.scanMessage', 'sms.scanMessage.update'], 'icon' => 'settings'],
             ],
         ];

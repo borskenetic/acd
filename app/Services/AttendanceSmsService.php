@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Http\Controllers\SmsController;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentAttendanceAlertState;
@@ -48,7 +47,7 @@ class AttendanceSmsService
                 'child' => $childName,
                 'status' => $status,
                 'time' => $time,
-            ]);
+            ], $student);
 
             return;
         }
@@ -62,14 +61,16 @@ class AttendanceSmsService
                 'child' => $childName,
                 'status' => $status,
                 'time' => $time,
-            ]);
+            ], $student);
         } else {
             // SHS / College: keep arrival + departure (once each), guardian name in {name}.
             if (! $daily->arrival_sent) {
                 $ok = $this->sendTemplate(
                     $number,
                     Setting::scanSmsArrivalTemplate(),
-                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time]
+                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time],
+                    'arrival',
+                    $student,
                 );
                 if ($ok) {
                     $daily->update(['arrival_sent' => true]);
@@ -78,7 +79,9 @@ class AttendanceSmsService
                 $ok = $this->sendTemplate(
                     $number,
                     Setting::scanSmsDepartureTemplate(),
-                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time]
+                    ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time],
+                    'departure',
+                    $student,
                 );
                 if ($ok) {
                     $daily->update(['departure_sent' => true]);
@@ -126,7 +129,9 @@ class AttendanceSmsService
                     'name' => $this->guardianDisplayName($student),
                     'child' => trim($student->firstname.' '.$student->lastname),
                     'count' => (string) $consecutiveAbsent,
-                ]
+                ],
+                'consecutive_absent',
+                $student,
             );
 
             if ($ok) {
@@ -168,7 +173,9 @@ class AttendanceSmsService
                 'name' => $this->guardianDisplayName($student),
                 'child' => trim($student->firstname.' '.$student->lastname),
                 'count' => (string) $consecutiveLate,
-            ]
+            ],
+            'consecutive_late',
+            $student,
         );
 
         if ($ok) {
@@ -209,8 +216,14 @@ class AttendanceSmsService
     }
 
     /** @param  array<string, string>  $vars */
-    protected function sendOnce(StudentDailySms $daily, string $event, string $number, string $template, array $vars): void
-    {
+    protected function sendOnce(
+        StudentDailySms $daily,
+        string $event,
+        string $number,
+        string $template,
+        array $vars,
+        ?Student $student = null,
+    ): void {
         $sent = $daily->events_sent ?? [];
         if (! is_array($sent)) {
             $sent = [];
@@ -220,7 +233,7 @@ class AttendanceSmsService
             return;
         }
 
-        if ($this->sendTemplate($number, $template, $vars)) {
+        if ($this->sendTemplate($number, $template, $vars, $event, $student)) {
             $sent[] = $event;
             $daily->update(['events_sent' => array_values(array_unique($sent))]);
         }
@@ -236,8 +249,13 @@ class AttendanceSmsService
     }
 
     /** @param  array<string, string>  $vars */
-    protected function sendTemplate(string $number, string $template, array $vars): bool
-    {
+    protected function sendTemplate(
+        string $number,
+        string $template,
+        array $vars,
+        string $type = 'gate',
+        ?Student $student = null,
+    ): bool {
         $number = trim($number);
         if ($number === '') {
             return false;
@@ -248,6 +266,15 @@ class AttendanceSmsService
             $message = str_replace('{'.$key.'}', $value, $message);
         }
 
-        return app(SmsController::class)->sendDirect($number, $message);
+        $child = $vars['child'] ?? null;
+        $label = is_string($child) && $child !== ''
+            ? $child
+            : (is_string($vars['name'] ?? null) ? $vars['name'] : null);
+
+        return app(ModemSmsService::class)->send($number, $message, [
+            'type' => $type !== '' ? $type : 'gate',
+            'student_id' => $student?->id,
+            'recipient_label' => $label,
+        ]);
     }
 }

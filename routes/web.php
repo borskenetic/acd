@@ -15,6 +15,7 @@ use App\Http\Controllers\IdCardController;
 use App\Http\Controllers\PendingEmployeeController;
 use App\Http\Controllers\PendingStudentController;
 use App\Http\Controllers\SmsController;
+use App\Http\Controllers\SmsLogController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SchoolCalendarController;
 use App\Http\Controllers\SchoolSetupController;
@@ -146,6 +147,7 @@ Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
 
         Route::get('/sms/scan-message', [SmsController::class, 'scanMessage'])->name('sms.scanMessage');
         Route::post('/sms/scan-message', [SmsController::class, 'updateScanMessage'])->name('sms.scanMessage.update');
+        Route::get('/sms-logs', [SmsLogController::class, 'index'])->name('sms.logs');
 
         Route::get('/visitor-logs', [VisitorLogController::class, 'index'])->name('visitor_logs.index');
         Route::get('/visitors/issue', [VisitorAdminController::class, 'create'])->name('visitors.issue.create');

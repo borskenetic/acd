@@ -65,6 +65,7 @@
                     <div class="nav-dropdown-content">
                         <a href="{{ route('feedback.index') }}" class="{{ $linkActive(['feedback.index']) }}">Feedback</a>
                         <a href="{{ route('sms.page') }}" class="{{ $linkActive(['sms.page', 'sms.send']) }}">SMS blast</a>
+                        <a href="{{ route('sms.logs') }}" class="{{ $linkActive(['sms.logs']) }}">SMS logs</a>
                         <a href="{{ route('sms.scanMessage') }}" class="{{ $linkActive(['sms.scanMessage', 'sms.scanMessage.update']) }}">Gate terminal message</a>
                     </div>
                 </div>

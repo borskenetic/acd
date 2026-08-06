@@ -218,6 +218,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/students/rfid-import', [StudentController::class, 'importRfid'])->name('students.rfid.import');
     Route::get('/students/sex-template', [StudentController::class, 'downloadSexTemplate'])->name('students.sex.template');
     Route::post('/students/sex-import', [StudentController::class, 'importSex'])->name('students.sex.import');
+    Route::get('/students/contact-template', [StudentController::class, 'downloadContactTemplate'])->name('students.contact.template');
+    Route::post('/students/contact-import', [StudentController::class, 'importContact'])->name('students.contact.import');
     Route::get('/employees/import-template', [EmployeeController::class, 'downloadImportTemplate'])->name('employees.import.template');
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
     Route::post('/students/{student}/face', [FaceEnrollmentController::class, 'store'])->name('students.face.store');

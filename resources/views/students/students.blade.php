@@ -56,6 +56,10 @@
                         <li><h6 class="dropdown-header">Gender (sex)</h6></li>
                         <li><a class="dropdown-item" href="{{ route('students.sex.template') }}">Download gender template</a></li>
                         <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#spSexModal">Upload gender update</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Contacts / emergency</h6></li>
+                        <li><a class="dropdown-item" href="{{ route('students.contact.template') }}">Download contact template</a></li>
+                        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#spContactModal">Upload contact update</button></li>
                     </ul>
                 </div>
             @endcan
@@ -84,7 +88,7 @@
         @endcan
     </nav>
 
-    @if(session('success') || session('error') || session('rfid_import_report') || session('sex_import_report') || $errors->any())
+    @if(session('success') || session('error') || session('rfid_import_report') || session('sex_import_report') || session('contact_import_report') || $errors->any())
         <div class="sp-alerts">
             @if(session('success'))
                 <div class="alert alert-success">{{ session('success') }}</div>
@@ -164,6 +168,44 @@
                                 @foreach(array_slice($sexReport['ambiguous'], 0, 20) as $line)
                                     <li>{{ $line }}</li>
                                 @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                @endif
+            @endif
+            @if(session('contact_import_report'))
+                @php $contactReport = session('contact_import_report'); @endphp
+                @if(!empty($contactReport['not_found']) || !empty($contactReport['ambiguous']) || !empty($contactReport['no_contact_data']))
+                    <div class="alert alert-warning text-start mb-0">
+                        <strong>Contact update details</strong>
+                        @if(!empty($contactReport['not_found']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($contactReport['not_found'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($contactReport['not_found']) > 30)
+                                    <li>… and {{ count($contactReport['not_found']) - 30 }} more not found</li>
+                                @endif
+                            </ul>
+                        @endif
+                        @if(!empty($contactReport['ambiguous']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($contactReport['ambiguous'], 0, 20) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($contactReport['ambiguous']) > 20)
+                                    <li>… and {{ count($contactReport['ambiguous']) - 20 }} more ambiguous</li>
+                                @endif
+                            </ul>
+                        @endif
+                        @if(!empty($contactReport['no_contact_data']))
+                            <ul class="small mb-0">
+                                @foreach(array_slice($contactReport['no_contact_data'], 0, 15) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($contactReport['no_contact_data']) > 15)
+                                    <li>… and {{ count($contactReport['no_contact_data']) - 15 }} more with no contact fields</li>
+                                @endif
                             </ul>
                         @endif
                     </div>
@@ -406,6 +448,41 @@
                             Match order: <strong>ID Number</strong> → LRN → RFID → Name (+ Year/Section if needed).
                             Gender values: <code>Male</code>/<code>Female</code> (or male/female).
                             Your gendered roster CSV works as-is.
+                        </p>
+                        <div class="sp-file-pick">
+                            <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade sp-modal" id="spContactModal" tabindex="-1" aria-labelledby="spContactModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('students.contact.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="spContactModalLabel">Update contacts &amp; emergency info</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-2">
+                            Updates mobile number and emergency fields on existing students only. Blank fields are left unchanged.
+                        </p>
+                        <p class="text-muted small mb-2">
+                            Columns: <code>Student Mobile Number</code>, <code>Emergency Person to be Contacted</code>,
+                            <code>Relationship</code>, <code>Emergency Contact Number</code>, <code>Emergency Person Address</code>.
+                        </p>
+                        <p class="text-muted small">
+                            Match order: <strong>ID Number</strong> → LRN → RFID → Name (+ Year/Section).
+                            Multi-sheet section rosters (e.g. Grade 7–10 class sheets) work as-is.
+                            <a href="{{ route('students.contact.template') }}">Download template</a>.
                         </p>
                         <div class="sp-file-pick">
                             <input type="file" name="file" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" required>

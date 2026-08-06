@@ -13,10 +13,12 @@ use App\Models\Program;
 use App\Models\GradeSection;
 use App\Models\StudentEditRequest;
 use App\Console\Commands\NormalizeStudentNames;
+use App\Exports\StudentsContactTemplateExport;
 use App\Exports\StudentsImportTemplateExport;
 use App\Exports\StudentsListExport;
 use App\Exports\StudentsRfidTemplateExport;
 use App\Exports\StudentsSexTemplateExport;
+use App\Imports\StudentsContactImport;
 use App\Imports\StudentsImport;
 use App\Imports\StudentsRfidImport;
 use App\Imports\StudentsSexImport;
@@ -206,6 +208,38 @@ class StudentController extends Controller
         return back()
             ->with('success', $message)
             ->with('sex_import_report', $report);
+    }
+
+    public function downloadContactTemplate()
+    {
+        return Excel::download(
+            new StudentsContactTemplateExport,
+            'students_contact_update_template.xlsx'
+        );
+    }
+
+    public function importContact(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls|max:20480',
+        ]);
+
+        $import = new StudentsContactImport;
+        $import->importFile($request->file('file'));
+
+        $report = $import->report();
+        $message = 'Contact update complete: '.$report['updated'].' student(s) updated.';
+
+        if ($report['unchanged'] > 0) {
+            $message .= ' '.$report['unchanged'].' already up to date.';
+        }
+        if ($report['skipped'] > 0) {
+            $message .= ' '.$report['skipped'].' row(s) skipped.';
+        }
+
+        return back()
+            ->with('success', $message)
+            ->with('contact_import_report', $report);
     }
 
     public function bulkDownloadIds(Request $request, BulkIdCardService $bulkIds)

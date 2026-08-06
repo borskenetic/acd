@@ -325,10 +325,11 @@ class StudentScanService
     }
 
     /**
-     * Re-apply IN/OUT along the calendar day so late-arriving earlier scans stay consistent.
-     * Does not re-send SMS for corrected rows.
+     * Plan IN/OUT fixes for one student on one calendar day (no writes).
+     *
+     * @return list<array{id: int, student_id: int, from: string, to: string, scanned_at: ?string, kiosk_name: ?string, source: ?string}>
      */
-    public function reconcileStudentDayToggleStatuses(Student $student, Carbon $at): void
+    public function planStudentDayToggleRepairs(Student $student, Carbon $at): array
     {
         $tz = $this->sessionSchedule->timezone();
         $dayStart = $at->copy()->timezone($tz)->startOfDay();
@@ -350,13 +351,48 @@ class StudentScanService
             ->orderBy('id')
             ->get();
 
+        $changes = [];
         foreach ($logs as $log) {
             $expected = $open ? 'OUT' : 'IN';
-            if (strtoupper((string) $log->status) !== $expected) {
-                $log->update(['status' => $expected]);
+            $actual = strtoupper((string) $log->status);
+            if ($actual !== $expected) {
+                $changes[] = [
+                    'id' => (int) $log->id,
+                    'student_id' => (int) $log->student_id,
+                    'from' => $actual,
+                    'to' => $expected,
+                    'scanned_at' => $log->scanned_at?->toDateTimeString(),
+                    'kiosk_name' => $log->kiosk_name,
+                    'source' => $log->source,
+                ];
             }
             $open = $expected === 'IN';
         }
+
+        return $changes;
+    }
+
+    /**
+     * Re-apply IN/OUT along the calendar day so late-arriving earlier scans stay consistent.
+     * Does not re-send SMS for corrected rows.
+     *
+     * @return int Number of rows updated
+     */
+    public function reconcileStudentDayToggleStatuses(Student $student, Carbon $at): int
+    {
+        $changes = $this->planStudentDayToggleRepairs($student, $at);
+        if ($changes === []) {
+            return 0;
+        }
+
+        $byId = collect($changes)->keyBy('id');
+        foreach ($byId as $id => $change) {
+            AttendanceLog::query()
+                ->whereKey($id)
+                ->update(['status' => $change['to']]);
+        }
+
+        return $byId->count();
     }
 
     public function lastLogBefore(Student $student, Carbon $scannedAt): ?AttendanceLog

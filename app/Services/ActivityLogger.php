@@ -253,6 +253,7 @@ class ActivityLogger
             'students.import' => 'Imported students from spreadsheet',
             'students.rfid.import' => 'Imported student RFID tags',
             'students.sex.import' => 'Updated student genders from spreadsheet',
+            'students.contact.import' => 'Updated student contact / emergency info from spreadsheet',
             'students.face.store' => 'Enrolled face for student #:student',
             'students.face.destroy' => 'Removed face enrollment for student #:student',
             'employees.store' => 'Created employee',
@@ -309,6 +310,7 @@ class ActivityLogger
             'sf2.excel' => 'Downloaded SF2 report Excel #:sf2',
             'students.import.template' => 'Downloaded student import template',
             'students.rfid.template' => 'Downloaded RFID import template',
+            'students.contact.template' => 'Downloaded contact import template',
             'employees.import.template' => 'Downloaded employee import template',
             'visitors.pass' => 'Viewed visitor pass #:visitor',
         ];

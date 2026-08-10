@@ -26,6 +26,12 @@
   color: #fff;
 }
 
+.sf2-cal-mode[data-mode="half"].active {
+  background-color: #0dcaf0;
+  border-color: #0dcaf0;
+  color: #000;
+}
+
 .sf2-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -78,6 +84,13 @@
   font-weight: 600;
 }
 
+.sf2-cal-day.is-half {
+  background: #cff4fc;
+  border-color: #0dcaf0;
+  color: #055160;
+  font-weight: 600;
+}
+
 .sf2-cal-day.is-outside-month {
   visibility: hidden;
   pointer-events: none;
@@ -111,4 +124,5 @@
 
 .sf2-cal-swatch.absent { background: #dc3545; border-color: #bb2d3b; }
 .sf2-cal-swatch.tardy { background: linear-gradient(to bottom, #fd7e14 50%, #fff 50%); }
+.sf2-cal-swatch.half { background: #cff4fc; border-color: #0dcaf0; }
 .sf2-cal-swatch.present { background: #fff; }

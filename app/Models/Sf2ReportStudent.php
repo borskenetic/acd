@@ -17,6 +17,7 @@ class Sf2ReportStudent extends Model
         'remarks',
         'absent_dates',
         'tardy_dates',
+        'half_day_dates',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class Sf2ReportStudent extends Model
         return [
             'absent_dates' => 'array',
             'tardy_dates' => 'array',
+            'half_day_dates' => 'array',
             'sort_order' => 'integer',
         ];
     }

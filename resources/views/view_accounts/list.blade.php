@@ -55,7 +55,7 @@
                                 <td class="text-start">{{ $user->email }}</td>
                                 <td>
                                     <span class="badge role-badge role-badge-{{ $user->role }}">
-                                        {{ ucfirst($user->role) }}
+                                        {{ \App\Models\User::roleOptions()[$user->role] ?? ucfirst(str_replace('_', ' ', $user->role)) }}
                                     </span>
                                 </td>
                                 <td class="small">{{ $user->advisoryLabel() }}</td>

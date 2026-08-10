@@ -29,19 +29,21 @@ class SmsController extends Controller
                 ->orderBy('course')
                 ->pluck('course');
         } else {
-            $yearOptions = PatronOptions::allYearOptions();
-            $courses = Student::select('course')
+            $yearOptions = AdvisoryScope::yearOptions($user);
+            $studentQuery = Student::query()->tap(fn ($q) => AdvisoryScope::applyToStudents($q, $user));
+            $courses = (clone $studentQuery)
                 ->whereNotNull('course')
+                ->where('course', '!=', '')
                 ->distinct()
                 ->orderBy('course')
                 ->pluck('course');
-            $sections = Student::query()
+            $sections = (clone $studentQuery)
                 ->whereNotNull('section')
                 ->where('section', '!=', '')
                 ->distinct()
                 ->orderBy('section')
                 ->pluck('section');
-            $sectionsByGrade = Student::query()
+            $sectionsByGrade = (clone $studentQuery)
                 ->whereNotNull('section')
                 ->where('section', '!=', '')
                 ->whereNotNull('year')
@@ -60,14 +62,14 @@ class SmsController extends Controller
             'facultyLocked' => $facultyLocked,
             'facultyClasses' => $facultyLocked ? AdvisoryScope::managePairs($user) : [],
             'simLoad' => Setting::smsSimLoadStatus(),
-            'canManageSimLoad' => $user && in_array($user->role, ['admin', 'staff'], true),
+            'canManageSimLoad' => $user && $user->isSchoolOps(),
         ]);
     }
 
     public function updateSimLoad(Request $request)
     {
         $user = $request->user();
-        if (! $user || ! in_array($user->role, ['admin', 'staff'], true)) {
+        if (! $user || ! $user->isSchoolOps()) {
             abort(403, 'Only admin or staff can update SIM load.');
         }
 

@@ -48,8 +48,8 @@
                     <label for="actRole">Role</label>
                     <select id="actRole" name="role">
                         <option value="">All roles</option>
-                        @foreach(['admin', 'staff', 'faculty', 'student'] as $role)
-                            <option value="{{ $role }}" @selected(request('role') === $role)>{{ ucfirst($role) }}</option>
+                        @foreach(array_keys(\App\Models\User::roleOptions()) as $role)
+                            <option value="{{ $role }}" @selected(request('role') === $role)>{{ \App\Models\User::roleOptions()[$role] }}</option>
                         @endforeach
                     </select>
                 </div>

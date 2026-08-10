@@ -201,7 +201,19 @@ Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
     });
 });
 
-// Admin only
+// Superadmin only (user accounts + activity log)
+Route::middleware(['auth', 'can:isSuperAdmin'])->group(function () {
+    Route::get('/view-users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/create-user', [UserController::class, 'create'])->name('users.create');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
+    Route::put('/update-user/{id}', [UserController::class, 'update'])->name('users.update');
+    Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+
+    Route::get('/activity-log', [PlatformActivityLogController::class, 'index'])->name('activity_logs.index');
+});
+
+// Platform admins (superadmin + SHS/K–10 admins; student data is grade-keyholed)
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/attendance/policy', [AttendanceController::class, 'policySettings'])->name('attendance.policy.settings');
     Route::post('/attendance/policy', [AttendanceController::class, 'updatePolicySettings'])->name('attendance.policy.settings.update');
@@ -254,13 +266,4 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
         Route::post('/strands', [SchoolSetupController::class, 'storeStrand'])->name('strands.store');
         Route::delete('/strands/{schoolStrand}', [SchoolSetupController::class, 'destroyStrand'])->name('strands.destroy');
     });
-
-    Route::get('/view-users', [UserController::class, 'index'])->name('users.index');
-    Route::get('/create-user', [UserController::class, 'create'])->name('users.create');
-    Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
-    Route::put('/update-user/{id}', [UserController::class, 'update'])->name('users.update');
-    Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
-
-    Route::get('/activity-log', [PlatformActivityLogController::class, 'index'])->name('activity_logs.index');
 });

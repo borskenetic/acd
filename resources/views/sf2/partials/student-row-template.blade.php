@@ -25,7 +25,7 @@
                     <label class="form-label small">Middle name</label>
                     <input type="text" class="form-control form-control-sm" data-field="middle_name" maxlength="100">
                 </div>
-                @include('sf2.partials.attendance-calendar', ['index' => null, 'absentDates' => [], 'tardyDates' => []])
+                @include('sf2.partials.attendance-calendar', ['index' => null, 'absentDates' => [], 'tardyDates' => [], 'halfDayDates' => []])
                 <div class="col-12">
                     <label class="form-label small">Remarks (dropout / transfer, etc.)</label>
                     <input type="text" class="form-control form-control-sm" data-field="remarks" maxlength="500">

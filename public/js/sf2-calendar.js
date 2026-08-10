@@ -1,5 +1,5 @@
 /**
- * SF2 per-learner month calendar: click weekdays to mark absent or tardy.
+ * SF2 per-learner month calendar: click weekdays to mark absent, tardy, or half-day.
  */
 (function () {
   const DOW = ['Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'];
@@ -52,13 +52,18 @@
   function syncHiddenInputs(calRoot) {
     const absentInput = calRoot.querySelector('.sf2-absent-input');
     const tardyInput = calRoot.querySelector('.sf2-tardy-input');
+    const halfInput = calRoot.querySelector('.sf2-half-input');
     const absent = JSON.parse(calRoot.dataset.absent || '[]');
     const tardy = JSON.parse(calRoot.dataset.tardy || '[]');
+    const half = JSON.parse(calRoot.dataset.half || '[]');
     if (absentInput) {
       absentInput.value = absent.join('\n');
     }
     if (tardyInput) {
       tardyInput.value = tardy.join('\n');
+    }
+    if (halfInput) {
+      halfInput.value = half.join('\n');
     }
   }
 
@@ -77,6 +82,7 @@
     const { month, year } = my;
     const absent = new Set(JSON.parse(calRoot.dataset.absent || '[]'));
     const tardy = new Set(JSON.parse(calRoot.dataset.tardy || '[]'));
+    const half = new Set(JSON.parse(calRoot.dataset.half || '[]'));
     const mode = calRoot.dataset.mode || 'absent';
 
     const first = new Date(year, month - 1, 1);
@@ -100,6 +106,8 @@
         cls += ' is-weekend';
       } else if (absent.has(dateStr)) {
         cls += ' is-absent';
+      } else if (half.has(dateStr)) {
+        cls += ' is-half';
       } else if (tardy.has(dateStr)) {
         cls += ' is-tardy';
       }
@@ -131,6 +139,7 @@
   function toggleDay(calRoot, dateStr) {
     const absent = new Set(JSON.parse(calRoot.dataset.absent || '[]'));
     const tardy = new Set(JSON.parse(calRoot.dataset.tardy || '[]'));
+    const half = new Set(JSON.parse(calRoot.dataset.half || '[]'));
     const mode = calRoot.dataset.mode || 'absent';
 
     if (mode === 'absent') {
@@ -139,6 +148,15 @@
       } else {
         absent.add(dateStr);
         tardy.delete(dateStr);
+        half.delete(dateStr);
+      }
+    } else if (mode === 'half') {
+      if (half.has(dateStr)) {
+        half.delete(dateStr);
+      } else {
+        half.add(dateStr);
+        absent.delete(dateStr);
+        tardy.delete(dateStr);
       }
     } else {
       if (tardy.has(dateStr)) {
@@ -146,11 +164,13 @@
       } else {
         tardy.add(dateStr);
         absent.delete(dateStr);
+        half.delete(dateStr);
       }
     }
 
     calRoot.dataset.absent = JSON.stringify([...absent].sort());
     calRoot.dataset.tardy = JSON.stringify([...tardy].sort());
+    calRoot.dataset.half = JSON.stringify([...half].sort());
     syncHiddenInputs(calRoot);
     renderGrid(calRoot);
   }
@@ -169,8 +189,10 @@
 
     const absentInit = parseDateList(calRoot.dataset.absentInitial);
     const tardyInit = parseDateList(calRoot.dataset.tardyInitial);
+    const halfInit = parseDateList(calRoot.dataset.halfInitial);
     calRoot.dataset.absent = JSON.stringify(absentInit);
     calRoot.dataset.tardy = JSON.stringify(tardyInit);
+    calRoot.dataset.half = JSON.stringify(halfInit);
     syncHiddenInputs(calRoot);
 
     calRoot.querySelectorAll('.sf2-cal-mode').forEach((btn) => {
@@ -184,6 +206,7 @@
     calRoot.querySelector('.sf2-cal-clear')?.addEventListener('click', () => {
       calRoot.dataset.absent = '[]';
       calRoot.dataset.tardy = '[]';
+      calRoot.dataset.half = '[]';
       syncHiddenInputs(calRoot);
       renderGrid(calRoot);
     });

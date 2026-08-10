@@ -50,10 +50,13 @@
                     <div class="col-md-6">
                         <label class="form-label">Role</label>
                         <select name="role" id="roleSelect" class="form-select" required>
-                            <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
-                            <option value="staff" {{ old('role', 'staff') === 'staff' ? 'selected' : '' }}>Staff</option>
-                            <option value="faculty" {{ old('role') === 'faculty' ? 'selected' : '' }}>Faculty</option>
+                            @foreach(\App\Models\User::assignableRoleOptions() as $value => $label)
+                                <option value="{{ $value }}" @selected(old('role', 'staff') === $value)>{{ $label }}</option>
+                            @endforeach
                         </select>
+                        <p class="form-text small text-muted mb-0">
+                            SHS Admin and K–10 Admin get full admin tools but only student/SF2 data in their grade band.
+                        </p>
                     </div>
 
                     <div class="col-12 faculty-advisory-fields border rounded p-3 bg-light" style="{{ old('role') === 'faculty' ? '' : 'display:none' }}">

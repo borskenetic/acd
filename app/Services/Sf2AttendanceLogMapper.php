@@ -196,15 +196,22 @@ class Sf2AttendanceLogMapper
     /**
      * @param  list<string>  $schoolDays
      * @param  array<string, Carbon>  $firstInByDate
-     * @return array{absent_dates: list<string>, tardy_dates: list<string>}
+     * @return array{absent_dates: list<string>, tardy_dates: list<string>, half_day_dates: list<string>}
      */
-    public function marksForStudent(array $schoolDays, array $firstInByDate, ?string $year = null, ?string $section = null): array
-    {
+    public function marksForStudent(
+        array $schoolDays,
+        array $firstInByDate,
+        ?string $year = null,
+        ?string $section = null,
+        bool $supportHalfDay = true,
+    ): array {
         $absent = [];
         $tardy = [];
+        $halfDay = [];
         $tz = config('sf2.timezone', 'Asia/Manila');
         // Dates from generation day onward default PRESENT (not yet taken).
         $today = Carbon::now($tz)->toDateString();
+        $halfStart = $this->halfDayStartOnDate('1970-01-01'); // time-of-day only via helper below
 
         foreach ($schoolDays as $date) {
             $scannedAt = $firstInByDate[$date] ?? null;
@@ -225,6 +232,13 @@ class Sf2AttendanceLogMapper
                 continue;
             }
 
+            // First IN at/after noon (default 12:00) ⇒ half-day (K–10 only).
+            if ($supportHalfDay && $scannedAt->gte($this->halfDayStartOnDate($date))) {
+                $halfDay[] = $date;
+
+                continue;
+            }
+
             if ($scannedAt->gt($this->policy->tardyCutoffForDate($date, $year, $section))) {
                 $tardy[] = $date;
             }
@@ -233,7 +247,30 @@ class Sf2AttendanceLogMapper
         return [
             'absent_dates' => $absent,
             'tardy_dates' => $tardy,
+            'half_day_dates' => $halfDay,
         ];
+    }
+
+    public function usesHalfDayMarks(string $gradeLevel): bool
+    {
+        $level = trim($gradeLevel);
+        $shs = config('sf2.shs_grades', ['Grade 11', 'Grade 12']);
+
+        foreach ($shs as $option) {
+            if (strcasecmp($level, (string) $option) === 0) {
+                return false;
+            }
+        }
+
+        return ! (bool) preg_match('/\b(?:grade\s*)?1[12]\b/i', $level);
+    }
+
+    protected function halfDayStartOnDate(string $date): Carbon
+    {
+        $tz = config('sf2.timezone', 'Asia/Manila');
+        $time = (string) config('sf2.half_day_start_time', '12:00');
+
+        return Carbon::parse($date.' '.$time, $tz);
     }
 
     /**
@@ -264,6 +301,7 @@ class Sf2AttendanceLogMapper
         );
 
         $students = [];
+        $supportHalfDay = $this->usesHalfDayMarks($gradeLevel);
 
         foreach ($roster as $student) {
             if (! in_array($student->sex, ['male', 'female'], true)) {
@@ -280,7 +318,8 @@ class Sf2AttendanceLogMapper
                 $schoolDays,
                 $firstInMap[$student->id] ?? [],
                 $student->year,
-                $student->section
+                $student->section,
+                $supportHalfDay
             );
 
             $students[] = [
@@ -291,6 +330,7 @@ class Sf2AttendanceLogMapper
                 'remarks' => '',
                 'absent_dates' => implode(', ', $marks['absent_dates']),
                 'tardy_dates' => implode(', ', $marks['tardy_dates']),
+                'half_day_dates' => implode(', ', $marks['half_day_dates']),
             ];
         }
 

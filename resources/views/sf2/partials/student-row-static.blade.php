@@ -3,6 +3,7 @@
     $student = $student ?? [];
     $absentDates = $student['absent_dates'] ?? [];
     $tardyDates = $student['tardy_dates'] ?? [];
+    $halfDayDates = $student['half_day_dates'] ?? [];
 @endphp
 <div class="sf2-student-row card mb-3 border">
     <div class="card-body">
@@ -37,6 +38,7 @@
                 'index' => $index,
                 'absentDates' => $absentDates,
                 'tardyDates' => $tardyDates,
+                'halfDayDates' => $halfDayDates,
             ])
             <div class="col-12">
                 <label class="form-label small">Remarks</label>

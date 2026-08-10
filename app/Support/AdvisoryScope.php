@@ -89,9 +89,11 @@ class AdvisoryScope
         if (! $user) {
             return false;
         }
-        if (in_array($user->role, ['admin', 'staff'], true)) {
-            return true;
+
+        if ($user->isSchoolOps()) {
+            return $user->canAccessGradeLevel($year);
         }
+
         if ($user->role !== 'faculty') {
             return false;
         }
@@ -111,9 +113,11 @@ class AdvisoryScope
         if (! $user) {
             return false;
         }
-        if (in_array($user->role, ['admin', 'staff'], true)) {
-            return true;
+
+        if ($user->isSchoolOps()) {
+            return $user->canAccessGradeLevel($year);
         }
+
         if ($user->role !== 'faculty') {
             return false;
         }
@@ -133,9 +137,11 @@ class AdvisoryScope
         if (! $user) {
             return false;
         }
-        if (in_array($user->role, ['admin', 'staff'], true)) {
+
+        if ($user->isSchoolOps()) {
             return true;
         }
+
         if ($user->role !== 'faculty') {
             return false;
         }
@@ -144,29 +150,33 @@ class AdvisoryScope
     }
 
     /**
-     * Limit student queries to faculty class assignments.
+     * Limit student queries to the user's keyhole (faculty class, or SHS/K–10 band).
      */
     public static function applyToStudents(Builder $query, ?User $user = null): Builder
     {
         $user ??= auth()->user();
 
-        if (! $user || $user->role !== 'faculty') {
-            return $query;
-        }
-
-        $pairs = self::classPairs($user);
-        if ($pairs === []) {
+        if (! $user) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $outer) use ($pairs) {
-            foreach ($pairs as $i => $pair) {
-                $method = $i === 0 ? 'where' : 'orWhere';
-                $outer->{$method}(function (Builder $q) use ($pair) {
-                    $q->where('year', $pair['year'])->where('section', $pair['section']);
-                });
+        if ($user->role === 'faculty') {
+            $pairs = self::classPairs($user);
+            if ($pairs === []) {
+                return $query->whereRaw('1 = 0');
             }
-        });
+
+            return $query->where(function (Builder $outer) use ($pairs) {
+                foreach ($pairs as $i => $pair) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $outer->{$method}(function (Builder $q) use ($pair) {
+                        $q->where('year', $pair['year'])->where('section', $pair['section']);
+                    });
+                }
+            });
+        }
+
+        return self::applyGradeBandToYearColumn($query, $user, 'year');
     }
 
     /**
@@ -176,59 +186,75 @@ class AdvisoryScope
     {
         $user ??= auth()->user();
 
-        if (! $user || $user->role !== 'faculty') {
-            return $query;
-        }
-
-        $pairs = self::managePairs($user);
-        if ($pairs === []) {
+        if (! $user) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $outer) use ($pairs) {
-            foreach ($pairs as $i => $pair) {
-                $method = $i === 0 ? 'where' : 'orWhere';
-                $outer->{$method}(function (Builder $q) use ($pair) {
-                    $q->where('year', $pair['year'])->where('section', $pair['section']);
-                });
+        if ($user->role === 'faculty') {
+            $pairs = self::managePairs($user);
+            if ($pairs === []) {
+                return $query->whereRaw('1 = 0');
             }
-        });
+
+            return $query->where(function (Builder $outer) use ($pairs) {
+                foreach ($pairs as $i => $pair) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $outer->{$method}(function (Builder $q) use ($pair) {
+                        $q->where('year', $pair['year'])->where('section', $pair['section']);
+                    });
+                }
+            });
+        }
+
+        return self::applyGradeBandToYearColumn($query, $user, 'year');
     }
 
     public static function applyToAttendanceLogs(Builder $query, ?User $user = null): Builder
     {
         $user ??= auth()->user();
 
-        if (! $user || $user->role !== 'faculty') {
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->isSuperAdmin() || $user->role === 'staff') {
             return $query;
         }
 
-        return $query->whereHas('student', function (Builder $s) use ($user) {
-            self::applyToStudents($s, $user);
-        });
+        if ($user->isBandAdmin() || $user->role === 'faculty') {
+            return $query->whereHas('student', function (Builder $s) use ($user) {
+                self::applyToStudents($s, $user);
+            });
+        }
+
+        return $query;
     }
 
     public static function applyToSf2Reports(Builder $query, ?User $user = null): Builder
     {
         $user ??= auth()->user();
 
-        if (! $user || $user->role !== 'faculty') {
-            return $query;
-        }
-
-        $pairs = self::classPairs($user);
-        if ($pairs === []) {
+        if (! $user) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $outer) use ($pairs) {
-            foreach ($pairs as $i => $pair) {
-                $method = $i === 0 ? 'where' : 'orWhere';
-                $outer->{$method}(function (Builder $q) use ($pair) {
-                    $q->where('grade_level', $pair['year'])->where('section', $pair['section']);
-                });
+        if ($user->role === 'faculty') {
+            $pairs = self::classPairs($user);
+            if ($pairs === []) {
+                return $query->whereRaw('1 = 0');
             }
-        });
+
+            return $query->where(function (Builder $outer) use ($pairs) {
+                foreach ($pairs as $i => $pair) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $outer->{$method}(function (Builder $q) use ($pair) {
+                        $q->where('grade_level', $pair['year'])->where('section', $pair['section']);
+                    });
+                }
+            });
+        }
+
+        return self::applyGradeBandToYearColumn($query, $user, 'grade_level');
     }
 
     public static function applyToPendingStudents(Builder $query, ?User $user = null): Builder
@@ -236,11 +262,59 @@ class AdvisoryScope
         $user ??= auth()->user();
 
         if (! $user || $user->role !== 'faculty') {
+            // Band admins / staff / superadmin use same year keyhole as students.
+            if ($user && $user->isSchoolOps()) {
+                return self::applyGradeBandToYearColumn($query, $user, 'year');
+            }
+
             return $query;
         }
 
         // Advisers only — subject teachers do not approve registrations.
         return self::applyToManageableStudents($query, $user);
+    }
+
+    /**
+     * @param  'year'|'grade_level'  $column
+     */
+    public static function applyGradeBandToYearColumn(Builder $query, User $user, string $column): Builder
+    {
+        $allowed = $user->allowedGradeLevels();
+        if ($allowed === null) {
+            return $query;
+        }
+
+        if ($allowed === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $aliases = User::gradeLevelAliases($allowed);
+
+        return $query->whereIn($column, $aliases);
+    }
+
+    /**
+     * Restrict a list of grade labels to the user's band (for dropdowns).
+     *
+     * @param  list<string>  $grades
+     * @return list<string>
+     */
+    public static function filterGradeList(array $grades, ?User $user = null): array
+    {
+        $user ??= auth()->user();
+        if (! $user) {
+            return [];
+        }
+
+        $allowed = $user->allowedGradeLevels();
+        if ($allowed === null) {
+            return array_values($grades);
+        }
+
+        return array_values(array_filter(
+            $grades,
+            fn (string $g) => $user->canAccessGradeLevel($g)
+        ));
     }
 
     public static function canAccessStudent(object $student, ?User $user = null): bool
@@ -251,16 +325,16 @@ class AdvisoryScope
             return false;
         }
 
-        if (in_array($user->role, ['admin', 'staff'], true)) {
-            return true;
+        $year = is_string($student->year ?? null) ? $student->year : '';
+        $section = is_string($student->section ?? null) ? $student->section : '';
+
+        if ($user->isSchoolOps()) {
+            return $user->canAccessGradeLevel($year);
         }
 
         if ($user->role !== 'faculty') {
             return false;
         }
-
-        $year = is_string($student->year ?? null) ? $student->year : '';
-        $section = is_string($student->section ?? null) ? $student->section : '';
 
         return self::canViewClass($year, $section, $user);
     }
@@ -273,23 +347,23 @@ class AdvisoryScope
             return false;
         }
 
-        if (in_array($user->role, ['admin', 'staff'], true)) {
-            return true;
+        $year = is_string($student->year ?? null) ? $student->year : '';
+        $section = is_string($student->section ?? null) ? $student->section : '';
+
+        if ($user->isSchoolOps()) {
+            return $user->canAccessGradeLevel($year);
         }
 
         if ($user->role !== 'faculty') {
             return false;
         }
 
-        $year = is_string($student->year ?? null) ? $student->year : '';
-        $section = is_string($student->section ?? null) ? $student->section : '';
-
         return self::canManageClass($year, $section, $user);
     }
 
     /**
      * Force faculty-created students into an allowed adviser class.
-     * If they only manage one class, fill it. If multiple, keep their choice when valid.
+     * Band admins forced into their grade set when year is out of band.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -298,7 +372,21 @@ class AdvisoryScope
     {
         $user ??= auth()->user();
 
-        if (! $user || $user->role !== 'faculty') {
+        if (! $user) {
+            return $data;
+        }
+
+        if ($user->isBandAdmin()) {
+            $year = is_string($data['year'] ?? null) ? $data['year'] : '';
+            if (! $user->canAccessGradeLevel($year)) {
+                $allowed = $user->allowedGradeLevels() ?? [];
+                $data['year'] = $allowed[0] ?? $year;
+            }
+
+            return $data;
+        }
+
+        if ($user->role !== 'faculty') {
             return $data;
         }
 
@@ -336,6 +424,19 @@ class AdvisoryScope
 
     public static function advisoryLabels(?User $user = null): string
     {
+        $user ??= auth()->user();
+        if (! $user) {
+            return '';
+        }
+
+        if ($user->isBandAdmin()) {
+            $allowed = $user->allowedGradeLevels() ?? [];
+
+            return $user->role === 'shs_admin'
+                ? 'SHS Admin · '.implode(', ', $allowed)
+                : 'K–10 Admin · Kinder–Grade 10';
+        }
+
         $pairs = self::classPairs($user);
         if ($pairs === []) {
             return '—';
@@ -351,13 +452,27 @@ class AdvisoryScope
     }
 
     /**
-     * Year options limited to faculty classes (for forms/SMS).
+     * Year options limited to faculty classes or admin grade band (for forms/SMS).
      *
      * @return list<string>
      */
     public static function yearOptions(?User $user = null): array
     {
-        return array_values(array_unique(array_column(self::classPairs($user), 'year')));
+        $user ??= auth()->user();
+        if (! $user) {
+            return [];
+        }
+
+        if ($user->role === 'faculty') {
+            return array_values(array_unique(array_column(self::classPairs($user), 'year')));
+        }
+
+        $allowed = $user->allowedGradeLevels();
+        if ($allowed === null) {
+            return PatronOptions::allYearOptions();
+        }
+
+        return $allowed;
     }
 
     /**

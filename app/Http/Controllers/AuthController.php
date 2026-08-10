@@ -16,7 +16,7 @@ class AuthController extends Controller
     {
         if (Auth::guard('web')->check()) {
             $role = Auth::guard('web')->user()->role;
-            if (in_array($role, ['admin', 'staff'], true)) {
+            if (in_array($role, ['admin', 'staff', 'shs_admin', 'k10_admin'], true)) {
                 return redirect()->route('home');
             }
 
@@ -81,7 +81,7 @@ class AuthController extends Controller
     private function redirectForRole(?string $role)
     {
         return match ($role) {
-            'admin', 'staff' => redirect()->route('home'),
+            'admin', 'staff', 'shs_admin', 'k10_admin' => redirect()->route('home'),
             'student', 'faculty' => redirect()->route('attendance.scan'),
             default => redirect()->route('login')->with('error', 'Unauthorized role.'),
         };

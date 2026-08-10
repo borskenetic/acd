@@ -55,6 +55,14 @@ class Sf2ReportController extends Controller
             $gradeLevels = $rosterData['grades'] !== []
                 ? $rosterData['grades']
                 : config('sf2.grade_levels', []);
+            if ($user) {
+                $gradeLevels = \App\Support\AdvisoryScope::filterGradeList($gradeLevels, $user);
+                $rosterData['grades'] = $gradeLevels;
+                $rosterData['sections_by_grade'] = array_intersect_key(
+                    $rosterData['sections_by_grade'] ?? [],
+                    array_flip($gradeLevels)
+                );
+            }
             $defaultGrade = null;
             $defaultSection = null;
         }
@@ -73,7 +81,7 @@ class Sf2ReportController extends Controller
             'report_year' => (int) now(config('sf2.timezone', 'Asia/Manila'))->format('Y'),
             'grade_level' => $defaultGrade,
             'section' => $defaultSection,
-            'teacher_name' => ($user && in_array($user->role, ['faculty', 'staff'], true))
+            'teacher_name' => ($user && in_array($user->role, ['faculty', 'staff', 'shs_admin', 'k10_admin'], true))
                 ? $user->fullName()
                 : null,
         ];
@@ -222,6 +230,7 @@ class Sf2ReportController extends Controller
             'students.*.remarks' => 'nullable|string|max:500',
             'students.*.absent_dates' => 'nullable|string|max:2000',
             'students.*.tardy_dates' => 'nullable|string|max:2000',
+            'students.*.half_day_dates' => 'nullable|string|max:2000',
         ]);
 
         $user = $request->user();
@@ -275,6 +284,7 @@ class Sf2ReportController extends Controller
                     'remarks' => $row['remarks'] ?? null,
                     'absent_dates' => $this->grid->parseDateList($row['absent_dates'] ?? null),
                     'tardy_dates' => $this->grid->parseDateList($row['tardy_dates'] ?? null),
+                    'half_day_dates' => $this->grid->parseDateList($row['half_day_dates'] ?? null),
                 ]);
             }
 

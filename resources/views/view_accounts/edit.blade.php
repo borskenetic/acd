@@ -66,9 +66,9 @@
                 <div class="mb-3">
                     <label for="roleSelect" class="form-label">Role</label>
                     <select name="role" id="roleSelect" class="form-select" required>
-                        <option value="admin" {{ old('role', $user->role) === 'admin' ? 'selected' : '' }}>Admin</option>
-                        <option value="staff" {{ old('role', $user->role) === 'staff' ? 'selected' : '' }}>Staff</option>
-                        <option value="faculty" {{ old('role', $user->role) === 'faculty' ? 'selected' : '' }}>Faculty</option>
+                        @foreach(\App\Models\User::assignableRoleOptions() as $value => $label)
+                            <option value="{{ $value }}" @selected(old('role', $user->role) === $value)>{{ $label }}</option>
+                        @endforeach
                         @if($user->role === 'student')
                             <option value="student" selected>Student (legacy)</option>
                         @endif

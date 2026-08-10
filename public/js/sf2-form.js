@@ -118,6 +118,12 @@
           : String(data.tardy_dates).split(/[\s,;]+/).filter(Boolean);
         cal.dataset.tardyInitial = JSON.stringify(tardy);
       }
+      if (data.half_day_dates) {
+        const half = Array.isArray(data.half_day_dates)
+          ? data.half_day_dates
+          : String(data.half_day_dates).split(/[\s,;]+/).filter(Boolean);
+        cal.dataset.halfInitial = JSON.stringify(half);
+      }
     }
 
     row.querySelector('.sf2-row-number').textContent = String(rowIndex + 1);

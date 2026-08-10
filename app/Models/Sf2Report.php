@@ -65,4 +65,19 @@ class Sf2Report extends Model
             $this->report_year
         );
     }
+
+    /** True when this report should export the SF2-SHS workbook (Grade 11–12). */
+    public function usesShsTemplate(): bool
+    {
+        $level = trim((string) $this->grade_level);
+        $shs = config('sf2.shs_grades', ['Grade 11', 'Grade 12']);
+
+        foreach ($shs as $option) {
+            if (strcasecmp($level, (string) $option) === 0) {
+                return true;
+            }
+        }
+
+        return (bool) preg_match('/\b(?:grade\s*)?1[12]\b/i', $level);
+    }
 }

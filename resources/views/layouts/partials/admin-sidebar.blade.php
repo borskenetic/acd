@@ -2,7 +2,8 @@
     $isActive = fn (array $patterns) => collect($patterns)->contains(fn ($pattern) => request()->routeIs($pattern));
     $user = Auth::user();
     $isFaculty = $user && $user->role === 'faculty';
-    $isStaffish = $user && in_array($user->role, ['admin', 'staff'], true);
+    $isStaffish = $user && $user->isSchoolOps();
+    $isSuperAdmin = $user && $user->isSuperAdmin();
 
     $attendanceChildren = [
         ['label' => 'Gate Terminal',      'route' => 'attendance.scan',        'patterns' => ['attendance.scan', 'attendance.process'], 'icon' => 'scan', 'target' => '_blank'],
@@ -89,8 +90,10 @@
         ['label' => 'School Calendar', 'route' => 'school_calendar.index', 'patterns' => ['school_calendar.*'], 'icon' => 'calendar-check'],
         ['label' => 'Attendance Policy', 'route' => 'attendance.policy.settings', 'patterns' => ['attendance.policy.settings', 'attendance.policy.settings.update'], 'icon' => 'clock'],
         ['label' => 'Kiosks', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
-        ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'],
-        [
+    ];
+    if ($isSuperAdmin) {
+        $adminChildren[] = ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'];
+        $adminChildren[] = [
             'label'    => 'Accounts',
             'icon'     => 'user-plus',
             'patterns' => ['users.*'],
@@ -98,9 +101,8 @@
                 ['label' => 'Create Account', 'route' => 'users.create', 'patterns' => ['users.create', 'users.store'], 'icon' => 'user-plus'],
                 ['label' => 'View Accounts',  'route' => 'users.index',  'patterns' => ['users.index', 'users.edit'],   'icon' => 'list'],
             ],
-        ],
-    ];
-
+        ];
+    }
     $icon = function (string $name) {
         return match ($name) {
             'home'      => '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',

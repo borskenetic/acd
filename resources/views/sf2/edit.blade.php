@@ -48,6 +48,7 @@
                         'remarks' => $s->remarks,
                         'absent_dates' => $s->absent_dates ?? [],
                         'tardy_dates' => $s->tardy_dates ?? [],
+                        'half_day_dates' => $s->half_day_dates ?? [],
                     ])->all();
                 @endphp
                 @foreach($studentRows as $i => $student)

@@ -50,6 +50,41 @@ class Sf2SchoolCalendar
         return count($this->schoolDaysInMonth($year, $month));
     }
 
+    /**
+     * K–10 grid columns: chronological school days + holiday/otherwise overrides.
+     * Holiday columns are labeled in Excel (merged "holiday"); they do not count for attendance.
+     *
+     * @return list<array{date: string, type: string}>
+     */
+    public function k10GridDaysInMonth(int $year, int $month, ?int $max = null): array
+    {
+        $max = $max ?? (int) config('sf2.max_day_columns', 31);
+        $tz = config('sf2.timezone', 'Asia/Manila');
+
+        $start = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfDay();
+        $end = $start->copy()->endOfMonth();
+        $overrides = $this->overridesBetween($start->toDateString(), $end->toDateString());
+
+        $days = [];
+        for ($d = $start->copy(); $d->lte($end) && count($days) < $max; $d->addDay()) {
+            $key = $d->toDateString();
+            $override = $overrides[$key] ?? null;
+
+            if ($override === SchoolCalendarDay::TYPE_HOLIDAY
+                || $override === SchoolCalendarDay::TYPE_OTHERWISE) {
+                $days[] = ['date' => $key, 'type' => 'holiday'];
+
+                continue;
+            }
+
+            if ($override === SchoolCalendarDay::TYPE_SCHOOL_DAY || $d->isWeekday()) {
+                $days[] = ['date' => $key, 'type' => 'school'];
+            }
+        }
+
+        return $days;
+    }
+
     /** True when the date counts for attendance (scans, absence, SF2). */
     public function isAttendanceDay(string $date): bool
     {
@@ -70,6 +105,33 @@ class Sf2SchoolCalendar
         return $day->isWeekday();
     }
 
+    /**
+     * Holiday / otherwise dates in the month (for K–10 Excel labels).
+     *
+     * @return list<string> Y-m-d
+     */
+    public function nonClassDaysInMonth(int $year, int $month): array
+    {
+        $tz = config('sf2.timezone', 'Asia/Manila');
+        $start = Carbon::create($year, $month, 1, 0, 0, 0, $tz)->startOfDay();
+        $end = $start->copy()->endOfMonth();
+        $overrides = $this->overridesBetween($start->toDateString(), $end->toDateString());
+
+        $out = [];
+        foreach ($overrides as $date => $type) {
+            if ($type === SchoolCalendarDay::TYPE_HOLIDAY
+                || $type === SchoolCalendarDay::TYPE_OTHERWISE) {
+                $out[] = $date instanceof \DateTimeInterface
+                    ? Carbon::instance($date)->toDateString()
+                    : (string) $date;
+            }
+        }
+
+        sort($out);
+
+        return $out;
+    }
+
     public function isFridayOnlineDay(string $date): bool
     {
         $tz = config('sf2.timezone', 'Asia/Manila');
@@ -80,13 +142,17 @@ class Sf2SchoolCalendar
 
     protected function overrideType(string $date): ?string
     {
-        if (! Schema::hasTable('school_calendar_days')) {
+        try {
+            if (! Schema::hasTable('school_calendar_days')) {
+                return null;
+            }
+
+            $type = SchoolCalendarDay::query()->whereDate('date', $date)->value('type');
+
+            return is_string($type) ? $type : null;
+        } catch (\Throwable) {
             return null;
         }
-
-        $type = SchoolCalendarDay::query()->whereDate('date', $date)->value('type');
-
-        return is_string($type) ? $type : null;
     }
 
     /**
@@ -94,20 +160,24 @@ class Sf2SchoolCalendar
      */
     protected function overridesBetween(string $from, string $to): array
     {
-        if (! Schema::hasTable('school_calendar_days')) {
+        try {
+            if (! Schema::hasTable('school_calendar_days')) {
+                return [];
+            }
+
+            return SchoolCalendarDay::query()
+                ->whereBetween('date', [$from, $to])
+                ->pluck('type', 'date')
+                ->mapWithKeys(function ($type, $date) {
+                    $key = $date instanceof \DateTimeInterface
+                        ? Carbon::instance($date)->toDateString()
+                        : (string) $date;
+
+                    return [$key => (string) $type];
+                })
+                ->all();
+        } catch (\Throwable) {
             return [];
         }
-
-        return SchoolCalendarDay::query()
-            ->whereBetween('date', [$from, $to])
-            ->pluck('type', 'date')
-            ->mapWithKeys(function ($type, $date) {
-                $key = $date instanceof \DateTimeInterface
-                    ? Carbon::instance($date)->toDateString()
-                    : (string) $date;
-
-                return [$key => (string) $type];
-            })
-            ->all();
     }
 }

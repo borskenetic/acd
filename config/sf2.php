@@ -22,6 +22,17 @@ return [
   ],
 
   /*
+  | Grades that use the SF2-SHS multi-month template (Track/Strand, Mon–Sat grid).
+  | All other grade_levels use the K–10 SF2 template.
+  */
+  'shs_grades' => ['Grade 11', 'Grade 12'],
+
+  /*
+  | First IN at or after this time (H:i) counts as half-day on K–10 (code H = 0.5 day).
+  */
+  'half_day_start_time' => env('SF2_HALF_DAY_START', '12:00'),
+
+  /*
   | School-day columns on older DepEd grids; SHS template uses full calendar months.
   */
   'max_day_columns' => 31,
@@ -68,6 +79,7 @@ return [
   */
   'excel' => [
     'template' => resource_path('templates/sf2/sf2-template.xlsx'),
+    'template_k10' => resource_path('templates/sf2/sf2-k10-template.xlsx'),
     'month_sheets' => [
       1 => 'JANUARY',
       2 => 'FEBRUARY',
@@ -93,6 +105,33 @@ return [
     'male_last_row' => 27,
     'female_first_row' => 29,
     'female_last_row' => 64,
+    /*
+    | K–10 single-sheet SF2 (M–F class day columns; X / T / H codes).
+    */
+    'k10' => [
+      'sheet' => 'FINAL SCHOOL FORM 2',
+      'first_day_col' => 'G',
+      'date_header_row' => 10,
+      'dow_header_row' => 11,
+      'number_col' => 'A',
+      'name_col' => 'B',
+      'absent_col' => 'AF',
+      'present_col' => 'AG',
+      'remarks_col' => 'AH',
+      'male_first_row' => 13,
+      'male_last_row' => 42,
+      'male_total_absent_row' => 43,
+      'male_total_present_row' => 44,
+      'female_first_row' => 45,
+      'female_last_row' => 74,
+      'female_total_absent_row' => 75,
+      'female_total_present_row' => 76,
+      'combined_total_row' => 77,
+      'school_days_cell' => 'AQ9',
+      'male_count_cell' => 'AO23',
+      'female_count_cell' => 'AO24',
+      'summary_start_row' => 79,
+    ],
   ],
 
 ];

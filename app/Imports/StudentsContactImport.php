@@ -4,6 +4,8 @@ namespace App\Imports;
 
 use App\Console\Commands\NormalizeStudentNames;
 use App\Models\Student;
+use App\Models\User;
+use App\Support\AdvisoryScope;
 use App\Support\StudentNameParser;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -30,6 +32,14 @@ class StudentsContactImport
     /** @var list<string> */
     public array $noContactData = [];
 
+    /** @var list<string> */
+    public array $outOfScope = [];
+
+    public function __construct(public ?User $actor = null)
+    {
+        $this->actor = $actor ?? auth()->user();
+    }
+
     public function importFile(string|UploadedFile $file): void
     {
         $path = $file instanceof UploadedFile ? $file->getRealPath() : $file;
@@ -51,6 +61,7 @@ class StudentsContactImport
             'not_found' => $this->notFound,
             'ambiguous' => $this->ambiguous,
             'no_contact_data' => $this->noContactData,
+            'out_of_scope' => $this->outOfScope,
         ];
     }
 
@@ -139,6 +150,14 @@ class StudentsContactImport
 
             /** @var Student $student */
             $student = $match['student'];
+
+            if (! AdvisoryScope::canMutateStudent($student, $this->actor)) {
+                $this->outOfScope[] = $line.': outside your grade access ('.$student->year.' · '.$student->section.')';
+                $this->skipped++;
+
+                continue;
+            }
+
             $changes = [];
 
             foreach ($payload as $column => $value) {

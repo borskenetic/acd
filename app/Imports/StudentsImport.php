@@ -16,6 +16,12 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 
 class StudentsImport implements ToModel, WithHeadingRow, WithMapping, SkipsEmptyRows, WithValidation
 {
+    public function __construct(
+        protected ?\App\Models\User $actor = null,
+    ) {
+        $this->actor ??= auth()->user();
+    }
+
     public function map($row): array
     {
         $recordId = $this->pick($row, 'recordid', 'record_id');
@@ -106,6 +112,14 @@ class StudentsImport implements ToModel, WithHeadingRow, WithMapping, SkipsEmpty
             $level = EducationalLevel::College->value;
         }
 
+        $year = $row['year'] ?? null;
+        if ($this->actor && $this->actor->isBandAdmin()) {
+            if (! is_string($year) || $year === '' || ! $this->actor->canAccessGradeLevel($year)) {
+                // Skip rows outside the importer's grade band.
+                return null;
+            }
+        }
+
         $lrn = trim((string) ($row['lrn'] ?? ''));
 
         return new Student([
@@ -116,7 +130,7 @@ class StudentsImport implements ToModel, WithHeadingRow, WithMapping, SkipsEmpty
             'lastname' => $lastname,
             'middle_initial' => $row['middle_initial'] ?? null,
             'birth_date' => $row['birth_date'] ?? null,
-            'year' => $row['year'] ?? null,
+            'year' => $year,
             'section' => $row['section'] ?? null,
             'course' => $row['course'] ?? null,
             'educational_level' => $level,

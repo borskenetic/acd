@@ -4,6 +4,8 @@ namespace App\Imports;
 
 use App\Console\Commands\NormalizeStudentNames;
 use App\Models\Student;
+use App\Models\User;
+use App\Support\AdvisoryScope;
 use App\Support\StudentNameParser;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -31,7 +33,15 @@ class StudentsSexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     /** @var list<string> */
     public array $invalid = [];
 
-    public function __construct(public bool $dryRun = false) {}
+    /** @var list<string> */
+    public array $outOfScope = [];
+
+    public function __construct(
+        public bool $dryRun = false,
+        public ?User $actor = null,
+    ) {
+        $this->actor = $actor ?? auth()->user();
+    }
 
     public function collection(Collection $rows): void
     {
@@ -75,6 +85,13 @@ class StudentsSexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             /** @var Student $student */
             $student = $match['student'];
 
+            if (! AdvisoryScope::canMutateStudent($student, $this->actor)) {
+                $this->outOfScope[] = 'Row '.$line.': outside your grade access ('.$student->year.' · '.$student->section.')';
+                $this->skipped++;
+
+                continue;
+            }
+
             if (strtolower((string) $student->sex) === $sex) {
                 $this->unchanged++;
 
@@ -89,7 +106,7 @@ class StudentsSexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
     }
 
-    /** @return array{updated:int,skipped:int,unchanged:int,not_found:list<string>,ambiguous:list<string>,invalid:list<string>,dry_run:bool} */
+    /** @return array{updated:int,skipped:int,unchanged:int,not_found:list<string>,ambiguous:list<string>,invalid:list<string>,out_of_scope:list<string>,dry_run:bool} */
     public function report(): array
     {
         return [
@@ -99,6 +116,7 @@ class StudentsSexImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             'not_found' => $this->notFound,
             'ambiguous' => $this->ambiguous,
             'invalid' => $this->invalid,
+            'out_of_scope' => $this->outOfScope,
             'dry_run' => $this->dryRun,
         ];
     }

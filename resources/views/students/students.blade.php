@@ -112,9 +112,19 @@
             @endif
             @if(session('rfid_import_report'))
                 @php $rfidReport = session('rfid_import_report'); @endphp
-                @if(!empty($rfidReport['not_found']) || !empty($rfidReport['ambiguous']) || !empty($rfidReport['conflicts']))
+                @if(!empty($rfidReport['not_found']) || !empty($rfidReport['ambiguous']) || !empty($rfidReport['conflicts']) || !empty($rfidReport['out_of_scope']))
                     <div class="alert alert-warning text-start mb-0">
                         <strong>RFID import details</strong>
+                        @if(!empty($rfidReport['out_of_scope']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($rfidReport['out_of_scope'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                @if(count($rfidReport['out_of_scope']) > 30)
+                                    <li>… and {{ count($rfidReport['out_of_scope']) - 30 }} more outside grade access</li>
+                                @endif
+                            </ul>
+                        @endif
                         @if(!empty($rfidReport['not_found']))
                             <ul class="small mb-1 mt-2">
                                 @foreach(array_slice($rfidReport['not_found'], 0, 30) as $line)
@@ -147,9 +157,16 @@
             @endif
             @if(session('sex_import_report'))
                 @php $sexReport = session('sex_import_report'); @endphp
-                @if(!empty($sexReport['not_found']) || !empty($sexReport['ambiguous']) || !empty($sexReport['invalid']))
+                @if(!empty($sexReport['not_found']) || !empty($sexReport['ambiguous']) || !empty($sexReport['invalid']) || !empty($sexReport['out_of_scope']))
                     <div class="alert alert-warning text-start mb-0">
                         <strong>Gender update details</strong>
+                        @if(!empty($sexReport['out_of_scope']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($sexReport['out_of_scope'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
                         @if(!empty($sexReport['invalid']))
                             <ul class="small mb-1 mt-2">
                                 @foreach(array_slice($sexReport['invalid'], 0, 30) as $line)
@@ -179,9 +196,16 @@
             @endif
             @if(session('contact_import_report'))
                 @php $contactReport = session('contact_import_report'); @endphp
-                @if(!empty($contactReport['not_found']) || !empty($contactReport['ambiguous']) || !empty($contactReport['no_contact_data']))
+                @if(!empty($contactReport['not_found']) || !empty($contactReport['ambiguous']) || !empty($contactReport['no_contact_data']) || !empty($contactReport['out_of_scope']))
                     <div class="alert alert-warning text-start mb-0">
                         <strong>Contact update details</strong>
+                        @if(!empty($contactReport['out_of_scope']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($contactReport['out_of_scope'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
                         @if(!empty($contactReport['not_found']))
                             <ul class="small mb-1 mt-2">
                                 @foreach(array_slice($contactReport['not_found'], 0, 30) as $line)
@@ -217,9 +241,16 @@
             @endif
             @if(session('records_import_report'))
                 @php $recordsReport = session('records_import_report'); @endphp
-                @if(!empty($recordsReport['not_found']) || !empty($recordsReport['ambiguous']) || !empty($recordsReport['conflicts']) || !empty($recordsReport['no_data']))
+                @if(!empty($recordsReport['not_found']) || !empty($recordsReport['ambiguous']) || !empty($recordsReport['conflicts']) || !empty($recordsReport['no_data']) || !empty($recordsReport['out_of_scope']))
                     <div class="alert alert-warning text-start mb-0">
                         <strong>Records update details</strong>
+                        @if(!empty($recordsReport['out_of_scope']))
+                            <ul class="small mb-1 mt-2">
+                                @foreach(array_slice($recordsReport['out_of_scope'], 0, 30) as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
                         @if(!empty($recordsReport['conflicts']))
                             <ul class="small mb-1 mt-2">
                                 @foreach(array_slice($recordsReport['conflicts'], 0, 20) as $line)
@@ -304,7 +335,7 @@
                     <label for="spYear">Year / grade</label>
                     <select name="year" id="spYear" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">All years</option>
-                        @foreach(\App\Support\PatronOptions::allYearOptions() as $y)
+                        @foreach(\App\Support\AdvisoryScope::yearOptions(auth()->user()) as $y)
                             <option value="{{ $y }}" {{ request('year') == $y ? 'selected' : '' }}>{{ $y }}</option>
                         @endforeach
                     </select>

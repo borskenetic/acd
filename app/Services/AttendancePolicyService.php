@@ -605,56 +605,209 @@ class AttendancePolicyService
         ];
     }
 
-    /** @param  array<string, mixed>  $data */
-    public function save(array $data): void
+    /**
+     * Whether the user may edit Kinder–Grade 10 / general gate times.
+     */
+    public function canEditK10Schedule(?\App\Models\User $user = null): bool
     {
+        $user ??= auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->role === 'staff'
+            || $user->role === 'k10_admin';
+    }
+
+    /**
+     * Whether the user may edit SHS day + evening schedules.
+     */
+    public function canEditShsSchedule(?\App\Models\User $user = null): bool
+    {
+        $user ??= auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->role === 'staff'
+            || $user->role === 'shs_admin';
+    }
+
+    /**
+     * Shared school thresholds + full temp override (cross-band impact).
+     * Superadmin and staff only.
+     */
+    public function canEditSharedPolicy(?\App\Models\User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        return $user && ($user->isSuperAdmin() || $user->role === 'staff');
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public function save(array $data, ?\App\Models\User $user = null): void
+    {
+        $user ??= auth()->user();
         $existing = $this->policy();
+        $payload = [];
 
-        $payload = [
-            'login_time' => $this->normalizeTimeInput((string) ($data['login_time'] ?? '07:30')),
-            'logout_time' => $this->normalizeTimeInput((string) ($data['logout_time'] ?? '16:00')),
-            'shs_login_time' => $this->normalizeTimeInput((string) ($data['shs_login_time'] ?? $this->shsLoginTime())),
-            'shs_logout_time' => $this->normalizeTimeInput((string) ($data['shs_logout_time'] ?? $this->shsLogoutTime())),
-            'shs_evening_login_time' => $this->normalizeTimeInput((string) ($data['shs_evening_login_time'] ?? $this->shsEveningLoginTime())),
-            'shs_evening_logout_time' => $this->normalizeTimeInput((string) ($data['shs_evening_logout_time'] ?? $this->shsEveningLogoutTime())),
-            'tardy_grace_minutes' => (int) ($data['tardy_grace_minutes'] ?? 5),
-            'consecutive_late_threshold' => (int) ($data['consecutive_late_threshold'] ?? 5),
-            'consecutive_absent_threshold' => (int) ($data['consecutive_absent_threshold'] ?? 3),
-        ];
+        $canK10 = $this->canEditK10Schedule($user);
+        $canShs = $this->canEditShsSchedule($user);
+        $canShared = $this->canEditSharedPolicy($user);
 
-        $tempEnabled = ! empty($data['temp_enabled']);
-        if ($tempEnabled
+        if ($canK10 && array_key_exists('login_time', $data)) {
+            $payload['login_time'] = $this->normalizeTimeInput((string) $data['login_time']);
+        }
+        if ($canK10 && array_key_exists('logout_time', $data)) {
+            $payload['logout_time'] = $this->normalizeTimeInput((string) $data['logout_time']);
+        }
+        if ($canShs && array_key_exists('shs_login_time', $data)) {
+            $payload['shs_login_time'] = $this->normalizeTimeInput((string) $data['shs_login_time']);
+        }
+        if ($canShs && array_key_exists('shs_logout_time', $data)) {
+            $payload['shs_logout_time'] = $this->normalizeTimeInput((string) $data['shs_logout_time']);
+        }
+        if ($canShs && array_key_exists('shs_evening_login_time', $data)) {
+            $payload['shs_evening_login_time'] = $this->normalizeTimeInput((string) $data['shs_evening_login_time']);
+        }
+        if ($canShs && array_key_exists('shs_evening_logout_time', $data)) {
+            $payload['shs_evening_logout_time'] = $this->normalizeTimeInput((string) $data['shs_evening_logout_time']);
+        }
+
+        if ($canShared) {
+            if (array_key_exists('tardy_grace_minutes', $data)) {
+                $payload['tardy_grace_minutes'] = (int) $data['tardy_grace_minutes'];
+            }
+            if (array_key_exists('consecutive_late_threshold', $data)) {
+                $payload['consecutive_late_threshold'] = (int) $data['consecutive_late_threshold'];
+            }
+            if (array_key_exists('consecutive_absent_threshold', $data)) {
+                $payload['consecutive_absent_threshold'] = (int) $data['consecutive_absent_threshold'];
+            }
+            $payload['temporary_override'] = $this->buildTempOverride($data, $existing, fullControl: true);
+        } elseif ($canK10 || $canShs) {
+            $payload['temporary_override'] = $this->buildTempOverride(
+                $data,
+                $existing,
+                fullControl: false,
+                k10: $canK10,
+                shs: $canShs,
+            );
+        }
+
+        // Effective permanent times for reverts_to snapshot
+        $merged = array_merge($existing, $payload);
+        if (isset($payload['temporary_override']) && is_array($payload['temporary_override'])
+            && ! empty($payload['temporary_override']['enabled'])) {
+            $payload['temporary_override']['reverts_to'] = [
+                'login_time' => $merged['login_time'] ?? $this->permanentLoginTime(),
+                'logout_time' => $merged['logout_time'] ?? $this->permanentLogoutTime(),
+                'shs_login_time' => $merged['shs_login_time'] ?? $this->shsLoginTime(),
+                'shs_logout_time' => $merged['shs_logout_time'] ?? $this->shsLogoutTime(),
+                'shs_evening_login_time' => $merged['shs_evening_login_time'] ?? $this->shsEveningLoginTime(),
+                'shs_evening_logout_time' => $merged['shs_evening_logout_time'] ?? $this->shsEveningLogoutTime(),
+            ];
+        }
+
+        Setting::setAttendancePolicy(array_merge($existing, $payload));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $existing
+     * @return array<string, mixed>
+     */
+    protected function buildTempOverride(
+        array $data,
+        array $existing,
+        bool $fullControl,
+        bool $k10 = false,
+        bool $shs = false,
+    ): array {
+        $prev = is_array($existing['temporary_override'] ?? null)
+            ? $existing['temporary_override']
+            : [];
+
+        if ($fullControl) {
+            $tempEnabled = ! empty($data['temp_enabled']);
+            if ($tempEnabled
+                && ! empty($data['temp_login_time'])
+                && ! empty($data['temp_logout_time'])
+                && ! empty($data['temp_starts_on'])
+                && ! empty($data['temp_ends_on'])) {
+                return [
+                    'enabled' => true,
+                    'login_time' => $this->normalizeTimeInput((string) $data['temp_login_time']),
+                    'logout_time' => $this->normalizeTimeInput((string) $data['temp_logout_time']),
+                    'starts_on' => (string) $data['temp_starts_on'],
+                    'ends_on' => (string) $data['temp_ends_on'],
+                    'apply_to_default' => ! empty($data['temp_apply_to_default']),
+                    'apply_to_shs' => ! empty($data['temp_apply_to_shs']),
+                    'apply_to_shs_evening' => ! empty($data['temp_apply_to_shs_evening']),
+                ];
+            }
+
+            return ['enabled' => false];
+        }
+
+        // Band-admin partial temp: merge apply flags for their band only.
+        $applyDefault = $k10
+            ? ! empty($data['temp_apply_to_default'])
+            : (bool) ($prev['apply_to_default'] ?? false);
+        $applyShs = $shs
+            ? ! empty($data['temp_apply_to_shs'])
+            : (bool) ($prev['apply_to_shs'] ?? false);
+        $applyEve = $shs
+            ? ! empty($data['temp_apply_to_shs_evening'])
+            : (bool) ($prev['apply_to_shs_evening'] ?? false);
+
+        $wantsTemp = ! empty($data['temp_enabled']) && (
+            ($k10 && $applyDefault) || ($shs && ($applyShs || $applyEve))
+        );
+
+        if ($wantsTemp
             && ! empty($data['temp_login_time'])
             && ! empty($data['temp_logout_time'])
             && ! empty($data['temp_starts_on'])
             && ! empty($data['temp_ends_on'])) {
-            $payload['temporary_override'] = [
+            return [
                 'enabled' => true,
                 'login_time' => $this->normalizeTimeInput((string) $data['temp_login_time']),
                 'logout_time' => $this->normalizeTimeInput((string) $data['temp_logout_time']),
                 'starts_on' => (string) $data['temp_starts_on'],
                 'ends_on' => (string) $data['temp_ends_on'],
-                'apply_to_default' => ! empty($data['temp_apply_to_default']),
-                'apply_to_shs' => ! empty($data['temp_apply_to_shs']),
-                'apply_to_shs_evening' => ! empty($data['temp_apply_to_shs_evening']),
-                // Snapshot of permanent times for audit/clarity (auto-revert is lookup-based).
-                'reverts_to' => [
-                    'login_time' => $payload['login_time'],
-                    'logout_time' => $payload['logout_time'],
-                    'shs_login_time' => $payload['shs_login_time'],
-                    'shs_logout_time' => $payload['shs_logout_time'],
-                    'shs_evening_login_time' => $payload['shs_evening_login_time'],
-                    'shs_evening_logout_time' => $payload['shs_evening_logout_time'],
-                ],
-            ];
-        } else {
-            $payload['temporary_override'] = [
-                'enabled' => false,
+                'apply_to_default' => $applyDefault,
+                'apply_to_shs' => $applyShs,
+                'apply_to_shs_evening' => $applyEve,
             ];
         }
 
-        // Preserve unknown keys from older policy payloads.
-        Setting::setAttendancePolicy(array_merge($existing, $payload));
+        // Band cleared their temp: only disable fully if no other band still applies.
+        if (! empty($data['temp_enabled']) === false || ! $wantsTemp) {
+            if ($k10 && ! $shs) {
+                $applyDefault = false;
+            }
+            if ($shs && ! $k10) {
+                $applyShs = false;
+                $applyEve = false;
+            }
+            if (! $applyDefault && ! $applyShs && ! $applyEve) {
+                return ['enabled' => false];
+            }
+
+            // Keep other band's active temp if present
+            if (! empty($prev['enabled'])) {
+                return array_merge($prev, [
+                    'apply_to_default' => $applyDefault,
+                    'apply_to_shs' => $applyShs,
+                    'apply_to_shs_evening' => $applyEve,
+                ]);
+            }
+        }
+
+        return $prev !== [] ? $prev : ['enabled' => false];
     }
 
     /** @return array<string, mixed> */

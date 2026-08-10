@@ -10,6 +10,7 @@ use App\Models\Student;
 use Illuminate\Support\Facades\Schema;
 use App\Services\PatronAttendanceReportService;
 use App\Services\AttendancePolicyService;
+use App\Support\AdvisoryScope;
 use App\Support\PatronOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
@@ -27,23 +28,26 @@ class AttendanceLogController extends Controller
 
         $summary = $this->summaryForQuery(clone $baseQuery, $policy);
 
-        $yearOptions = PatronOptions::allYearOptions();
+        $yearOptions = AdvisoryScope::yearOptions(auth()->user());
 
         $homeroomSections = collect();
         if (Schema::hasTable('grade_sections')) {
-            $homeroomSections = $homeroomSections->merge(
-                GradeSection::query()->orderBy('section')->pluck('section')
-            );
+            $sectionsQuery = GradeSection::query()->orderBy('section');
+            $allowed = auth()->user()?->allowedGradeLevels();
+            if (is_array($allowed)) {
+                $sectionsQuery->whereIn('grade_level', $allowed !== [] ? $allowed : ['__none__']);
+            }
+            $homeroomSections = $homeroomSections->merge($sectionsQuery->pluck('section'));
         }
+        $studentSectionQuery = Student::query()
+            ->tap(fn ($q) => AdvisoryScope::applyToStudents($q))
+            ->whereNotNull('section')
+            ->where('section', '!=', '')
+            ->distinct()
+            ->orderBy('section')
+            ->pluck('section');
         $homeroomSections = $homeroomSections
-            ->merge(
-                Student::query()
-                    ->whereNotNull('section')
-                    ->where('section', '!=', '')
-                    ->distinct()
-                    ->orderBy('section')
-                    ->pluck('section')
-            )
+            ->merge($studentSectionQuery)
             ->unique()
             ->sort()
             ->values();

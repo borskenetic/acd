@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Student;
 use App\Services\StudentIdCardService;
+use App\Support\AdvisoryScope;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
@@ -16,21 +17,21 @@ class IdCardController extends Controller
 
     public function front(int $id): Response
     {
-        $student = Student::findOrFail($id);
+        $student = $this->findAccessibleStudent($id);
 
         return $this->idCards->renderFront($student)->response('png');
     }
 
     public function back(int $id): Response
     {
-        $student = Student::findOrFail($id);
+        $student = $this->findAccessibleStudent($id);
 
         return $this->idCards->renderBack($student)->response('png');
     }
 
     public function download(int $id): BinaryFileResponse
     {
-        $student = Student::findOrFail($id);
+        $student = $this->findAccessibleStudent($id);
 
         $front = (string) $this->idCards->renderFront($student)->encode('png');
         $back = (string) $this->idCards->renderBack($student)->encode('png');
@@ -54,5 +55,15 @@ class IdCardController extends Controller
 
         return response()->download($zipPath, "{$student->lastname}_{$student->firstname}_ID.zip")
             ->deleteFileAfterSend(true);
+    }
+
+    protected function findAccessibleStudent(int $id): Student
+    {
+        $student = Student::findOrFail($id);
+        if (! AdvisoryScope::canAccessStudent($student)) {
+            abort(403, 'You cannot access ID cards outside your grade access.');
+        }
+
+        return $student;
     }
 }

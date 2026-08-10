@@ -12,7 +12,14 @@
 @php
     use Illuminate\Support\Str;
 
-    $activeTab = request('tab', 'programs');
+    $canManageCollege = $canManageCollege ?? true;
+    $canManageK10 = $canManageK10 ?? true;
+    $canManageShs = $canManageShs ?? true;
+    $defaultTab = $canManageCollege ? 'programs' : 'sections';
+    $activeTab = request('tab', $defaultTab);
+    if ($activeTab === 'programs' && ! $canManageCollege) {
+        $activeTab = 'sections';
+    }
     $sectionListId = fn (string $grade, string $strand = '') => 'grade-sections-'.Str::slug($grade.($strand ? '-'.$strand : ''));
 @endphp
 
@@ -20,7 +27,15 @@
     <div class="mb-4">
         <h4 class="mb-1">School Setup</h4>
         <p class="text-muted small mb-0">
-            College programs, K–10 homeroom sections, and senior high sections by strand.
+            @if($canManageCollege && $canManageK10 && $canManageShs)
+                College programs, K–10 homeroom sections, and senior high sections by strand.
+            @elseif($canManageShs)
+                Senior high (Grade 11–12) sections by strand.
+            @elseif($canManageK10)
+                K–10 (Kinder–Grade 10) homeroom sections.
+            @else
+                School structure for your access level.
+            @endif
         </p>
     </div>
 
@@ -39,10 +54,12 @@
     @endif
 
     <ul class="nav nav-tabs mb-3" role="tablist">
+        @if($canManageCollege)
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'programs' ? 'active' : '' }}" data-bs-toggle="tab"
                     data-bs-target="#tab-programs" type="button">Programs &amp; courses</button>
         </li>
+        @endif
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'sections' ? 'active' : '' }}" data-bs-toggle="tab"
                     data-bs-target="#tab-sections" type="button">Grade &amp; sections</button>
@@ -50,6 +67,7 @@
     </ul>
 
     <div class="tab-content">
+        @if($canManageCollege)
         <div class="tab-pane fade {{ $activeTab === 'programs' ? 'show active' : '' }}" id="tab-programs">
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
@@ -135,12 +153,20 @@
                 </div>
             @endforelse
         </div>
+        @endif
 
         <div class="tab-pane fade {{ $activeTab === 'sections' ? 'show active' : '' }}" id="tab-sections">
             <p class="small text-muted mb-3">
-                Use <strong>+ Section</strong> on Kinder–Grade 10. For senior high, add strands first, then sections under each strand.
+                @if($canManageK10 && $canManageShs)
+                    Use <strong>+ Section</strong> on Kinder–Grade 10. For senior high, add strands first, then sections under each strand.
+                @elseif($canManageShs)
+                    Manage senior high strands and sections (Grade 11–12).
+                @else
+                    Manage homeroom sections for Kinder–Grade 10.
+                @endif
             </p>
 
+            @if($canManageK10)
             <h6 class="fw-semibold mb-2">Kinder – Grade 10</h6>
             <div class="row g-3 mb-4">
                 @foreach($basicGrades as $grade)
@@ -169,7 +195,9 @@
                     </div>
                 @endforeach
             </div>
+            @endif
 
+            @if($canManageShs)
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <h6 class="fw-semibold mb-0">Senior high — Grades 11 &amp; 12</h6>
                 <button type="button" class="btn btn-primary ss-action-btn ss-add-strand-main"
@@ -203,6 +231,7 @@
                     </div>
                 @endforeach
             </div>
+            @endif
         </div>
     </div>
 </div>

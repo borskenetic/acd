@@ -4,6 +4,8 @@ namespace App\Imports;
 
 use App\Console\Commands\NormalizeStudentNames;
 use App\Models\Student;
+use App\Models\User;
+use App\Support\AdvisoryScope;
 use App\Support\StudentNameParser;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -28,6 +30,14 @@ class StudentsRfidImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
     /** @var list<string> */
     public array $conflicts = [];
+
+    /** @var list<string> */
+    public array $outOfScope = [];
+
+    public function __construct(public ?User $actor = null)
+    {
+        $this->actor = $actor ?? auth()->user();
+    }
 
     public function collection(Collection $rows): void
     {
@@ -60,6 +70,13 @@ class StudentsRfidImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             /** @var Student $student */
             $student = $match['student'];
 
+            if (! AdvisoryScope::canMutateStudent($student, $this->actor)) {
+                $this->outOfScope[] = 'Row '.$line.': outside your grade access ('.$student->year.' · '.$student->section.')';
+                $this->skipped++;
+
+                continue;
+            }
+
             $conflict = Student::query()
                 ->where('rfid', $rfid)
                 ->where('id', '!=', $student->id)
@@ -77,7 +94,7 @@ class StudentsRfidImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
     }
 
-    /** @return array{updated:int,skipped:int,not_found:list<string>,ambiguous:list<string>,conflicts:list<string>} */
+    /** @return array{updated:int,skipped:int,not_found:list<string>,ambiguous:list<string>,conflicts:list<string>,out_of_scope:list<string>} */
     public function report(): array
     {
         return [
@@ -86,6 +103,7 @@ class StudentsRfidImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             'not_found' => $this->notFound,
             'ambiguous' => $this->ambiguous,
             'conflicts' => $this->conflicts,
+            'out_of_scope' => $this->outOfScope,
         ];
     }
 

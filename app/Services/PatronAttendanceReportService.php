@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AttendanceLog;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,53 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PatronAttendanceReportService
 {
+    /**
+     * Constrain a query that joins or uses the students table to the current user's grade band.
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $query
+     */
+    protected function applyStudentBandScope($query, string $studentsTable = 'students'): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $allowed = $user->allowedGradeLevels();
+        if ($allowed === null) {
+            return;
+        }
+
+        $aliases = User::gradeLevelAliases($allowed);
+        if ($aliases === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn($studentsTable.'.year', $aliases);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     */
+    protected function applyLogBandScope($query): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || ! $user->isBandAdmin()) {
+            return;
+        }
+
+        $aliases = User::gradeLevelAliases($user->allowedGradeLevels() ?? []);
+        if ($aliases === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereHas('student', fn ($s) => $s->whereIn('year', $aliases));
+    }
+
     protected function normalizeDateRange(?string $from, ?string $to): array
     {
         $tz = 'Asia/Manila';
@@ -58,7 +106,9 @@ class PatronAttendanceReportService
         $topStudentsByIns = DB::table('attendance_logs')
             ->join('students', 'students.id', '=', 'attendance_logs.student_id')
             ->whereRaw($inExpr)
-            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]))
+            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]));
+        $this->applyStudentBandScope($topStudentsByIns);
+        $topStudentsByIns = $topStudentsByIns
             ->select(
                 'students.id',
                 'students.lastname',
@@ -74,7 +124,9 @@ class PatronAttendanceReportService
         $topStudentsByDistinctInDays = DB::table('attendance_logs')
             ->join('students', 'students.id', '=', 'attendance_logs.student_id')
             ->whereRaw($inExpr)
-            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]))
+            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]));
+        $this->applyStudentBandScope($topStudentsByDistinctInDays);
+        $topStudentsByDistinctInDays = $topStudentsByDistinctInDays
             ->select(
                 'students.id',
                 'students.lastname',
@@ -89,7 +141,9 @@ class PatronAttendanceReportService
 
         $registeredByCourse = DB::table('students')
             ->whereNotNull('course')
-            ->where('course', '!=', '')
+            ->where('course', '!=', '');
+        $this->applyStudentBandScope($registeredByCourse);
+        $registeredByCourse = $registeredByCourse
             ->select('course', DB::raw('COUNT(*) as student_count'))
             ->groupBy('course')
             ->get()
@@ -100,7 +154,9 @@ class PatronAttendanceReportService
             ->whereRaw($inExpr)
             ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]))
             ->whereNotNull('students.course')
-            ->where('students.course', '!=', '')
+            ->where('students.course', '!=', '');
+        $this->applyStudentBandScope($insByCourse);
+        $insByCourse = $insByCourse
             ->select('students.course', DB::raw('COUNT(*) as ins_count'))
             ->groupBy('students.course')
             ->get()
@@ -131,10 +187,11 @@ class PatronAttendanceReportService
                 $rangeStart = max($start->toDateTimeString(), $fromDt);
                 $rangeEnd = min($end->toDateTimeString(), $toDt);
 
-                $cnt = AttendanceLog::query()
+                $q = AttendanceLog::query()
                     ->whereRaw("LOWER(TRIM(status)) = 'in'")
-                    ->whereBetween('scanned_at', [$rangeStart, $rangeEnd])
-                    ->count();
+                    ->whereBetween('scanned_at', [$rangeStart, $rangeEnd]);
+                $this->applyLogBandScope($q);
+                $cnt = $q->count();
 
                 $weeklyInsTrend->push((object) [
                     'label' => $start->format('M j').' – '.$end->format('M j, Y'),
@@ -147,10 +204,11 @@ class PatronAttendanceReportService
             for ($i = 11; $i >= 0; $i--) {
                 $start = Carbon::now($tz)->subWeeks($i)->startOfWeek(Carbon::MONDAY);
                 $end = $start->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay();
-                $cnt = AttendanceLog::query()
+                $q = AttendanceLog::query()
                     ->whereRaw("LOWER(TRIM(status)) = 'in'")
-                    ->whereBetween('scanned_at', [$start->toDateTimeString(), $end->toDateTimeString()])
-                    ->count();
+                    ->whereBetween('scanned_at', [$start->toDateTimeString(), $end->toDateTimeString()]);
+                $this->applyLogBandScope($q);
+                $cnt = $q->count();
                 $weeklyInsTrend->push((object) [
                     'label' => $start->format('M j').' – '.$end->format('M j, Y'),
                     'count' => $cnt,
@@ -168,10 +226,11 @@ class PatronAttendanceReportService
                 $rangeStart = max($start->toDateTimeString(), $fromDt);
                 $rangeEnd = min($end->toDateTimeString(), $toDt);
 
-                $cnt = AttendanceLog::query()
+                $q = AttendanceLog::query()
                     ->whereRaw("LOWER(TRIM(status)) = 'in'")
-                    ->whereBetween('scanned_at', [$rangeStart, $rangeEnd])
-                    ->count();
+                    ->whereBetween('scanned_at', [$rangeStart, $rangeEnd]);
+                $this->applyLogBandScope($q);
+                $cnt = $q->count();
 
                 $monthlyInsTrend->push((object) [
                     'label' => $start->format('F Y'),
@@ -184,10 +243,11 @@ class PatronAttendanceReportService
             for ($i = 11; $i >= 0; $i--) {
                 $start = Carbon::now($tz)->subMonths($i)->startOfMonth();
                 $end = $start->copy()->endOfMonth()->endOfDay();
-                $cnt = AttendanceLog::query()
+                $q = AttendanceLog::query()
                     ->whereRaw("LOWER(TRIM(status)) = 'in'")
-                    ->whereBetween('scanned_at', [$start->toDateTimeString(), $end->toDateTimeString()])
-                    ->count();
+                    ->whereBetween('scanned_at', [$start->toDateTimeString(), $end->toDateTimeString()]);
+                $this->applyLogBandScope($q);
+                $cnt = $q->count();
                 $monthlyInsTrend->push((object) [
                     'label' => $start->format('F Y'),
                     'count' => $cnt,
@@ -195,10 +255,17 @@ class PatronAttendanceReportService
             }
         }
 
-        $hourRows = DB::table('attendance_logs')
+        $hourQuery = DB::table('attendance_logs')
             ->whereRaw($inExpr)
-            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]))
-            ->select(DB::raw('HOUR(scanned_at) as hr'), DB::raw('COUNT(*) as cnt'))
+            ->when($fromDt && $toDt, fn ($q) => $q->whereBetween('attendance_logs.scanned_at', [$fromDt, $toDt]));
+        $user = auth()->user();
+        if ($user instanceof User && $user->isBandAdmin()) {
+            $aliases = User::gradeLevelAliases($user->allowedGradeLevels() ?? []);
+            $hourQuery->join('students', 'students.id', '=', 'attendance_logs.student_id')
+                ->whereIn('students.year', $aliases !== [] ? $aliases : ['__none__']);
+        }
+        $hourRows = $hourQuery
+            ->select(DB::raw('HOUR(attendance_logs.scanned_at) as hr'), DB::raw('COUNT(*) as cnt'))
             ->groupBy('hr')
             ->get()
             ->keyBy(fn ($r) => (int) $r->hr);

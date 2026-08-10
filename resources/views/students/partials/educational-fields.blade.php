@@ -4,7 +4,28 @@
     $selectedLevel = old('educational_level', $educationalLevel ?? '');
     $selectedYear = old('year', $year ?? '');
     $yearOptionsByLevel = config('patron.year_options', []);
-    $programs = $programs ?? collect();
+    $user = auth()->user();
+    if ($user && method_exists($user, 'isBandAdmin') && $user->isBandAdmin()) {
+        $filtered = [];
+        foreach ($yearOptionsByLevel as $level => $years) {
+            $kept = array_values(array_filter(
+                $years,
+                fn ($y) => $user->canAccessGradeLevel((string) $y)
+            ));
+            if ($kept !== []) {
+                $filtered[$level] = $kept;
+            }
+        }
+        $yearOptionsByLevel = $filtered;
+    }
+    $levelOptions = \App\Enums\EducationalLevel::options();
+    if ($user && method_exists($user, 'isBandAdmin') && $user->isBandAdmin()) {
+        $levelOptions = array_filter(
+            $levelOptions,
+            fn ($label, $value) => isset($yearOptionsByLevel[$value]),
+            ARRAY_FILTER_USE_BOTH
+        );
+    }
     $schoolSetup = $schoolSetup ?? ($sectionsByGrade ?? null ? [
         'sectionsByGrade' => $sectionsByGrade ?? [],
         'sectionsByGradeStrand' => [],
@@ -23,7 +44,7 @@
     <select name="educational_level" id="educational_level"
             class="form-select @error('educational_level') is-invalid @enderror" required>
         <option value="">Select level…</option>
-        @foreach (EducationalLevel::options() as $value => $label)
+        @foreach ($levelOptions as $value => $label)
             <option value="{{ $value }}" {{ $selectedLevel === $value ? 'selected' : '' }}>{{ $label }}</option>
         @endforeach
     </select>

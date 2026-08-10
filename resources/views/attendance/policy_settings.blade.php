@@ -14,10 +14,18 @@
     $eveLogin = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_login_time'])->format('g:i A');
     $eveLogout = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_logout_time'])->format('g:i A');
     $activeTemp = $policy->activeTemporaryOverride();
+    $canEditK10 = $canEditK10 ?? true;
+    $canEditShs = $canEditShs ?? true;
+    $canEditShared = $canEditShared ?? true;
 @endphp
 <div class="container py-4" style="max-width: 920px;">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h3 class="mb-0">Attendance policy</h3>
+        <div>
+            <h3 class="mb-0">Attendance policy</h3>
+            @if($scopeLabel ?? null)
+                <p class="text-muted small mb-0">{{ $scopeLabel }}</p>
+            @endif
+        </div>
         <div class="d-flex gap-2">
             <a href="{{ route('school_calendar.index') }}" class="btn btn-outline-secondary btn-sm">School calendar</a>
             <a href="{{ route('attendance_logs.index') }}" class="btn btn-outline-secondary btn-sm">Attendance logs</a>
@@ -52,6 +60,7 @@
     <form method="POST" action="{{ route('attendance.policy.settings.update') }}">
         @csrf
 
+        @if($canEditK10)
         <div class="card mb-4">
             <div class="card-header fw-semibold">Gate times (Kinder – Grade 10 / general)</div>
             <div class="card-body">
@@ -73,6 +82,7 @@
                                value="{{ old('logout_time', $values['logout_time']) }}" required>
                         <div class="form-text">Currently {{ $logoutDisplay }}</div>
                     </div>
+                    @if($canEditShared)
                     <div class="col-md-6">
                         <label for="tardyGrace" class="form-label">Grace period before late (minutes)</label>
                         <input type="number" name="tardy_grace_minutes" id="tardyGrace" class="form-control"
@@ -81,10 +91,22 @@
                             Check-in after <strong>{{ $lateCutoffDisplay }}</strong> is LATE (login + grace).
                         </div>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
+        @elseif(! $canEditShs)
+            {{-- super only unreachable --}}
+        @else
+        <div class="card mb-4 border-0 bg-light">
+            <div class="card-body small text-muted">
+                <strong>K–10 / general times</strong> (read only): login {{ $loginDisplay }}, logout {{ $logoutDisplay }}.
+                Managed by K–10 Admin or superadmin.
+            </div>
+        </div>
+        @endif
 
+        @if($canEditShs)
         <div class="card mb-4">
             <div class="card-header fw-semibold">Senior high (Grade 11–12) day class</div>
             <div class="card-body">
@@ -131,7 +153,16 @@
                 </div>
             </div>
         </div>
+        @else
+        <div class="card mb-4 border-0 bg-light">
+            <div class="card-body small text-muted">
+                <strong>SHS times</strong> (read only): day {{ $shsLogin }}–{{ $shsLogout }},
+                evening {{ $eveLogin }}–{{ $eveLogout }}. Managed by SHS Admin or superadmin.
+            </div>
+        </div>
+        @endif
 
+        @if($canEditShared || $canEditK10 || $canEditShs)
         <div class="card mb-4">
             <div class="card-header fw-semibold">Temporary time change</div>
             <div class="card-body">
@@ -167,11 +198,14 @@
                                value="{{ old('temp_ends_on', $values['temp_ends_on']) }}">
                     </div>
                     <div class="col-12">
+                        @if($canEditShared || $canEditK10)
                         <div class="form-check form-check-inline">
                             <input type="checkbox" name="temp_apply_to_default" value="1" class="form-check-input" id="tempDef"
                                    @checked(old('temp_apply_to_default', $values['temp_apply_to_default']))>
                             <label class="form-check-label" for="tempDef">Apply to general (K–10)</label>
                         </div>
+                        @endif
+                        @if($canEditShared || $canEditShs)
                         <div class="form-check form-check-inline">
                             <input type="checkbox" name="temp_apply_to_shs" value="1" class="form-check-input" id="tempShs"
                                    @checked(old('temp_apply_to_shs', $values['temp_apply_to_shs']))>
@@ -182,17 +216,21 @@
                                    @checked(old('temp_apply_to_shs_evening', $values['temp_apply_to_shs_evening']))>
                             <label class="form-check-label" for="tempEve">Apply to SHS evening</label>
                         </div>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
+        @endif
 
+        @if($canEditShared)
         <div class="card mb-4">
             <div class="card-header fw-semibold">SMS alert thresholds</div>
             <div class="card-body">
                 <p class="text-muted mb-3">
                     When a student reaches these streaks, an SMS is sent to their
                     <strong>emergency contact</strong> using Communication → Gate Terminal Message.
+                    School-wide (superadmin / staff only).
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -210,6 +248,16 @@
                 </div>
             </div>
         </div>
+        @else
+        <div class="card mb-4 border-0 bg-light">
+            <div class="card-body small text-muted">
+                Grace period and SMS streak thresholds are school-wide and can only be changed by
+                superadmin / staff. Current: grace {{ $values['tardy_grace_minutes'] }} min;
+                late streak {{ $values['consecutive_late_threshold'] }};
+                absent streak {{ $values['consecutive_absent_threshold'] }}.
+            </div>
+        </div>
+        @endif
 
         <button type="submit" class="btn btn-primary">Save policy</button>
     </form>

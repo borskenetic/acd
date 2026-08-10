@@ -133,7 +133,7 @@ class StudentController extends Controller
         ]);
 
         try {
-            Excel::import(new StudentsImport, $request->file('file'));
+            Excel::import(new StudentsImport($request->user()), $request->file('file'));
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $messages = collect($e->failures())
                 ->map(fn ($failure) => 'Row '.$failure->row().': '.implode(' ', $failure->errors()))
@@ -165,7 +165,7 @@ class StudentController extends Controller
             'file' => 'required|file|mimes:csv,xlsx,xls|max:10240',
         ]);
 
-        $import = new StudentsRfidImport;
+        $import = new StudentsRfidImport($request->user());
         Excel::import($import, $request->file('file'));
 
         $report = $import->report();
@@ -194,7 +194,7 @@ class StudentController extends Controller
             'file' => 'required|file|mimes:csv,xlsx,xls|max:10240',
         ]);
 
-        $import = new StudentsSexImport;
+        $import = new StudentsSexImport(actor: $request->user());
         Excel::import($import, $request->file('file'));
 
         $report = $import->report();
@@ -226,7 +226,7 @@ class StudentController extends Controller
             'file' => 'required|file|mimes:csv,xlsx,xls|max:20480',
         ]);
 
-        $import = new StudentsContactImport;
+        $import = new StudentsContactImport($request->user());
         $import->importFile($request->file('file'));
 
         $report = $import->report();
@@ -258,7 +258,7 @@ class StudentController extends Controller
             'file' => 'required|file|mimes:csv,xlsx,xls|max:20480',
         ]);
 
-        $import = new StudentsRecordsImport;
+        $import = new StudentsRecordsImport($request->user());
         Excel::import($import, $request->file('file'));
 
         $report = $import->report();
@@ -374,6 +374,12 @@ class StudentController extends Controller
         ]);
 
         $validated = AdvisoryScope::enforceStudentYearSection($validated, $user);
+
+        if ($user && $user->isBandAdmin() && ! $user->canAccessGradeLevel((string) $validated['year'])) {
+            return back()->withInput()->withErrors([
+                'year' => 'That grade level is outside your admin access.',
+            ]);
+        }
 
         if ($user && $user->role === 'faculty'
             && ! AdvisoryScope::canManageClass((string) $validated['year'], (string) ($validated['section'] ?? ''), $user)) {
@@ -509,6 +515,13 @@ class StudentController extends Controller
 
         $validated = AdvisoryScope::enforceStudentYearSection($validated);
     
+        if (Auth::user() && Auth::user()->isBandAdmin()
+            && ! Auth::user()->canAccessGradeLevel((string) $validated['year'])) {
+            return back()->withInput()->withErrors([
+                'year' => 'That grade level is outside your admin access.',
+            ]);
+        }
+
         if (Auth::user() && Auth::user()->role === 'faculty'
             && ! AdvisoryScope::canManageClass((string) $validated['year'], (string) ($validated['section'] ?? ''), Auth::user())) {
             return back()->withInput()->withErrors([

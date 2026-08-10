@@ -4,6 +4,8 @@ namespace App\Imports;
 
 use App\Console\Commands\NormalizeStudentNames;
 use App\Models\Student;
+use App\Models\User;
+use App\Support\AdvisoryScope;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -46,6 +48,14 @@ class StudentsRecordsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
     /** @var list<string> */
     public array $noData = [];
 
+    /** @var list<string> */
+    public array $outOfScope = [];
+
+    public function __construct(public ?User $actor = null)
+    {
+        $this->actor = $actor ?? auth()->user();
+    }
+
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
@@ -86,6 +96,13 @@ class StudentsRecordsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
 
             /** @var Student $student */
             $student = $match['student'];
+
+            if (! AdvisoryScope::canMutateStudent($student, $this->actor)) {
+                $this->outOfScope[] = 'Row '.$line.': outside your grade access ('.$student->year.' · '.$student->section.')';
+                $this->skipped++;
+
+                continue;
+            }
 
             $newRecordId = $fields['record_id'] ?? '';
             if ($newRecordId !== '') {
@@ -151,6 +168,7 @@ class StudentsRecordsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
             'ambiguous' => $this->ambiguous,
             'conflicts' => $this->conflicts,
             'no_data' => $this->noData,
+            'out_of_scope' => $this->outOfScope,
         ];
     }
 

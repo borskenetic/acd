@@ -135,53 +135,69 @@ class AttendanceController extends Controller
 
     public function policySettings(AttendancePolicyService $policy)
     {
+        $user = auth()->user();
+
         return view('attendance.policy_settings', [
             'policy' => $policy,
             'values' => $policy->toFormValues(),
+            'canEditK10' => $policy->canEditK10Schedule($user),
+            'canEditShs' => $policy->canEditShsSchedule($user),
+            'canEditShared' => $policy->canEditSharedPolicy($user),
+            'scopeLabel' => $user?->isBandAdmin()
+                ? ($user->role === 'shs_admin' ? 'SHS Admin — Grade 11–12 schedules only' : 'K–10 Admin — Kinder–Grade 10 schedules only')
+                : null,
         ]);
     }
 
     public function updatePolicySettings(Request $request, AttendancePolicyService $policy)
     {
-        $request->validate([
-            'login_time' => 'required|date_format:H:i',
-            'logout_time' => 'required|date_format:H:i',
-            'shs_login_time' => 'required|date_format:H:i',
-            'shs_logout_time' => 'required|date_format:H:i',
-            'shs_evening_login_time' => 'required|date_format:H:i',
-            'shs_evening_logout_time' => 'required|date_format:H:i',
-            'tardy_grace_minutes' => 'required|integer|min:0|max:120',
-            'consecutive_late_threshold' => 'required|integer|min:1|max:30',
-            'consecutive_absent_threshold' => 'required|integer|min:1|max:30',
-            'temp_enabled' => 'nullable|boolean',
-            'temp_login_time' => 'nullable|date_format:H:i',
-            'temp_logout_time' => 'nullable|date_format:H:i',
-            'temp_starts_on' => 'nullable|date',
-            'temp_ends_on' => 'nullable|date|after_or_equal:temp_starts_on',
-            'temp_apply_to_default' => 'nullable|boolean',
-            'temp_apply_to_shs' => 'nullable|boolean',
-            'temp_apply_to_shs_evening' => 'nullable|boolean',
-        ]);
+        $user = $request->user();
+        $canK10 = $policy->canEditK10Schedule($user);
+        $canShs = $policy->canEditShsSchedule($user);
+        $canShared = $policy->canEditSharedPolicy($user);
 
-        $policy->save($request->only([
-            'login_time',
-            'logout_time',
-            'shs_login_time',
-            'shs_logout_time',
-            'shs_evening_login_time',
-            'shs_evening_logout_time',
-            'tardy_grace_minutes',
-            'consecutive_late_threshold',
-            'consecutive_absent_threshold',
-            'temp_enabled',
-            'temp_login_time',
-            'temp_logout_time',
-            'temp_starts_on',
-            'temp_ends_on',
-            'temp_apply_to_default',
-            'temp_apply_to_shs',
-            'temp_apply_to_shs_evening',
-        ]));
+        $rules = [];
+        if ($canK10) {
+            $rules['login_time'] = 'required|date_format:H:i';
+            $rules['logout_time'] = 'required|date_format:H:i';
+        }
+        if ($canShs) {
+            $rules['shs_login_time'] = 'required|date_format:H:i';
+            $rules['shs_logout_time'] = 'required|date_format:H:i';
+            $rules['shs_evening_login_time'] = 'required|date_format:H:i';
+            $rules['shs_evening_logout_time'] = 'required|date_format:H:i';
+        }
+        if ($canShared) {
+            $rules['tardy_grace_minutes'] = 'required|integer|min:0|max:120';
+            $rules['consecutive_late_threshold'] = 'required|integer|min:1|max:30';
+            $rules['consecutive_absent_threshold'] = 'required|integer|min:1|max:30';
+            $rules['temp_enabled'] = 'nullable|boolean';
+            $rules['temp_login_time'] = 'nullable|date_format:H:i';
+            $rules['temp_logout_time'] = 'nullable|date_format:H:i';
+            $rules['temp_starts_on'] = 'nullable|date';
+            $rules['temp_ends_on'] = 'nullable|date|after_or_equal:temp_starts_on';
+            $rules['temp_apply_to_default'] = 'nullable|boolean';
+            $rules['temp_apply_to_shs'] = 'nullable|boolean';
+            $rules['temp_apply_to_shs_evening'] = 'nullable|boolean';
+        } elseif ($canK10 || $canShs) {
+            // Band admins may set a temporary override only for their band flags.
+            $rules['temp_enabled'] = 'nullable|boolean';
+            $rules['temp_login_time'] = 'nullable|date_format:H:i';
+            $rules['temp_logout_time'] = 'nullable|date_format:H:i';
+            $rules['temp_starts_on'] = 'nullable|date';
+            $rules['temp_ends_on'] = 'nullable|date|after_or_equal:temp_starts_on';
+            if ($canK10) {
+                $rules['temp_apply_to_default'] = 'nullable|boolean';
+            }
+            if ($canShs) {
+                $rules['temp_apply_to_shs'] = 'nullable|boolean';
+                $rules['temp_apply_to_shs_evening'] = 'nullable|boolean';
+            }
+        }
+
+        $request->validate($rules);
+
+        $policy->save($request->all(), $user);
 
         return back()->with('success', 'Attendance policy saved. Gate logs, SF2, and SMS alerts will use the new times and thresholds.');
     }

@@ -232,13 +232,24 @@ class SmsController extends Controller
             ->whereNotNull($column)
             ->where($column, '!=', '');
 
-        // Faculty advisers: always limited to their adviser classes.
-        if ($user && $user->role === 'faculty') {
-            AdvisoryScope::applyToManageableStudents($query, $user);
+        // Faculty: adviser classes only. Band admins: grade band. Super/staff: full school then filters.
+        if ($user) {
+            if ($user->role === 'faculty') {
+                AdvisoryScope::applyToManageableStudents($query, $user);
+            } elseif ($user->isBandAdmin()) {
+                AdvisoryScope::applyToStudents($query, $user);
+            }
         }
 
-        if ($request->year) {
-            $query->where('year', $request->year);
+        if ($request->filled('year')) {
+            $year = (string) $request->input('year');
+            if ($user && $user->isSchoolOps() && ! $user->canAccessGradeLevel($year)) {
+                $query->whereRaw('1 = 0');
+            } elseif ($user && $user->role === 'faculty' && ! in_array($year, AdvisoryScope::yearOptions($user), true)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('year', $year);
+            }
         }
 
         if ($request->course) {

@@ -35,7 +35,7 @@
         Messages are sent to the student&apos;s <strong>emergency contact number</strong>.
         <code>{name}</code> is the <strong>emergency contact / guardian name</strong> (not the student).
         Elementary/JHS get one SMS per real gate scan (morning IN, lunch OUT, afternoon IN, EOD OUT).
-        System autofills (lunch OUT, afternoon IN, missed EOD auto-OUT) do not send SMS.
+        Lunch/afternoon system autofills do not send SMS; missed EOD auto-OUT does notify the guardian.
         SHS/College still use arrival + departure (once each per day).
     </p>
 
@@ -76,7 +76,6 @@
         <div class="card mb-3">
             <div class="card-header fw-semibold">Missed EOD OUT (automatic at 10:00 PM)</div>
             <div class="card-body">
-                <p class="small text-muted mb-2">Stored for reference only — automatic EOD OUT no longer sends SMS. Real EOD gate scans use the template above.</p>
                 <textarea name="missed_eod" class="form-control" rows="2" required>{{ old('missed_eod', $missedEod) }}</textarea>
             </div>
         </div>

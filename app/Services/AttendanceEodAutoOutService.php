@@ -17,7 +17,7 @@ class AttendanceEodAutoOutService
     ) {}
 
     /**
-     * Auto-OUT anyone still IN today at EOD (10:00 PM default). No guardian SMS.
+     * Auto-OUT anyone still IN today at EOD (10:00 PM default), with missed-checkout SMS.
      */
     public function run(?Carbon $asOf = null): array
     {
@@ -78,7 +78,8 @@ class AttendanceEodAutoOutService
                     $outAt,
                     'auto_eod_out',
                     StudentSessionScheduleService::SESSION_EOD_OUT,
-                    sendSms: false,
+                    sendSms: true,
+                    smsEvent: 'missed_eod',
                 );
                 $closed++;
             } catch (\Throwable $e) {

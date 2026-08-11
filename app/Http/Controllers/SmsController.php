@@ -90,6 +90,20 @@ class SmsController extends Controller
 
     public function scanMessage()
     {
+        $user = auth()->user();
+        $scope = AdvisoryScope::gateSmsEditScope($user);
+
+        if (! $scope['k10'] && ! $scope['shs'] && ! $scope['alerts']) {
+            abort(403, 'You cannot manage gate SMS templates.');
+        }
+
+        $scopeLabel = null;
+        if ($user && $user->isBandAdmin()) {
+            $scopeLabel = $user->role === 'shs_admin'
+                ? 'SHS Admin — Grade 11–12 arrival/departure templates only'
+                : 'K–10 Admin — Kinder–Grade 10 session templates only';
+        }
+
         return view('sms.scan_message', [
             'arrival' => Setting::scanSmsArrivalTemplate(),
             'departure' => Setting::scanSmsDepartureTemplate(),
@@ -100,36 +114,59 @@ class SmsController extends Controller
             'missedEod' => Setting::scanSmsMissedEodTemplate(),
             'consecutiveLate' => Setting::smsConsecutiveLateTemplate(),
             'consecutiveAbsent' => Setting::smsConsecutiveAbsentTemplate(),
+            'canEditK10' => $scope['k10'],
+            'canEditShs' => $scope['shs'],
+            'canEditAlerts' => $scope['alerts'],
+            'scopeLabel' => $scopeLabel,
         ]);
     }
 
     public function updateScanMessage(Request $request)
     {
-        $request->validate([
-            'arrival' => 'required|string|max:500',
-            'departure' => 'required|string|max:500',
-            'morning_in' => 'required|string|max:500',
-            'lunch_out' => 'required|string|max:500',
-            'afternoon_in' => 'required|string|max:500',
-            'eod_out' => 'required|string|max:500',
-            'missed_eod' => 'required|string|max:500',
-            'consecutive_late' => 'required|string|max:500',
-            'consecutive_absent' => 'required|string|max:500',
-        ]);
+        $scope = AdvisoryScope::gateSmsEditScope($request->user());
+        if (! $scope['k10'] && ! $scope['shs'] && ! $scope['alerts']) {
+            abort(403, 'You cannot manage gate SMS templates.');
+        }
 
-        Setting::setSmsTemplates([
-            'arrival' => $request->input('arrival'),
-            'departure' => $request->input('departure'),
-            'morning_in' => $request->input('morning_in'),
-            'lunch_out' => $request->input('lunch_out'),
-            'afternoon_in' => $request->input('afternoon_in'),
-            'eod_out' => $request->input('eod_out'),
-            'missed_eod' => $request->input('missed_eod'),
-            'consecutive_late' => $request->input('consecutive_late'),
-            'consecutive_absent' => $request->input('consecutive_absent'),
-        ]);
+        $rules = [];
+        if ($scope['k10']) {
+            $rules['morning_in'] = 'required|string|max:500';
+            $rules['lunch_out'] = 'required|string|max:500';
+            $rules['afternoon_in'] = 'required|string|max:500';
+            $rules['eod_out'] = 'required|string|max:500';
+            $rules['missed_eod'] = 'required|string|max:500';
+        }
+        if ($scope['shs']) {
+            $rules['arrival'] = 'required|string|max:500';
+            $rules['departure'] = 'required|string|max:500';
+        }
+        if ($scope['alerts']) {
+            $rules['consecutive_late'] = 'required|string|max:500';
+            $rules['consecutive_absent'] = 'required|string|max:500';
+        }
 
-        return back()->with('success', 'Gate SMS templates saved.');
+        $request->validate($rules);
+
+        $payload = [];
+        if ($scope['k10']) {
+            $payload['morning_in'] = $request->input('morning_in');
+            $payload['lunch_out'] = $request->input('lunch_out');
+            $payload['afternoon_in'] = $request->input('afternoon_in');
+            $payload['eod_out'] = $request->input('eod_out');
+            $payload['missed_eod'] = $request->input('missed_eod');
+        }
+        if ($scope['shs']) {
+            $payload['arrival'] = $request->input('arrival');
+            $payload['departure'] = $request->input('departure');
+        }
+        if ($scope['alerts']) {
+            $payload['consecutive_late'] = $request->input('consecutive_late');
+            $payload['consecutive_absent'] = $request->input('consecutive_absent');
+        }
+
+        Setting::setSmsTemplates($payload);
+
+        return back()->with('success', 'Gate SMS templates saved for your access level.');
     }
 
     public function count(Request $request)

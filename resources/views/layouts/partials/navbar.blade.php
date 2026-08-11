@@ -78,10 +78,10 @@
                         <div class="nav-dropdown-content">
                             <a href="{{ route('school-setup.index') }}" class="{{ $linkActive(['school-setup.*', 'prospectus.*']) }}">School Setup</a>
                             <a href="{{ route('school_calendar.index') }}" class="{{ $linkActive(['school_calendar.*']) }}">School Calendar</a>
+                            <a href="{{ route('activity_logs.index') }}" class="{{ $linkActive(['activity_logs.*']) }}">Activity Log</a>
                             @can('isSuperAdmin')
                                 <a href="{{ route('users.create') }}" class="{{ $linkActive(['users.create', 'users.store']) }}">Create Account</a>
                                 <a href="{{ route('users.index') }}" class="{{ $linkActive(['users.index', 'users.edit']) }}">View Accounts</a>
-                                <a href="{{ route('activity_logs.index') }}" class="{{ $linkActive(['activity_logs.*']) }}">Activity Log</a>
                             @endcan
                         </div>
                     </div>

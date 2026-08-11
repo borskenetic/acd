@@ -24,6 +24,10 @@
         $reportsChildren[] = ['label' => 'Patron Reports',      'route' => 'attendance_logs.reports.hub',  'patterns' => ['attendance_logs.reports.*'], 'icon' => 'chart'];
         $reportsChildren[] = ['label' => 'Visitor Logs',        'route' => 'visitor_logs.index',           'patterns' => ['visitor_logs.*'],              'icon' => 'clock'];
     }
+    // Staff has no Admin menu — surface full activity here
+    if ($user && $user->role === 'staff') {
+        $reportsChildren[] = ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'];
+    }
 
     $navLinks = [
         [
@@ -48,7 +52,7 @@
         [
             'label'    => 'Reports',
             'icon'     => 'chart',
-            'patterns' => ['sf2.*', 'attendance_logs.*', 'visitor_logs.*'],
+            'patterns' => ['sf2.*', 'attendance_logs.*', 'visitor_logs.*', 'activity_logs.*'],
             'children' => $reportsChildren,
         ],
         [
@@ -91,8 +95,11 @@
         ['label' => 'Attendance Policy', 'route' => 'attendance.policy.settings', 'patterns' => ['attendance.policy.settings', 'attendance.policy.settings.update'], 'icon' => 'clock'],
         ['label' => 'Kiosks', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
     ];
-    if ($isSuperAdmin) {
+    // Activity log: super = all; band admins = department; shown under Admin for platform admins
+    if ($isSuperAdmin || ($user && $user->isBandAdmin())) {
         $adminChildren[] = ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'];
+    }
+    if ($isSuperAdmin) {
         $adminChildren[] = [
             'label'    => 'Accounts',
             'icon'     => 'user-plus',
@@ -101,6 +108,15 @@
                 ['label' => 'Create Account', 'route' => 'users.create', 'patterns' => ['users.create', 'users.store'], 'icon' => 'user-plus'],
                 ['label' => 'View Accounts',  'route' => 'users.index',  'patterns' => ['users.index', 'users.edit'],   'icon' => 'list'],
             ],
+        ];
+    }
+
+    if ($isFaculty) {
+        $navLinks[] = [
+            'label'    => 'My Activity',
+            'route'    => 'activity_logs.index',
+            'patterns' => ['activity_logs.*'],
+            'icon'     => 'list',
         ];
     }
     $icon = function (string $name) {

@@ -15,7 +15,7 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        /** Superadmin only (user accounts, activity log). */
+        /** Superadmin only (user accounts). */
         Gate::define('isSuperAdmin', fn (User $user) => $user->isSuperAdmin());
 
         /**
@@ -32,6 +32,14 @@ class AuthServiceProvider extends ServiceProvider
 
         /** Admin tiers, staff, or faculty (adviser portal). */
         Gate::define('isAdminOrStaffOrFaculty', fn (User $user) =>
+            $user->isSchoolOps() || $user->role === 'faculty'
+        );
+
+        /**
+         * Activity log: superadmin (all), staff (all), band admins (department),
+         * faculty (own actions only) — scoped further in controller.
+         */
+        Gate::define('viewActivityLog', fn (User $user) =>
             $user->isSchoolOps() || $user->role === 'faculty'
         );
 

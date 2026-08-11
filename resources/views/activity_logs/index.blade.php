@@ -17,7 +17,9 @@
     <header class="act-header">
         <div>
             <h1 class="act-title">Activity Log</h1>
-            <p class="act-subtitle">Audit trail of staff and admin actions on the platform.</p>
+            <p class="act-subtitle">
+                {{ $scopeLabel ?? 'Audit trail of platform actions within your access.' }}
+            </p>
         </div>
     </header>
 
@@ -33,10 +35,11 @@
             </div>
 
             <div class="act-filters">
+                @if($canFilterUsers ?? true)
                 <div class="act-field">
                     <label for="actUser">User</label>
                     <select id="actUser" name="user_id">
-                        <option value="">All users</option>
+                        <option value="">All users in scope</option>
                         @foreach($users as $user)
                             <option value="{{ $user->id }}" @selected((string) request('user_id') === (string) $user->id)>
                                 {{ trim($user->fname.' '.$user->lname) ?: $user->email }} ({{ $user->role }})
@@ -53,6 +56,7 @@
                         @endforeach
                     </select>
                 </div>
+                @endif
                 <div class="act-field">
                     <label for="actAction">Action</label>
                     <select id="actAction" name="action">

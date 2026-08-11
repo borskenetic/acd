@@ -406,7 +406,7 @@ class StudentScanService
     }
 
     /**
-     * Create an automatic attendance row (lunch autofill / EOD) and optionally SMS.
+     * Create an automatic attendance row (lunch autofill / EOD). SMS off by default.
      */
     public function recordAutomaticScan(
         Student $student,
@@ -414,7 +414,7 @@ class StudentScanService
         Carbon $scannedAt,
         string $source,
         ?string $sessionKey = null,
-        bool $sendSms = true,
+        bool $sendSms = false,
         ?string $smsEvent = null,
     ): AttendanceLog {
         $log = AttendanceLog::create([

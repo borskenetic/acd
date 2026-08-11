@@ -87,7 +87,7 @@ class AttendanceLunchAutofillService
                     $lunchAt,
                     'auto_lunch_out',
                     StudentSessionScheduleService::SESSION_LUNCH_OUT,
-                    sendSms: true,
+                    sendSms: false,
                 );
 
                 $this->scan->recordAutomaticScan(
@@ -96,7 +96,7 @@ class AttendanceLunchAutofillService
                     $afternoonAt,
                     'auto_afternoon_in',
                     StudentSessionScheduleService::SESSION_AFTERNOON_IN,
-                    sendSms: true,
+                    sendSms: false,
                 );
 
                 $filled++;

@@ -26,4 +26,4 @@ Artisan::command('attendance:auto-eod-out', function (\App\Services\AttendanceEo
     $this->info("EOD auto-out: closed {$result['closed']} open IN session(s).");
 
     return 0;
-})->purpose('Auto OUT at 10:00 PM for students still IN, with guardian SMS.');
+})->purpose('Auto OUT at 10:00 PM for students still IN (no guardian SMS).');

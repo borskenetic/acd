@@ -5,16 +5,31 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Support\AdvisoryScope;
 use Illuminate\Http\Request;
 
 class PlatformActivityLogController extends Controller
 {
     public function index(Request $request, ActivityLogger $logger)
     {
+        $viewer = $request->user();
+        if (! $viewer) {
+            abort(403);
+        }
+
+        $visibleUserIds = AdvisoryScope::visibleActivityUserIds($viewer);
         $query = ActivityLog::query()->with('user')->orderByDesc('created_at');
 
+        if ($visibleUserIds !== null) {
+            $query->whereIn('user_id', $visibleUserIds !== [] ? $visibleUserIds : [0]);
+        }
+
         if ($request->filled('user_id')) {
-            $query->where('user_id', $request->integer('user_id'));
+            $filterUserId = $request->integer('user_id');
+            if ($visibleUserIds !== null && ! in_array($filterUserId, $visibleUserIds, true)) {
+                abort(403, 'That user is outside your activity access.');
+            }
+            $query->where('user_id', $filterUserId);
         }
 
         if ($request->filled('role')) {
@@ -45,24 +60,42 @@ class PlatformActivityLogController extends Controller
 
         $logs = $query->paginate(30)->withQueryString();
 
-        $users = User::query()
+        $usersQuery = User::query()
             ->orderBy('fname')
-            ->orderBy('lname')
-            ->get(['id', 'fname', 'lname', 'email', 'role']);
+            ->orderBy('lname');
 
-        $actionOptions = ActivityLog::query()
-            ->select('action')
-            ->distinct()
-            ->orderBy('action')
-            ->pluck('action');
+        if ($visibleUserIds !== null) {
+            $usersQuery->whereIn('id', $visibleUserIds !== [] ? $visibleUserIds : [0]);
+        }
+
+        $users = $usersQuery->get(['id', 'fname', 'lname', 'email', 'role']);
+
+        $actionsQuery = ActivityLog::query()->select('action')->distinct()->orderBy('action');
+        if ($visibleUserIds !== null) {
+            $actionsQuery->whereIn('user_id', $visibleUserIds !== [] ? $visibleUserIds : [0]);
+        }
+        $actionOptions = $actionsQuery->pluck('action');
 
         $actionLabels = $logger->actionLabels();
+
+        $scopeLabel = match (true) {
+            $viewer->isSuperAdmin() => 'All platform activity',
+            $viewer->role === 'staff' => 'All staff and admin activity',
+            $viewer->role === 'shs_admin' => 'Your activity and faculty assigned to Grade 11–12',
+            $viewer->role === 'k10_admin' => 'Your activity and faculty assigned to Kinder–Grade 10',
+            $viewer->role === 'faculty' => 'Your own activity only',
+            default => null,
+        };
+
+        $canFilterUsers = $visibleUserIds === null || count($visibleUserIds) > 1;
 
         return view('activity_logs.index', compact(
             'logs',
             'users',
             'actionOptions',
             'actionLabels',
+            'scopeLabel',
+            'canFilterUsers',
         ));
     }
 }

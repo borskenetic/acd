@@ -490,4 +490,82 @@ class AdvisoryScope
 
         return $map;
     }
+
+    /**
+     * User IDs whose activity is visible to the viewer.
+     * null = unrestricted (superadmin / staff).
+     *
+     * @return list<int>|null
+     */
+    public static function visibleActivityUserIds(?User $user = null): ?array
+    {
+        $user ??= auth()->user();
+        if (! $user) {
+            return [];
+        }
+
+        if ($user->isSuperAdmin() || $user->role === 'staff') {
+            return null;
+        }
+
+        if ($user->isBandAdmin()) {
+            return self::departmentUserIds($user);
+        }
+
+        // Faculty (and any other role): only their own actions.
+        return [(int) $user->id];
+    }
+
+    /**
+     * Band admin + faculty members assigned to classes in that admin's grade band.
+     *
+     * @return list<int>
+     */
+    public static function departmentUserIds(User $bandAdmin): array
+    {
+        $grades = $bandAdmin->allowedGradeLevels() ?? [];
+        $aliases = User::gradeLevelAliases($grades);
+        if ($aliases === []) {
+            return [(int) $bandAdmin->id];
+        }
+
+        $facultyIds = User::query()
+            ->where('role', 'faculty')
+            ->where(function ($q) use ($aliases) {
+                $q->whereHas('advisories', fn ($a) => $a->whereIn('year', $aliases))
+                    ->orWhereIn('advisory_year', $aliases);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_values(array_unique(array_merge([(int) $bandAdmin->id], $facultyIds)));
+    }
+
+    /**
+     * Gate terminal SMS field groups editable by the user.
+     *
+     * @return array{k10: bool, shs: bool, alerts: bool}
+     */
+    public static function gateSmsEditScope(?User $user = null): array
+    {
+        $user ??= auth()->user();
+        if (! $user) {
+            return ['k10' => false, 'shs' => false, 'alerts' => false];
+        }
+
+        if ($user->isSuperAdmin() || $user->role === 'staff') {
+            return ['k10' => true, 'shs' => true, 'alerts' => true];
+        }
+
+        if ($user->role === 'k10_admin') {
+            return ['k10' => true, 'shs' => false, 'alerts' => false];
+        }
+
+        if ($user->role === 'shs_admin') {
+            return ['k10' => false, 'shs' => true, 'alerts' => false];
+        }
+
+        return ['k10' => false, 'shs' => false, 'alerts' => false];
+    }
 }

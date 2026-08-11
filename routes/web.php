@@ -199,9 +199,14 @@ Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
         Route::put('/students/{id}', [StudentController::class, 'update'])->name('students.update');
         Route::delete('/students/{id}', [StudentController::class, 'destroy'])->name('students.destroy');
     });
+
+    // Activity log: super = all; band admins = department faculty; faculty = own
+    Route::get('/activity-log', [PlatformActivityLogController::class, 'index'])
+        ->middleware('can:viewActivityLog')
+        ->name('activity_logs.index');
 });
 
-// Superadmin only (user accounts + activity log)
+// Superadmin only (user accounts)
 Route::middleware(['auth', 'can:isSuperAdmin'])->group(function () {
     Route::get('/view-users', [UserController::class, 'index'])->name('users.index');
     Route::get('/create-user', [UserController::class, 'create'])->name('users.create');
@@ -209,8 +214,6 @@ Route::middleware(['auth', 'can:isSuperAdmin'])->group(function () {
     Route::get('/edit-user/{id}', [UserController::class, 'edit'])->name('users.edit');
     Route::put('/update-user/{id}', [UserController::class, 'update'])->name('users.update');
     Route::delete('/delete-user/{id}', [UserController::class, 'destroy'])->name('users.destroy');
-
-    Route::get('/activity-log', [PlatformActivityLogController::class, 'index'])->name('activity_logs.index');
 });
 
 // Platform admins (superadmin + SHS/K–10 admins; student data is grade-keyholed)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Visitor;
 use App\Support\QrCodePng;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 
 class VisitorAdminController extends Controller
 {
@@ -37,7 +38,8 @@ class VisitorAdminController extends Controller
         $validated['qrcode'] = Visitor::allocateQrCode();
         $visitor = Visitor::create($validated);
 
-        return redirect()->route('visitors.pass', $visitor)
-            ->with('success', 'Walk-in visitor pass created. Print or show this QR at the gate.');
+        return redirect()->to(
+            URL::temporarySignedRoute('visitors.pass', now()->addDays(14), ['visitor' => $visitor])
+        )->with('success', 'Walk-in visitor pass created. Print or show this QR at the gate.');
     }
 }

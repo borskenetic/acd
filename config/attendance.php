@@ -13,6 +13,12 @@ return [
     'logout_feedback_enabled' => env('ATTENDANCE_LOGOUT_FEEDBACK_ENABLED', false),
 
     /*
+    | When true, POST /attendance/section and /attendance/visitor require an
+    | active paired kiosk token (X-Gate-Token). Preview still works unpaired.
+    */
+    'require_kiosk_token' => env('ATTENDANCE_REQUIRE_KIOSK_TOKEN', false),
+
+    /*
     | Gate login / logout times and tardy rules (overridable in Admin → Gate policy).
     */
     'gate' => [

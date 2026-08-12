@@ -9,7 +9,8 @@ use Illuminate\Console\Command;
 /**
  * Undo automatic attendance rows created by lunch/EOD/stale/friday jobs.
  *
- * Safe target: source in auto_eod_out, auto_lunch_out, auto_afternoon_in, friday_auto.
+ * Safe target: source in auto_eod_out, auto_lunch_out, auto_afternoon_in,
+ * friday_auto, auto_stale_out.
  * (Manual scans use web/gate_sync and are left alone.)
  */
 class RollbackAutoAttendanceScans extends Command
@@ -20,12 +21,12 @@ class RollbackAutoAttendanceScans extends Command
         {--dry-run : List rows only; do not delete}
         {--force : Delete without interactive confirmation}';
 
-    protected $description = 'Delete automatic attendance log rows (auto_eod_out / auto_lunch_out / auto_afternoon_in)';
+    protected $description = 'Delete automatic attendance log rows (auto_eod_out / auto_lunch_out / auto_afternoon_in / friday_auto / auto_stale_out)';
 
     public function handle(): int
     {
         $tz = (string) config('attendance_sessions.timezone', 'Asia/Manila');
-        $sources = ['auto_eod_out', 'auto_lunch_out', 'auto_afternoon_in', 'friday_auto'];
+        $sources = ['auto_eod_out', 'auto_lunch_out', 'auto_afternoon_in', 'friday_auto', 'auto_stale_out'];
 
         if ($this->option('hours') !== null) {
             $since = Carbon::now($tz)->subHours(max(1, (int) $this->option('hours')));
@@ -55,7 +56,7 @@ class RollbackAutoAttendanceScans extends Command
         }
 
         if ($count === 0) {
-            $this->warn('Nothing to roll back. If OUTs remain, they may be from close-stale-ins (source=web) or real scans.');
+            $this->warn('Nothing to roll back. Remaining OUTs may be real scans (web / web_kiosk / gate_sync).');
 
             return self::SUCCESS;
         }

@@ -14,6 +14,9 @@ class AttendanceSessionService
 {
     public const TZ = 'Asia/Manila';
 
+    /** Source tag for OUTs invented by close-stale (rollback can target these). */
+    public const SOURCE_STALE_OUT = 'auto_stale_out';
+
     public function isInStatus(?string $status): bool
     {
         return $status !== null && strtolower(trim((string) $status)) === 'in';
@@ -36,8 +39,8 @@ class AttendanceSessionService
             return false;
         }
 
-        $inDayStart = $last->scanned_at->copy()->startOfDay();
-        $todayStart = Carbon::today();
+        $inDayStart = $last->scanned_at->copy()->timezone(self::TZ)->startOfDay();
+        $todayStart = Carbon::now(self::TZ)->startOfDay();
 
         if ($inDayStart->greaterThanOrEqualTo($todayStart)) {
             return false;
@@ -49,6 +52,7 @@ class AttendanceSessionService
             'student_id' => $student->id,
             'status' => 'OUT',
             'scanned_at' => $outAt,
+            'source' => self::SOURCE_STALE_OUT,
         ]);
 
         return true;
@@ -66,8 +70,8 @@ class AttendanceSessionService
             return false;
         }
 
-        $inDayStart = $last->scanned_at->copy()->startOfDay();
-        $todayStart = Carbon::today();
+        $inDayStart = $last->scanned_at->copy()->timezone(self::TZ)->startOfDay();
+        $todayStart = Carbon::now(self::TZ)->startOfDay();
 
         if ($inDayStart->greaterThanOrEqualTo($todayStart)) {
             return false;
@@ -95,13 +99,20 @@ class AttendanceSessionService
         $today = Carbon::now(self::TZ)->toDateString();
 
         $staleStudentIds = DB::table('attendance_logs as al')
-            ->join(DB::raw('(
-                SELECT student_id, MAX(id) AS max_id
-                FROM attendance_logs
-                GROUP BY student_id
-            ) AS last'), 'last.max_id', '=', 'al.id')
             ->whereRaw("LOWER(TRIM(al.status)) = 'in'")
             ->whereRaw('DATE(al.scanned_at) < ?', [$today])
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('attendance_logs as newer')
+                    ->whereColumn('newer.student_id', 'al.student_id')
+                    ->where(function ($inner) {
+                        $inner->whereColumn('newer.scanned_at', '>', 'al.scanned_at')
+                            ->orWhere(function ($tie) {
+                                $tie->whereColumn('newer.scanned_at', '=', 'al.scanned_at')
+                                    ->whereColumn('newer.id', '>', 'al.id');
+                            });
+                    });
+            })
             ->pluck('al.student_id');
 
         foreach ($staleStudentIds as $sid) {
@@ -116,13 +127,20 @@ class AttendanceSessionService
 
         if (Schema::hasTable('visitor_logs')) {
             $staleVisitorIds = DB::table('visitor_logs as vl')
-                ->join(DB::raw('(
-                    SELECT visitor_id, MAX(id) AS max_id
-                    FROM visitor_logs
-                    GROUP BY visitor_id
-                ) AS last'), 'last.max_id', '=', 'vl.id')
                 ->whereRaw("LOWER(TRIM(vl.status)) = 'in'")
                 ->whereRaw('DATE(vl.scanned_at) < ?', [$today])
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('visitor_logs as newer')
+                        ->whereColumn('newer.visitor_id', 'vl.visitor_id')
+                        ->where(function ($inner) {
+                            $inner->whereColumn('newer.scanned_at', '>', 'vl.scanned_at')
+                                ->orWhere(function ($tie) {
+                                    $tie->whereColumn('newer.scanned_at', '=', 'vl.scanned_at')
+                                        ->whereColumn('newer.id', '>', 'vl.id');
+                                });
+                        });
+                })
                 ->pluck('vl.visitor_id');
 
             foreach ($staleVisitorIds as $vid) {

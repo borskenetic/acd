@@ -130,6 +130,7 @@
   let selectedVisitor = null;
   let currentStudentId = null;
   let currentVisitorId = null;
+  let currentConfirmToken = null;
   let clearDisplayTimer = null;
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -169,6 +170,7 @@
       selectedVisitor = null;
       currentStudentId = null;
       currentVisitorId = null;
+      currentConfirmToken = null;
     }
 
     function playAlarmSound() {
@@ -286,7 +288,7 @@
       }, 500);
     }
 
-    function processVisitorLog(visitorId) {
+    function processVisitorLog(visitorId, confirmToken) {
       return fetch("{{ route('attendance.visitor') }}", {
         method: 'POST',
         headers: (window.KioskPairing && window.KioskPairing.headers({
@@ -298,7 +300,9 @@
           'X-CSRF-TOKEN': '{{ csrf_token() }}',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({ visitor_id: visitorId }),
+        body: JSON.stringify((window.KioskPairing
+          ? window.KioskPairing.attachBody({ visitor_id: visitorId, confirm_token: confirmToken })
+          : { visitor_id: visitorId, confirm_token: confirmToken })),
       });
     }
 
@@ -360,9 +364,10 @@
           if (data.type === 'visitor') {
             selectedVisitor = data.visitor;
             currentVisitorId = data.visitor_id;
+            currentConfirmToken = data.confirm_token || null;
             profileImg.src = "{{ asset('images/2x2_undifined_gender.jpg') }}";
 
-            processVisitorLog(currentVisitorId)
+            processVisitorLog(currentVisitorId, currentConfirmToken)
               .then(res => res.json())
               .then(response => {
                 showVisitorScanResult(selectedVisitor, response.status, response.scanned_at);
@@ -374,6 +379,7 @@
           if (data.type === 'student') {
             selectedStudent = data.student;
             currentStudentId = data.student_id;
+            currentConfirmToken = data.confirm_token || null;
             profileImg.src = profileUrl(data.student.profile_picture);
 
             if (data.next_status === 'OUT') {
@@ -389,8 +395,8 @@
                   'Accept': 'application/json',
                 },
                 body: JSON.stringify((window.KioskPairing
-                  ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null })
-                  : { student_id: currentStudentId, section: null }))
+                  ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null, confirm_token: currentConfirmToken })
+                  : { student_id: currentStudentId, section: null, confirm_token: currentConfirmToken }))
               })
               .then(async res => {
                 const response = await res.json();
@@ -446,8 +452,8 @@
                     'Accept': 'application/json',
                   },
                   body: JSON.stringify((window.KioskPairing
-                    ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null })
-                    : { student_id: currentStudentId, section: null }))
+                    ? window.KioskPairing.attachBody({ student_id: currentStudentId, section: null, confirm_token: currentConfirmToken })
+                    : { student_id: currentStudentId, section: null, confirm_token: currentConfirmToken }))
                 })
                 .then(res => res.json())
                 .then(response => {
@@ -492,11 +498,13 @@
           body: JSON.stringify((window.KioskPairing
             ? window.KioskPairing.attachBody({
                 student_id: currentStudentId,
-                section: this.dataset.section
+                section: this.dataset.section,
+                confirm_token: currentConfirmToken
               })
             : {
                 student_id: currentStudentId,
-                section: this.dataset.section
+                section: this.dataset.section,
+                confirm_token: currentConfirmToken
               }))
         })
         .then(res => res.json())

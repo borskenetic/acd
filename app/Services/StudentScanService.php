@@ -7,7 +7,9 @@ use App\Models\AttendanceLog;
 use App\Models\GateDevice;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Support\ScanConfirmToken;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class StudentScanService
 {
@@ -106,6 +108,7 @@ class StudentScanService
                 'session_key' => $decision['session_key'] ?? null,
                 'session_label' => $decision['session_label'] ?? null,
                 'student_id' => $student->id,
+                'confirm_token' => ScanConfirmToken::issue('student', (int) $student->id),
                 'logout_feedback_enabled' => $this->logoutFeedbackEnabled(),
                 'section_picker_enabled' => $this->sectionPickerEnabled(),
                 'student' => $this->studentPayload($student),
@@ -140,6 +143,7 @@ class StudentScanService
             'type' => 'student',
             'next_status' => $nextStatus,
             'student_id' => $student->id,
+            'confirm_token' => ScanConfirmToken::issue('student', (int) $student->id),
             'logout_feedback_enabled' => $this->logoutFeedbackEnabled(),
             'section_picker_enabled' => $this->sectionPickerEnabled(),
             'student' => $this->studentPayload($student),
@@ -160,70 +164,84 @@ class StudentScanService
         ?string $forcedStatus = null,
         ?string $sessionKey = null,
     ): array {
-        $this->sessions->closeStaleOpenInForStudent($student);
+        return DB::transaction(function () use (
+            $student,
+            $section,
+            $scannedAt,
+            $clientUuid,
+            $gateDevice,
+            $source,
+            $sendSms,
+            $forcedStatus,
+            $sessionKey,
+        ) {
+            Student::query()->whereKey($student->id)->lockForUpdate()->first();
 
-        $scannedAt ??= now($this->sessionSchedule->timezone());
-        $sessionKeyResolved = $sessionKey;
+            $this->sessions->closeStaleOpenInForStudent($student);
 
-        if ($forcedStatus !== null) {
-            $newStatus = strtoupper($forcedStatus);
-        } elseif ($this->sessionSchedule->usesSessionModel($student)) {
-            $decision = $this->sessionSchedule->decideNextScan($student, $scannedAt);
+            $scannedAt ??= now($this->sessionSchedule->timezone());
+            $sessionKeyResolved = $sessionKey;
 
-            if ($decision['type'] === 'already_scanned') {
-                throw new \RuntimeException($decision['message'] ?? 'Already scanned.');
+            if ($forcedStatus !== null) {
+                $newStatus = strtoupper($forcedStatus);
+            } elseif ($this->sessionSchedule->usesSessionModel($student)) {
+                $decision = $this->sessionSchedule->decideNextScan($student, $scannedAt);
+
+                if ($decision['type'] === 'already_scanned') {
+                    throw new \RuntimeException($decision['message'] ?? 'Already scanned.');
+                }
+
+                if ($decision['type'] === 'early_out_blocked') {
+                    throw new \RuntimeException($decision['message'] ?? $this->earlyOutMessage());
+                }
+
+                $newStatus = $decision['next_status'];
+                $sessionKeyResolved = $decision['session_key'] ?? null;
+            } else {
+                $lastLog = $this->lastLogForStudent($student);
+                $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog, $scannedAt);
+                if ($cooldown !== null) {
+                    throw new \RuntimeException($cooldown['message'] ?? 'Already scanned.');
+                }
+
+                $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+
+                if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {
+                    throw new \RuntimeException($this->earlyOutMessage());
+                }
             }
 
-            if ($decision['type'] === 'early_out_blocked') {
-                throw new \RuntimeException($decision['message'] ?? $this->earlyOutMessage());
+            if ($section !== null && $section !== '') {
+                $allowed = Setting::attendanceSections();
+                if (! in_array($section, $allowed, true)) {
+                    throw new \InvalidArgumentException('Invalid section selected.');
+                }
+            } else {
+                $section = null;
             }
 
-            $newStatus = $decision['next_status'];
-            $sessionKeyResolved = $decision['session_key'] ?? null;
-        } else {
-            $lastLog = $this->lastLogForStudent($student);
-            $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog, $scannedAt);
-            if ($cooldown !== null) {
-                throw new \RuntimeException($cooldown['message'] ?? 'Already scanned.');
+            $log = AttendanceLog::create([
+                'student_id' => $student->id,
+                'section' => $section,
+                'kiosk_name' => $gateDevice?->name,
+                'status' => $newStatus,
+                'scanned_at' => $scannedAt,
+                'client_uuid' => $clientUuid,
+                'gate_device_id' => $gateDevice?->id,
+                'source' => $source,
+            ]);
+
+            if ($sendSms) {
+                $this->sms->handleStudentScan($student, $newStatus, $log->scanned_at, $sessionKeyResolved);
             }
 
-            $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
-
-            if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {
-                throw new \RuntimeException($this->earlyOutMessage());
-            }
-        }
-
-        if ($section !== null && $section !== '') {
-            $allowed = Setting::attendanceSections();
-            if (! in_array($section, $allowed, true)) {
-                throw new \InvalidArgumentException('Invalid section selected.');
-            }
-        } else {
-            $section = null;
-        }
-
-        $log = AttendanceLog::create([
-            'student_id' => $student->id,
-            'section' => $section,
-            'kiosk_name' => $gateDevice?->name,
-            'status' => $newStatus,
-            'scanned_at' => $scannedAt,
-            'client_uuid' => $clientUuid,
-            'gate_device_id' => $gateDevice?->id,
-            'source' => $source,
-        ]);
-
-        if ($sendSms) {
-            $this->sms->handleStudentScan($student, $newStatus, $log->scanned_at, $sessionKeyResolved);
-        }
-
-        return [
-            'status' => $newStatus,
-            'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
-            'log' => $log,
-            'session_key' => $sessionKeyResolved,
-        ];
+            return [
+                'status' => $newStatus,
+                'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
+                'log' => $log,
+                'session_key' => $sessionKeyResolved,
+            ];
+        });
     }
 
     /**
@@ -241,52 +259,56 @@ class StudentScanService
         string $clientUuid,
         GateDevice $gateDevice,
     ): AttendanceLog {
-        $existing = AttendanceLog::where('client_uuid', $clientUuid)->first();
-        if ($existing) {
-            return $existing;
-        }
+        return DB::transaction(function () use ($student, $status, $scannedAt, $section, $clientUuid, $gateDevice) {
+            Student::query()->whereKey($student->id)->lockForUpdate()->first();
 
-        // Accept either case from devices; status is recomputed below (not used raw).
-        $status = strtoupper(trim($status));
-        if (! in_array($status, ['IN', 'OUT'], true)) {
-            throw new \InvalidArgumentException('Invalid scan status.');
-        }
+            $existing = AttendanceLog::where('client_uuid', $clientUuid)->first();
+            if ($existing) {
+                return $existing;
+            }
 
-        if ($section !== null && $section !== '') {
-            $allowed = Setting::attendanceSections();
-            if (! in_array($section, $allowed, true)) {
+            // Accept either case from devices; status is recomputed below (not used raw).
+            $status = strtoupper(trim($status));
+            if (! in_array($status, ['IN', 'OUT'], true)) {
+                throw new \InvalidArgumentException('Invalid scan status.');
+            }
+
+            if ($section !== null && $section !== '') {
+                $allowed = Setting::attendanceSections();
+                if (! in_array($section, $allowed, true)) {
+                    $section = null;
+                }
+            } else {
                 $section = null;
             }
-        } else {
-            $section = null;
-        }
 
-        $this->sessions->closeStaleOpenInForStudent($student);
+            $this->sessions->closeStaleOpenInForStudent($student);
 
-        $scannedAt = $scannedAt->copy()->timezone($this->sessionSchedule->timezone());
-        $resolved = $this->resolveStatusFromHistory($student, $scannedAt);
-        $status = $resolved['status'];
-        $sessionKey = $resolved['session_key'];
+            $scannedAt = $scannedAt->copy()->timezone($this->sessionSchedule->timezone());
+            $resolved = $this->resolveStatusFromHistory($student, $scannedAt);
+            $status = $resolved['status'];
+            $sessionKey = $resolved['session_key'];
 
-        $log = AttendanceLog::create([
-            'student_id' => $student->id,
-            'section' => $section,
-            'kiosk_name' => $gateDevice->name,
-            'status' => $status,
-            'scanned_at' => $scannedAt,
-            'client_uuid' => $clientUuid,
-            'gate_device_id' => $gateDevice->id,
-            'source' => 'gate_sync',
-        ]);
+            $log = AttendanceLog::create([
+                'student_id' => $student->id,
+                'section' => $section,
+                'kiosk_name' => $gateDevice->name,
+                'status' => $status,
+                'scanned_at' => $scannedAt,
+                'client_uuid' => $clientUuid,
+                'gate_device_id' => $gateDevice->id,
+                'source' => 'gate_sync',
+            ]);
 
-        $this->reconcileStudentDayToggleStatuses($student, $scannedAt);
+            $this->reconcileStudentDayToggleStatuses($student, $scannedAt);
 
-        $log->refresh();
-        $status = strtoupper((string) $log->status);
+            $log->refresh();
+            $status = strtoupper((string) $log->status);
 
-        $this->sms->handleStudentScan($student, $status, $log->scanned_at, $sessionKey);
+            $this->sms->handleStudentScan($student, $status, $log->scanned_at, $sessionKey);
 
-        return $log;
+            return $log;
+        });
     }
 
     /**
@@ -335,14 +357,9 @@ class StudentScanService
         $dayStart = $at->copy()->timezone($tz)->startOfDay();
         $dayEnd = $dayStart->copy()->endOfDay();
 
-        $prev = AttendanceLog::query()
-            ->where('student_id', $student->id)
-            ->where('scanned_at', '<', $dayStart)
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->first();
-
-        $open = $prev && $this->sessions->isInStatus($prev->status);
+        // Each calendar day starts expecting IN. Prior-day open INs are handled by
+        // close-stale; using them as still-open would flip today's first IN → OUT.
+        $open = false;
 
         $logs = AttendanceLog::query()
             ->where('student_id', $student->id)
@@ -417,25 +434,29 @@ class StudentScanService
         bool $sendSms = false,
         ?string $smsEvent = null,
     ): AttendanceLog {
-        $log = AttendanceLog::create([
-            'student_id' => $student->id,
-            'section' => null,
-            'status' => strtoupper($status),
-            'scanned_at' => $scannedAt,
-            'source' => $source,
-        ]);
+        return DB::transaction(function () use ($student, $status, $scannedAt, $source, $sessionKey, $sendSms, $smsEvent) {
+            Student::query()->whereKey($student->id)->lockForUpdate()->first();
 
-        if ($sendSms) {
-            $this->sms->handleStudentScan(
-                $student,
-                strtoupper($status),
-                $log->scanned_at,
-                $sessionKey,
-                $smsEvent
-            );
-        }
+            $log = AttendanceLog::create([
+                'student_id' => $student->id,
+                'section' => null,
+                'status' => strtoupper($status),
+                'scanned_at' => $scannedAt,
+                'source' => $source,
+            ]);
 
-        return $log;
+            if ($sendSms) {
+                $this->sms->handleStudentScan(
+                    $student,
+                    strtoupper($status),
+                    $log->scanned_at,
+                    $sessionKey,
+                    $smsEvent
+                );
+            }
+
+            return $log;
+        });
     }
 
     /** @return array<string, mixed> */

@@ -80,6 +80,16 @@ class AttendanceLunchAutofillService
                 continue;
             }
 
+            // Never stamp OUT/IN before the real morning IN (late arrivals).
+            $minOut = $only->scanned_at->copy()->addSecond();
+            if ($lunchAt->lt($minOut)) {
+                $lunchAt = $minOut->copy();
+            }
+            $minAfternoon = $lunchAt->copy()->addSecond();
+            if ($afternoonAt->lt($minAfternoon)) {
+                $afternoonAt = $minAfternoon;
+            }
+
             try {
                 $this->scan->recordAutomaticScan(
                     $student,

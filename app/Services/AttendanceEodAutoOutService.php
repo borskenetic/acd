@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AttendanceLog;
 use App\Models\Student;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -30,14 +31,22 @@ class AttendanceEodAutoOutService
         $asOf = $asOf->copy()->timezone($tz);
         $today = $asOf->toDateString();
 
+        // Latest by scanned_at (then id), not MAX(id) — out-of-order gate sync can invert ids.
         $openStudentIds = DB::table('attendance_logs as al')
-            ->join(DB::raw('(
-                SELECT student_id, MAX(id) AS max_id
-                FROM attendance_logs
-                GROUP BY student_id
-            ) AS last'), 'last.max_id', '=', 'al.id')
-            ->whereRaw("LOWER(TRIM(al.status)) = 'in'")
             ->whereRaw('DATE(al.scanned_at) = ?', [$today])
+            ->whereRaw("LOWER(TRIM(al.status)) = 'in'")
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('attendance_logs as newer')
+                    ->whereColumn('newer.student_id', 'al.student_id')
+                    ->where(function ($inner) {
+                        $inner->whereColumn('newer.scanned_at', '>', 'al.scanned_at')
+                            ->orWhere(function ($tie) {
+                                $tie->whereColumn('newer.scanned_at', '=', 'al.scanned_at')
+                                    ->whereColumn('newer.id', '>', 'al.id');
+                            });
+                    });
+            })
             ->pluck('al.student_id');
 
         $closed = 0;
@@ -69,6 +78,18 @@ class AttendanceEodAutoOutService
                         $outAt = $eod;
                     }
                 }
+            }
+
+            $lastIn = AttendanceLog::query()
+                ->where('student_id', $student->id)
+                ->whereDate('scanned_at', $today)
+                ->whereRaw("LOWER(TRIM(status)) = 'in'")
+                ->orderByDesc('scanned_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($lastIn && $outAt->lte($lastIn->scanned_at)) {
+                $outAt = $lastIn->scanned_at->copy()->addSecond();
             }
 
             try {

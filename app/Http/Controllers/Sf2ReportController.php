@@ -99,8 +99,13 @@ class Sf2ReportController extends Controller
         ]);
 
         $user = auth()->user();
-        if ($user && $user->role === 'faculty') {
-            if (! \App\Support\AdvisoryScope::canViewClass($validated['grade_level'], $validated['section'], $user)) {
+        if ($user) {
+            if ($user->isBandAdmin() && ! $user->canAccessGradeLevel($validated['grade_level'])) {
+                return response()->json(['message' => 'You can only generate SF2 for your grade band.'], 403);
+            }
+            if ($user->role === 'faculty'
+                && ! \App\Support\AdvisoryScope::canViewClass($validated['grade_level'], $validated['section'], $user)
+            ) {
                 return response()->json(['message' => 'You can only generate SF2 for your assigned classes.'], 403);
             }
         }
@@ -138,7 +143,7 @@ class Sf2ReportController extends Controller
 
     public function edit(Sf2Report $sf2)
     {
-        $this->authorizeSf2Access($sf2);
+        $this->authorizeSf2Access($sf2, manage: true);
         $sf2->load('students');
         $gradeLevels = config('sf2.grade_levels', []);
 
@@ -147,7 +152,7 @@ class Sf2ReportController extends Controller
 
     public function update(Request $request, Sf2Report $sf2)
     {
-        $this->authorizeSf2Access($sf2);
+        $this->authorizeSf2Access($sf2, manage: true);
         $report = $this->persistReport($request, $sf2);
 
         return redirect()
@@ -157,7 +162,7 @@ class Sf2ReportController extends Controller
 
     public function destroy(Sf2Report $sf2)
     {
-        $this->authorizeSf2Access($sf2);
+        $this->authorizeSf2Access($sf2, manage: true);
         $sf2->delete();
 
         return redirect()
@@ -195,14 +200,37 @@ class Sf2ReportController extends Controller
         return $this->excel->download($sf2);
     }
 
-    protected function authorizeSf2Access(Sf2Report $sf2): void
+    protected function authorizeSf2Access(Sf2Report $sf2, bool $manage = false): void
     {
         $user = auth()->user();
-        if ($user && $user->role === 'faculty') {
-            if (! \App\Support\AdvisoryScope::canViewClass($sf2->grade_level, $sf2->section, $user)) {
+        if (! $user) {
+            abort(403);
+        }
+
+        if ($user->isSuperAdmin() || $user->role === 'staff') {
+            return;
+        }
+
+        if ($user->isBandAdmin()) {
+            if (! $user->canAccessGradeLevel($sf2->grade_level)) {
+                abort(403, 'You can only access SF2 reports for your grade band.');
+            }
+
+            return;
+        }
+
+        if ($user->role === 'faculty') {
+            $ok = $manage
+                ? \App\Support\AdvisoryScope::canManageClass($sf2->grade_level, $sf2->section, $user)
+                : \App\Support\AdvisoryScope::canViewClass($sf2->grade_level, $sf2->section, $user);
+            if (! $ok) {
                 abort(403, 'You can only access SF2 reports for your assigned classes.');
             }
+
+            return;
         }
+
+        abort(403);
     }
 
     protected function persistReport(Request $request, Sf2Report $report): Sf2Report
@@ -234,9 +262,14 @@ class Sf2ReportController extends Controller
         ]);
 
         $user = $request->user();
-        if ($user && $user->role === 'faculty') {
-            if (! \App\Support\AdvisoryScope::canViewClass($validated['grade_level'], $validated['section'], $user)) {
-                abort(403, 'You can only save SF2 for your assigned classes.');
+        if ($user) {
+            if ($user->isBandAdmin() && ! $user->canAccessGradeLevel($validated['grade_level'])) {
+                abort(403, 'You can only save SF2 for your grade band.');
+            }
+            if ($user->role === 'faculty'
+                && ! \App\Support\AdvisoryScope::canManageClass($validated['grade_level'], $validated['section'], $user)
+            ) {
+                abort(403, 'You can only save SF2 for your assigned advisory classes.');
             }
         }
 

@@ -93,8 +93,10 @@
         ['label' => 'School Setup', 'route' => 'school-setup.index', 'patterns' => ['school-setup.*', 'prospectus.*'], 'icon' => 'grid'],
         ['label' => 'School Calendar', 'route' => 'school_calendar.index', 'patterns' => ['school_calendar.*'], 'icon' => 'calendar-check'],
         ['label' => 'Attendance Policy', 'route' => 'attendance.policy.settings', 'patterns' => ['attendance.policy.settings', 'attendance.policy.settings.update'], 'icon' => 'clock'],
-        ['label' => 'Kiosks', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'],
     ];
+    if ($isSuperAdmin || ($user && $user->role === 'staff')) {
+        $adminChildren[] = ['label' => 'Kiosks', 'route' => 'gate_devices.index', 'patterns' => ['gate_devices.*'], 'icon' => 'scan'];
+    }
     // Activity log: super = all; band admins = department; shown under Admin for platform admins
     if ($isSuperAdmin || ($user && $user->isBandAdmin())) {
         $adminChildren[] = ['label' => 'Activity Log', 'route' => 'activity_logs.index', 'patterns' => ['activity_logs.*'], 'icon' => 'list'];

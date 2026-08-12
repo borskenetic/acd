@@ -57,7 +57,18 @@ class GateSyncController extends Controller
 
         $results = [];
 
-        foreach ($validated['scans'] as $row) {
+        $orderedScans = collect($validated['scans'])
+            ->sortBy(function (array $row) {
+                try {
+                    return Carbon::parse($row['scanned_at'])->getTimestamp();
+                } catch (\Throwable) {
+                    return PHP_INT_MAX;
+                }
+            })
+            ->values()
+            ->all();
+
+        foreach ($orderedScans as $row) {
             $clientUuid = $row['client_uuid'];
             $student = $scanService->resolveStudent($row['scan_token']);
 

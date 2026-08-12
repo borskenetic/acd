@@ -1,0 +1,31 @@
+Area 51 Information Technology Services
+Progress Report
+Date: 10 August 2026  ·  Client: Assumption College of Davao
+No.
+Module / Feature
+Description / Accomplishment
+Status
+1
+Dual SF2 Excel (K–10 & SHS)
+K–10 and Senior High use separate SF2 Excel templates. Holiday fills as a merged holiday column. Summary counts and ADA fixed (ceil, no empty-row inflation).
+✓  Completed
+2
+Half-day Attendance on SF2
+Afternoon-only first IN maps as half-day (0.5). Stored half_day_dates; SF2 grid/UI/Excel support half-day marks.
+✓  Completed
+3
+Grade-band Admin Roles
+Roles: superadmin, SHS Admin (G11–12), K–10 Admin (Kinder–G10). Seeded demo accounts; superadmin-only account management.
+✓  Completed
+4
+Module Keyholing
+Students, SF2, logs, SMS blast, school setup, imports, face/ID, and patron reports scoped by grade band or faculty class.
+✓  Completed
+5
+Attendance Policy & Gate SMS Scope
+Band admins edit only their schedule / gate SMS templates; shared grace, streak thresholds, and alert wording remain super/staff.
+✓  Completed
+6
+Activity Log (Scoped Access)
+Restored for school ops and faculty. Super/staff: all; SHS/K–10 admin: self + department faculty; faculty: own actions only.
+✓  Completed

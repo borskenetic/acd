@@ -9,6 +9,8 @@ class GateDeviceController extends Controller
 {
     public function index()
     {
+        $this->authorizeGateDeviceManage();
+
         $devices = GateDevice::query()->orderByDesc('id')->get();
 
         return view('gate_devices.index', compact('devices'));
@@ -16,6 +18,8 @@ class GateDeviceController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeGateDeviceManage();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
         ]);
@@ -32,6 +36,8 @@ class GateDeviceController extends Controller
 
     public function reissue(GateDevice $gateDevice)
     {
+        $this->authorizeGateDeviceManage();
+
         $plain = $gateDevice->reissueToken();
 
         return redirect()
@@ -44,6 +50,8 @@ class GateDeviceController extends Controller
 
     public function update(Request $request, GateDevice $gateDevice)
     {
+        $this->authorizeGateDeviceManage();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'is_active' => 'required|boolean',
@@ -59,8 +67,19 @@ class GateDeviceController extends Controller
 
     public function destroy(GateDevice $gateDevice)
     {
+        $this->authorizeGateDeviceManage();
+
         $gateDevice->delete();
 
         return back()->with('success', 'Kiosk removed.');
+    }
+
+    /** Band admins must not mint school-wide gate tokens (full roster + write API). */
+    protected function authorizeGateDeviceManage(): void
+    {
+        $user = auth()->user();
+        if (! $user || (! $user->isSuperAdmin() && $user->role !== 'staff')) {
+            abort(403, 'Only superadmin or staff can manage gate kiosk devices.');
+        }
     }
 }

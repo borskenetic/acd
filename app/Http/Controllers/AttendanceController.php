@@ -12,7 +12,9 @@ use App\Services\AttendancePolicyService;
 use App\Services\FaceMatchService;
 use App\Services\StudentDeparturePolicy;
 use App\Services\StudentScanService;
+use App\Support\ScanConfirmToken;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
 {
@@ -279,12 +281,28 @@ class AttendanceController extends Controller
         $request->validate([
             'student_id' => 'required|integer|exists:students,id',
             'section' => 'nullable|string|max:255',
+            'confirm_token' => 'required|string',
         ]);
+
+        try {
+            ScanConfirmToken::assertValid(
+                (string) $request->input('confirm_token'),
+                'student',
+                (int) $request->input('student_id')
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         $section = $request->section ? trim((string) $request->section) : null;
         $student = Student::findOrFail($request->student_id);
 
         $gateDevice = GateDevice::resolveFromRequest($request);
+        if (config('attendance.require_kiosk_token') && ! $gateDevice) {
+            return response()->json([
+                'message' => 'This kiosk is not paired. Pair a gate device token before recording attendance.',
+            ], 403);
+        }
 
         try {
             $result = $this->studentScan->recordScan(
@@ -318,29 +336,58 @@ class AttendanceController extends Controller
     {
         $request->validate([
             'visitor_id' => 'required|integer|exists:visitors,id',
+            'confirm_token' => 'required|string',
         ]);
+
+        try {
+            ScanConfirmToken::assertValid(
+                (string) $request->input('confirm_token'),
+                'visitor',
+                (int) $request->input('visitor_id')
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $gateDevice = GateDevice::resolveFromRequest($request);
+        if (config('attendance.require_kiosk_token') && ! $gateDevice) {
+            return response()->json([
+                'message' => 'This kiosk is not paired. Pair a gate device token before recording attendance.',
+            ], 403);
+        }
 
         $visitor = Visitor::findOrFail($request->visitor_id);
-        $sessions = app(AttendanceSessionService::class);
-        $sessions->closeStaleOpenInForVisitor($visitor);
 
-        $lastLog = VisitorLog::where('visitor_id', $visitor->id)
-            ->orderByDesc('scanned_at')
-            ->orderByDesc('id')
-            ->first();
+        try {
+            $payload = DB::transaction(function () use ($visitor) {
+                Visitor::query()->whereKey($visitor->id)->lockForUpdate()->first();
 
-        $newStatus = ($lastLog && $sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+                $sessions = app(AttendanceSessionService::class);
+                $sessions->closeStaleOpenInForVisitor($visitor);
 
-        $log = VisitorLog::create([
-            'visitor_id' => $visitor->id,
-            'status' => $newStatus,
-            'scanned_at' => now(),
-        ]);
+                $lastLog = VisitorLog::where('visitor_id', $visitor->id)
+                    ->orderByDesc('scanned_at')
+                    ->orderByDesc('id')
+                    ->first();
 
-        return response()->json([
-            'status' => $newStatus,
-            'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
-        ]);
+                $newStatus = ($lastLog && $sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+
+                $log = VisitorLog::create([
+                    'visitor_id' => $visitor->id,
+                    'status' => $newStatus,
+                    'scanned_at' => now(),
+                ]);
+
+                return [
+                    'status' => $newStatus,
+                    'scanned_at' => $log->scanned_at->format('Y-m-d h:i:s A'),
+                ];
+            });
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Could not record visitor scan.'], 500);
+        }
+
+        return response()->json($payload);
     }
 
     /** @return array<string, mixed> */
@@ -360,6 +407,7 @@ class AttendanceController extends Controller
             'type' => 'visitor',
             'next_status' => $nextStatus,
             'visitor_id' => $visitor->id,
+            'confirm_token' => ScanConfirmToken::issue('visitor', (int) $visitor->id),
             'visitor' => [
                 'id' => $visitor->id,
                 'firstname' => $visitor->firstname,

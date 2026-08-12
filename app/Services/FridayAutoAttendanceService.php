@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Fridays are online classes — mark every student present with timed IN/OUT
- * in their expected gate window when they have no real scan yet.
+ * Fridays are online classes — mark every student present with a morning IN
+ * when they have no real scan yet. OUT is written only after dismissal time
+ * has passed (otherwise EOD / half-day auto-out closes the day later).
  */
 class FridayAutoAttendanceService
 {
@@ -19,6 +20,7 @@ class FridayAutoAttendanceService
     public function __construct(
         protected AttendancePolicyService $policy,
         protected Sf2SchoolCalendar $calendar,
+        protected StudentSessionScheduleService $schedule,
     ) {}
 
     /**
@@ -48,15 +50,16 @@ class FridayAutoAttendanceService
         }
 
         $dateStr = $day->toDateString();
+        $now = Carbon::now($tz);
         $ins = 0;
         $outs = 0;
         $skipped = 0;
 
         Student::query()
             ->orderBy('id')
-            ->chunkById(200, function ($students) use ($dateStr, $tz, &$ins, &$outs, &$skipped) {
+            ->chunkById(200, function ($students) use ($dateStr, $tz, $now, &$ins, &$outs, &$skipped) {
                 foreach ($students as $student) {
-                    $result = $this->markStudent($student, $dateStr, $tz);
+                    $result = $this->markStudent($student, $dateStr, $tz, $now);
                     $ins += $result['in'] ? 1 : 0;
                     $outs += $result['out'] ? 1 : 0;
                     $skipped += $result['skipped'] ? 1 : 0;
@@ -76,37 +79,32 @@ class FridayAutoAttendanceService
     /**
      * @return array{in: bool, out: bool, skipped: bool}
      */
-    protected function markStudent(Student $student, string $dateStr, string $tz): array
+    protected function markStudent(Student $student, string $dateStr, string $tz, Carbon $now): array
     {
-        $hasAnyIn = AttendanceLog::query()
-            ->where('student_id', $student->id)
-            ->where('status', 'IN')
-            ->whereDate('scanned_at', $dateStr)
-            ->exists();
+        return DB::transaction(function () use ($student, $dateStr, $tz, $now) {
+            Student::query()->whereKey($student->id)->lockForUpdate()->first();
 
-        $hasAnyOut = AttendanceLog::query()
-            ->where('student_id', $student->id)
-            ->where('status', 'OUT')
-            ->whereDate('scanned_at', $dateStr)
-            ->exists();
+            $hasAnyIn = AttendanceLog::query()
+                ->where('student_id', $student->id)
+                ->where('status', 'IN')
+                ->whereDate('scanned_at', $dateStr)
+                ->exists();
 
-        if ($hasAnyIn && $hasAnyOut) {
-            return ['in' => false, 'out' => false, 'skipped' => true];
-        }
+            $hasAnyOut = AttendanceLog::query()
+                ->where('student_id', $student->id)
+                ->where('status', 'OUT')
+                ->whereDate('scanned_at', $dateStr)
+                ->exists();
 
-        $login = $this->policy->loginTime($student->year, $student->section);
-        $logout = $this->policy->logoutTime($student->year, $student->section);
+            if ($hasAnyIn && $hasAnyOut) {
+                return ['in' => false, 'out' => false, 'skipped' => true];
+            }
 
-        $inAt = Carbon::parse($dateStr.' '.$login, $tz);
-        $outAt = Carbon::parse($dateStr.' '.$logout, $tz);
-        if ($outAt->lte($inAt)) {
-            $outAt = $inAt->copy()->addHours(4);
-        }
+            [$inAt, $outAt] = $this->windowForStudent($student, $dateStr, $tz, $now);
 
-        $createdIn = false;
-        $createdOut = false;
+            $createdIn = false;
+            $createdOut = false;
 
-        DB::transaction(function () use ($student, $hasAnyIn, $hasAnyOut, $inAt, $outAt, &$createdIn, &$createdOut) {
             if (! $hasAnyIn) {
                 AttendanceLog::create([
                     'student_id' => $student->id,
@@ -118,7 +116,8 @@ class FridayAutoAttendanceService
                 $createdIn = true;
             }
 
-            if (! $hasAnyOut) {
+            // Never invent a future OUT — that blocks real campus scans for the rest of the day.
+            if (! $hasAnyOut && $now->gte($outAt)) {
                 AttendanceLog::create([
                     'student_id' => $student->id,
                     'status' => 'OUT',
@@ -128,8 +127,53 @@ class FridayAutoAttendanceService
                 ]);
                 $createdOut = true;
             }
-        });
 
-        return ['in' => $createdIn, 'out' => $createdOut, 'skipped' => false];
+            return [
+                'in' => $createdIn,
+                'out' => $createdOut,
+                'skipped' => ! $createdIn && ! $createdOut,
+            ];
+        });
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    protected function windowForStudent(Student $student, string $dateStr, string $tz, Carbon $asOf): array
+    {
+        $login = $this->policy->loginTime($student->year, $student->section);
+        $logout = $this->policy->logoutTime($student->year, $student->section);
+
+        $inAt = Carbon::parse($dateStr.' '.$login, $tz);
+        $outAt = Carbon::parse($dateStr.' '.$logout, $tz);
+
+        if ($this->schedule->usesSessionModel($student)) {
+            $schedule = $this->schedule->resolveSchedule($student);
+            if ($schedule) {
+                $halfDay = $this->schedule->isHalfDayToday($student, $asOf);
+                if ($halfDay) {
+                    $halfOut = $this->schedule->outAllowedAt(
+                        $schedule,
+                        StudentSessionScheduleService::SESSION_HALF_DAY_OUT,
+                        $asOf,
+                        true
+                    );
+                    if ($halfOut) {
+                        $outAt = $halfOut;
+                    }
+                } else {
+                    $eod = $this->schedule->eodOutAt($schedule, $asOf);
+                    if ($eod) {
+                        $outAt = $eod;
+                    }
+                }
+            }
+        }
+
+        if ($outAt->lte($inAt)) {
+            $outAt = $inAt->copy()->addHours(4);
+        }
+
+        return [$inAt, $outAt];
     }
 }

@@ -12,7 +12,7 @@ class FridayAutoAttendanceCommand extends Command
         {--date= : Y-m-d to mark (default: today Asia/Manila)}
         {--force : Run even if the date is not Friday}';
 
-    protected $description = 'Mark all students present on Friday (online classes) with IN/OUT at policy times';
+    protected $description = 'Mark all students present on Friday (online classes); IN at login, OUT only after dismissal';
 
     public function handle(FridayAutoAttendanceService $service): int
     {

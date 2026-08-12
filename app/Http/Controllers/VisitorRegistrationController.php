@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Visitor;
 use App\Support\QrCodePng;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 
 class VisitorRegistrationController extends Controller
 {
@@ -28,11 +29,18 @@ class VisitorRegistrationController extends Controller
 
         $visitor = Visitor::create($validated);
 
-        return redirect()->route('visitors.pass', $visitor);
+        return redirect()->to(
+            URL::temporarySignedRoute('visitors.pass', now()->addDays(14), ['visitor' => $visitor])
+        );
     }
 
-    public function pass(Visitor $visitor)
+    public function pass(Request $request, Visitor $visitor)
     {
+        // Signed public link, or any logged-in school ops / faculty user.
+        if (! $request->hasValidSignature() && ! auth()->check()) {
+            abort(403, 'This visitor pass link is invalid or has expired. Please register again or ask the guardhouse for a new pass.');
+        }
+
         $qrBase64 = QrCodePng::toBase64($visitor->qrcode, 280, 2);
 
         return view('visitors.pass', compact('visitor', 'qrBase64'));

@@ -54,6 +54,8 @@ class RepairDayToggleStatusesCommand extends Command
             if (! $student) {
                 continue;
             }
+            // Close leftover open INs from prior days before planning today's sequence.
+            app(\App\Services\AttendanceSessionService::class)->closeStaleOpenInForStudent($student);
             $changes = $scanService->planStudentDayToggleRepairs($student, $day);
             foreach ($changes as $change) {
                 $allChanges[] = $change + [

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -33,7 +35,17 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
+        $throttleKey = 'login:'.strtolower((string) $request->input('email')).'|'.$request->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            throw ValidationException::withMessages([
+                'email' => "Too many login attempts. Try again in {$seconds} seconds.",
+            ]);
+        }
+
         if (Auth::guard('web')->attempt($credentials, $request->boolean('remember'))) {
+            RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
             $this->activityLogger->logAuthEvent(
@@ -46,6 +58,8 @@ class AuthController extends Controller
 
             return $this->redirectForRole(Auth::guard('web')->user()->role);
         }
+
+        RateLimiter::hit($throttleKey, 60);
 
         $this->activityLogger->logAuthEvent(
             'auth.login.failed',

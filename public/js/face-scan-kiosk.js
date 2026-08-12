@@ -18,6 +18,7 @@
 
   let selectedStudent = null;
   let currentStudentId = null;
+  let currentConfirmToken = null;
   let clearDisplayTimer = null;
   let isCooldown = false;
   let scanning = false;
@@ -38,6 +39,7 @@
     hideEarlyOutAlarm();
     selectedStudent = null;
     currentStudentId = null;
+    currentConfirmToken = null;
   }
 
   function scheduleClear(delayMs) {
@@ -161,7 +163,11 @@
   }
 
   function processSection(section) {
-    const body = { student_id: currentStudentId, section: section };
+    const body = {
+      student_id: currentStudentId,
+      section: section,
+      confirm_token: currentConfirmToken,
+    };
     const headers = {
       'Content-Type': 'application/json',
       'X-CSRF-TOKEN': cfg.csrf,
@@ -201,6 +207,7 @@
 
     selectedStudent = data.student;
     currentStudentId = data.student_id;
+    currentConfirmToken = data.confirm_token || null;
     if (profileImg) profileImg.src = profileUrl(data.student.profile_picture);
 
     if (data.next_status === 'OUT') {

@@ -1,10 +1,12 @@
 <?php
 
+use App\Support\SessionExpiry;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,11 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {
-            if ($request->is('zendy') || $request->is('zendy/*')) {
-                return route('zendy.login');
-            }
-
-            return route('login');
+            return SessionExpiry::guestRedirect($request);
         });
     })
     ->withSchedule(function (Schedule $schedule) {
@@ -67,5 +65,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ->appendOutputTo($schedulerLog);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Your session expired. Sign in again.',
+                ], 419);
+            }
+
+            return response()->view('auth.session-expired', [], 419);
+        });
     })->create();

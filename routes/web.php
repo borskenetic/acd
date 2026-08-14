@@ -35,6 +35,7 @@ use App\Http\Controllers\GateDeviceController;
 use App\Http\Controllers\PlatformActivityLogController;
 use Illuminate\Support\Facades\Route;
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/session-expired', [AuthController::class, 'showSessionExpired'])->name('session.expired');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

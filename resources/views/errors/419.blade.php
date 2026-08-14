@@ -1,0 +1,1 @@
+@include('auth.session-expired')

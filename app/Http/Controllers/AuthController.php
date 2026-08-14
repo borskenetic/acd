@@ -14,6 +14,15 @@ class AuthController extends Controller
         private readonly ActivityLogger $activityLogger,
     ) {}
 
+    public function showSessionExpired()
+    {
+        if (Auth::guard('web')->check()) {
+            return redirect()->route('home');
+        }
+
+        return view('auth.session-expired');
+    }
+
     public function showLogin()
     {
         if (Auth::guard('web')->check()) {

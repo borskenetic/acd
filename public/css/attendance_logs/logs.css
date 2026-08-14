@@ -179,6 +179,14 @@
     color: var(--brand-primary-darker, #125a82);
 }
 
+.al-stat-card--sent .al-stat-card__value {
+    color: #15803d;
+}
+
+.al-stat-card--failed .al-stat-card__value {
+    color: #b91c1c;
+}
+
 /* ── Controls ── */
 .al-controls {
     background: #fff;

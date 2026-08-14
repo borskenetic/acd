@@ -96,6 +96,10 @@ class AttendanceSmsService
 
     public function checkConsecutiveAbsentAlerts(?Carbon $asOf = null): int
     {
+        if (! Setting::smsConsecutiveAbsentAlertsEnabled()) {
+            return 0;
+        }
+
         $tz = config('sf2.timezone', 'Asia/Manila');
         $asOf ??= Carbon::now($tz);
         $threshold = $this->policy->consecutiveAbsentThreshold();
@@ -145,6 +149,10 @@ class AttendanceSmsService
 
     protected function checkConsecutiveLateAlert(Student $student, Carbon $scannedAt): void
     {
+        if (! Setting::smsConsecutiveLateAlertsEnabled()) {
+            return;
+        }
+
         $threshold = $this->policy->consecutiveLateThreshold();
         $counts = $this->consecutive->countsForStudent($student, $scannedAt, $scannedAt);
         $consecutiveLate = $counts['consecutive_late'];

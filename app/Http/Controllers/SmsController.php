@@ -114,6 +114,8 @@ class SmsController extends Controller
             'missedEod' => Setting::scanSmsMissedEodTemplate(),
             'consecutiveLate' => Setting::smsConsecutiveLateTemplate(),
             'consecutiveAbsent' => Setting::smsConsecutiveAbsentTemplate(),
+            'consecutiveLateEnabled' => Setting::smsConsecutiveLateAlertsEnabled(),
+            'consecutiveAbsentEnabled' => Setting::smsConsecutiveAbsentAlertsEnabled(),
             'canEditK10' => $scope['k10'],
             'canEditShs' => $scope['shs'],
             'canEditAlerts' => $scope['alerts'],
@@ -143,6 +145,8 @@ class SmsController extends Controller
         if ($scope['alerts']) {
             $rules['consecutive_late'] = 'required|string|max:500';
             $rules['consecutive_absent'] = 'required|string|max:500';
+            $rules['consecutive_late_enabled'] = 'nullable|in:0,1';
+            $rules['consecutive_absent_enabled'] = 'nullable|in:0,1';
         }
 
         $request->validate($rules);
@@ -162,6 +166,8 @@ class SmsController extends Controller
         if ($scope['alerts']) {
             $payload['consecutive_late'] = $request->input('consecutive_late');
             $payload['consecutive_absent'] = $request->input('consecutive_absent');
+            Setting::setSmsConsecutiveLateAlertsEnabled($request->input('consecutive_late_enabled') === '1');
+            Setting::setSmsConsecutiveAbsentAlertsEnabled($request->input('consecutive_absent_enabled') === '1');
         }
 
         Setting::setSmsTemplates($payload);

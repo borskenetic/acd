@@ -32,6 +32,10 @@ class Setting extends Model
 
     public const KEY_SMS_CONSECUTIVE_ABSENT = 'sms_consecutive_absent';
 
+    public const KEY_SMS_CONSECUTIVE_LATE_ENABLED = 'sms_consecutive_late_enabled';
+
+    public const KEY_SMS_CONSECUTIVE_ABSENT_ENABLED = 'sms_consecutive_absent_enabled';
+
     public const KEY_ATTENDANCE_POLICY = 'attendance_policy';
 
     public const KEY_SMS_SIM_LOAD = 'sms_sim_load';
@@ -176,6 +180,43 @@ class Setting extends Model
     {
         return static::where('key', self::KEY_SMS_CONSECUTIVE_ABSENT)->value('value')
             ?? 'Hello {name}, your child has been absent {count} consecutive school days. Please contact the school.';
+    }
+
+    public static function smsConsecutiveLateAlertsEnabled(): bool
+    {
+        return static::booleanSetting(self::KEY_SMS_CONSECUTIVE_LATE_ENABLED, true);
+    }
+
+    public static function smsConsecutiveAbsentAlertsEnabled(): bool
+    {
+        return static::booleanSetting(self::KEY_SMS_CONSECUTIVE_ABSENT_ENABLED, true);
+    }
+
+    public static function setSmsConsecutiveLateAlertsEnabled(bool $enabled): void
+    {
+        static::updateOrCreate(
+            ['key' => self::KEY_SMS_CONSECUTIVE_LATE_ENABLED],
+            ['value' => $enabled ? '1' : '0']
+        );
+    }
+
+    public static function setSmsConsecutiveAbsentAlertsEnabled(bool $enabled): void
+    {
+        static::updateOrCreate(
+            ['key' => self::KEY_SMS_CONSECUTIVE_ABSENT_ENABLED],
+            ['value' => $enabled ? '1' : '0']
+        );
+    }
+
+    protected static function booleanSetting(string $key, bool $default): bool
+    {
+        $value = static::where('key', $key)->value('value');
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return in_array(strtolower((string) $value), ['1', 'true', 'yes', 'on'], true);
     }
 
     /** @param  array<string, string>  $templates */

@@ -594,6 +594,8 @@ class AttendancePolicyService
             'tardy_grace_minutes' => $this->tardyGraceMinutes(),
             'consecutive_late_threshold' => $this->consecutiveLateThreshold(),
             'consecutive_absent_threshold' => $this->consecutiveAbsentThreshold(),
+            'consecutive_late_sms_enabled' => Setting::smsConsecutiveLateAlertsEnabled(),
+            'consecutive_absent_sms_enabled' => Setting::smsConsecutiveAbsentAlertsEnabled(),
             'temp_enabled' => ! empty($temp['enabled']),
             'temp_login_time' => isset($temp['login_time']) ? $this->normalizeTimeInput((string) $temp['login_time']) : '',
             'temp_logout_time' => isset($temp['logout_time']) ? $this->normalizeTimeInput((string) $temp['logout_time']) : '',

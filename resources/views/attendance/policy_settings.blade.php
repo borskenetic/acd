@@ -230,7 +230,8 @@
                 <p class="text-muted mb-3">
                     When a student reaches these streaks, an SMS is sent to their
                     <strong>emergency contact</strong> using Communication → Gate Terminal Message.
-                    School-wide (superadmin / staff only).
+                    School-wide (superadmin / staff only). Turn a switch off to stop that auto message
+                    without changing the threshold or template.
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -238,12 +239,26 @@
                         <input type="number" name="consecutive_late_threshold" id="lateThreshold" class="form-control"
                                min="1" max="30"
                                value="{{ old('consecutive_late_threshold', $values['consecutive_late_threshold']) }}" required>
+                        <input type="hidden" name="consecutive_late_sms_enabled" value="0">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="lateSmsEnabled"
+                                   name="consecutive_late_sms_enabled" value="1"
+                                   @checked((string) old('consecutive_late_sms_enabled', ($values['consecutive_late_sms_enabled'] ?? true) ? '1' : '0') === '1')>
+                            <label class="form-check-label" for="lateSmsEnabled">Send auto SMS for consecutive lates</label>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label for="absentThreshold" class="form-label">Consecutive absences before warning</label>
                         <input type="number" name="consecutive_absent_threshold" id="absentThreshold" class="form-control"
                                min="1" max="30"
                                value="{{ old('consecutive_absent_threshold', $values['consecutive_absent_threshold']) }}" required>
+                        <input type="hidden" name="consecutive_absent_sms_enabled" value="0">
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="absentSmsEnabled"
+                                   name="consecutive_absent_sms_enabled" value="1"
+                                   @checked((string) old('consecutive_absent_sms_enabled', ($values['consecutive_absent_sms_enabled'] ?? true) ? '1' : '0') === '1')>
+                            <label class="form-check-label" for="absentSmsEnabled">Send auto SMS for consecutive absences</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -253,8 +268,10 @@
             <div class="card-body small text-muted">
                 Grace period and SMS streak thresholds are school-wide and can only be changed by
                 superadmin / staff. Current: grace {{ $values['tardy_grace_minutes'] }} min;
-                late streak {{ $values['consecutive_late_threshold'] }};
-                absent streak {{ $values['consecutive_absent_threshold'] }}.
+                late streak {{ $values['consecutive_late_threshold'] }}
+                ({{ ($values['consecutive_late_sms_enabled'] ?? true) ? 'SMS on' : 'SMS off' }});
+                absent streak {{ $values['consecutive_absent_threshold'] }}
+                ({{ ($values['consecutive_absent_sms_enabled'] ?? true) ? 'SMS on' : 'SMS off' }}).
             </div>
         </div>
         @endif

@@ -117,14 +117,32 @@
         <h5 class="mt-3 mb-2">Alerts (school-wide)</h5>
 
         <div class="card mb-3">
-            <div class="card-header fw-semibold">Consecutive lates alert</div>
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Consecutive lates alert</span>
+                <input type="hidden" name="consecutive_late_enabled" value="0">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="consecutiveLateEnabled"
+                           name="consecutive_late_enabled" value="1"
+                           @checked((string) old('consecutive_late_enabled', ($consecutiveLateEnabled ?? true) ? '1' : '0') === '1')>
+                    <label class="form-check-label" for="consecutiveLateEnabled">Auto SMS on</label>
+                </div>
+            </div>
             <div class="card-body">
                 <textarea name="consecutive_late" class="form-control" rows="2" required>{{ old('consecutive_late', $consecutiveLate) }}</textarea>
             </div>
         </div>
 
         <div class="card mb-3">
-            <div class="card-header fw-semibold">Consecutive absences alert</div>
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Consecutive absences alert</span>
+                <input type="hidden" name="consecutive_absent_enabled" value="0">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="consecutiveAbsentEnabled"
+                           name="consecutive_absent_enabled" value="1"
+                           @checked((string) old('consecutive_absent_enabled', ($consecutiveAbsentEnabled ?? true) ? '1' : '0') === '1')>
+                    <label class="form-check-label" for="consecutiveAbsentEnabled">Auto SMS on</label>
+                </div>
+            </div>
             <div class="card-body">
                 <textarea name="consecutive_absent" class="form-control" rows="2" required>{{ old('consecutive_absent', $consecutiveAbsent) }}</textarea>
                 <p class="small text-muted mb-0 mt-2">Checked daily at 4:30 PM for SF2 grade levels (Kinder–Grade 12).</p>
@@ -134,8 +152,10 @@
         <div class="card mb-3 border-0 bg-light">
             <div class="card-body small text-muted">
                 <strong>Consecutive late / absent alert wording</strong> is school-wide
-                (superadmin / staff only). Current late: “{{ \Illuminate\Support\Str::limit($consecutiveLate, 80) }}”;
-                absent: “{{ \Illuminate\Support\Str::limit($consecutiveAbsent, 80) }}”.
+                (superadmin / staff only). Late SMS {{ ($consecutiveLateEnabled ?? true) ? 'on' : 'off' }}:
+                “{{ \Illuminate\Support\Str::limit($consecutiveLate, 80) }}”;
+                absent SMS {{ ($consecutiveAbsentEnabled ?? true) ? 'on' : 'off' }}:
+                “{{ \Illuminate\Support\Str::limit($consecutiveAbsent, 80) }}”.
             </div>
         </div>
         @endif

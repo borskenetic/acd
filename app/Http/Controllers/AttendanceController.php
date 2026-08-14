@@ -173,6 +173,8 @@ class AttendanceController extends Controller
             $rules['tardy_grace_minutes'] = 'required|integer|min:0|max:120';
             $rules['consecutive_late_threshold'] = 'required|integer|min:1|max:30';
             $rules['consecutive_absent_threshold'] = 'required|integer|min:1|max:30';
+            $rules['consecutive_late_sms_enabled'] = 'nullable|in:0,1';
+            $rules['consecutive_absent_sms_enabled'] = 'nullable|in:0,1';
             $rules['temp_enabled'] = 'nullable|boolean';
             $rules['temp_login_time'] = 'nullable|date_format:H:i';
             $rules['temp_logout_time'] = 'nullable|date_format:H:i';
@@ -200,6 +202,11 @@ class AttendanceController extends Controller
         $request->validate($rules);
 
         $policy->save($request->all(), $user);
+
+        if ($canShared) {
+            Setting::setSmsConsecutiveLateAlertsEnabled($request->input('consecutive_late_sms_enabled') === '1');
+            Setting::setSmsConsecutiveAbsentAlertsEnabled($request->input('consecutive_absent_sms_enabled') === '1');
+        }
 
         return back()->with('success', 'Attendance policy saved. Gate logs, SF2, and SMS alerts will use the new times and thresholds.');
     }

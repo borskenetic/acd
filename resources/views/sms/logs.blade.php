@@ -53,11 +53,11 @@
             <span class="al-stat-card__label">Matching</span>
             <strong class="al-stat-card__value">{{ number_format($stats['matching']) }}</strong>
         </div>
-        <div class="al-stat-card al-stat-card--sent">
+        <div class="al-stat-card al-stat-card--in">
             <span class="al-stat-card__label">Sent</span>
             <strong class="al-stat-card__value">{{ number_format($stats['sent']) }}</strong>
         </div>
-        <div class="al-stat-card al-stat-card--failed">
+        <div class="al-stat-card al-stat-card--out">
             <span class="al-stat-card__label">Failed / skipped</span>
             <strong class="al-stat-card__value">{{ number_format($stats['failed']) }}</strong>
         </div>

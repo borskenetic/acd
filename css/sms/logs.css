@@ -1,0 +1,40 @@
+/* SMS logs — reuse attendance-log layout with four summary cards */
+
+.sms-log-page .al-stats {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.sms-log-page .al-meta {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.sms-log-page .al-code {
+    font-size: 0.78rem;
+    background: #f1f5f9;
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+}
+
+.sms-log-page .al-pill--sent.is-active {
+    background: #16a34a;
+    border-color: #16a34a;
+}
+
+.sms-log-page .al-pill--failed.is-active {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+.sms-log-page .al-pill--skipped.is-active {
+    background: #64748b;
+    border-color: #64748b;
+}
+
+@media (max-width: 720px) {
+    .sms-log-page .al-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

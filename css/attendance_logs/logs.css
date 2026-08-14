@@ -179,6 +179,24 @@
     color: var(--brand-primary-darker, #125a82);
 }
 
+.al-stat-card--sent {
+    border-color: rgba(22, 163, 74, 0.2);
+    background: linear-gradient(180deg, rgba(22, 163, 74, 0.06) 0%, #fff 100%);
+}
+
+.al-stat-card--sent .al-stat-card__value {
+    color: #15803d;
+}
+
+.al-stat-card--failed {
+    border-color: rgba(220, 38, 38, 0.2);
+    background: linear-gradient(180deg, rgba(220, 38, 38, 0.05) 0%, #fff 100%);
+}
+
+.al-stat-card--failed .al-stat-card__value {
+    color: #b91c1c;
+}
+
 /* ── Controls ── */
 .al-controls {
     background: #fff;

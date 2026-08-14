@@ -15,7 +15,7 @@
     <header class="sx-top">
         <div>
             <p class="sx-school">{{ config('app.name') }}</p>
-            <p class="sx-kicker">Powered by Pantas · staff access</p>
+            <p class="sx-kicker">Powered by Pantas</p>
         </div>
         <a href="{{ route('home') }}" class="sx-home-chip">← Home</a>
     </header>
@@ -30,7 +30,6 @@
             <a href="{{ route('login') }}" class="auth-btn auth-btn--primary sx-btn">Sign in again</a>
             <a href="{{ route('home') }}" class="auth-btn auth-btn--outline sx-btn">Go to home</a>
         </div>
-        <p class="sx-footer">For security, the attendance portal signs you out after a period of inactivity.</p>
     </main>
 </body>
 </html>

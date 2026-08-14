@@ -4,6 +4,8 @@
 
 @push('styles')
     <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/layout/data-pages.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/attendance_logs/logs.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\VersionedAsset::url('css/sms/logs.css') }}">
 @endpush
 
 @section('content')
@@ -11,97 +13,141 @@
     $query = request()->query();
     $hasFilters = collect($query)->except('page')->filter()->isNotEmpty();
     $tz = config('app.timezone', 'Asia/Manila');
+    $today = now($tz)->toDateString();
+    $weekStart = now($tz)->startOfWeek()->toDateString();
+    $monthStart = now($tz)->startOfMonth()->toDateString();
+    $currentStatus = (string) request('status', '');
+    if ($currentStatus === 'sent') {
+        $currentStatus = 'success';
+    }
+
+    $filterUrl = function (array $merge = [], array $except = []) use ($query) {
+        $params = collect($query)->except(array_merge(['page'], $except))->merge($merge)->filter(fn ($v) => $v !== null && $v !== '')->all();
+
+        return route('sms.logs', $params);
+    };
+
+    $isDatePreset = fn (string $preset) => match ($preset) {
+        'today' => request('from') === $today && request('to') === $today,
+        'week' => request('from') === $weekStart && request('to') === $today,
+        'month' => request('from') === $monthStart && request('to') === $today,
+        'all' => ! request('from') && ! request('to'),
+        default => false,
+    };
 @endphp
 
-<div class="data-page activity-log-page sms-log-page">
-    <header class="act-header">
-        <div>
-            <h1 class="act-title">SMS Logs</h1>
-            <p class="act-subtitle">
-                History of modem SMS attempts (blast, gate arrival/departure, consecutive alerts).
-                Use this to verify messages are reaching the modem.
-            </p>
+<div class="data-page attendance-logs-page sms-log-page">
+    <header class="al-header">
+        <div class="al-header__text">
+            <h1 class="al-title">SMS Logs</h1>
+            <p class="al-subtitle">SMS delivery history for blasts and scan notifications.</p>
         </div>
-        <div class="act-header__actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <a href="{{ route('sms.page') }}" class="act-btn act-btn--ghost">SMS Blast</a>
-            <a href="{{ route('sms.scanMessage') }}" class="act-btn act-btn--ghost">Gate templates</a>
+        <div class="al-header__actions">
+            <a href="{{ route('sms.page') }}" class="al-btn al-btn--primary">SMS Blast</a>
+            <a href="{{ route('sms.scanMessage') }}" class="al-btn al-btn--ghost">Gate templates</a>
         </div>
     </header>
 
-    <section class="act-controls" style="margin-bottom:1rem;">
-        <div class="act-filters" style="align-items:stretch;">
-            <div class="act-field">
-                <label>Today</label>
-                <div style="font-size:1.25rem;font-weight:700;color:#0f172a;">{{ number_format($stats['today']) }}</div>
-            </div>
-            <div class="act-field">
-                <label>Success (all time)</label>
-                <div style="font-size:1.25rem;font-weight:700;color:#15803d;">{{ number_format($stats['success']) }}</div>
-            </div>
-            <div class="act-field">
-                <label>Failed (all time)</label>
-                <div style="font-size:1.25rem;font-weight:700;color:#b91c1c;">{{ number_format($stats['failed']) }}</div>
-            </div>
-            <div class="act-field">
-                <label>Skipped (all time)</label>
-                <div style="font-size:1.25rem;font-weight:700;color:#64748b;">{{ number_format($stats['skipped']) }}</div>
-            </div>
+    <div class="al-stats">
+        <div class="al-stat-card">
+            <span class="al-stat-card__label">Matching</span>
+            <strong class="al-stat-card__value">{{ number_format($stats['matching']) }}</strong>
         </div>
-    </section>
+        <div class="al-stat-card al-stat-card--sent">
+            <span class="al-stat-card__label">Sent</span>
+            <strong class="al-stat-card__value">{{ number_format($stats['sent']) }}</strong>
+        </div>
+        <div class="al-stat-card al-stat-card--failed">
+            <span class="al-stat-card__label">Failed / skipped</span>
+            <strong class="al-stat-card__value">{{ number_format($stats['failed']) }}</strong>
+        </div>
+        <div class="al-stat-card al-stat-card--today">
+            <span class="al-stat-card__label">Today</span>
+            <strong class="al-stat-card__value">{{ number_format($stats['today']) }}</strong>
+        </div>
+    </div>
 
-    <section class="act-controls">
-        <form method="GET" class="act-controls__form">
-            <div class="act-search-row">
-                <label class="act-search" for="smsSearch">
-                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <section class="al-controls" aria-label="Filter SMS logs">
+        <form method="GET" class="al-controls__form">
+            <div class="al-search-row">
+                <label class="al-search" for="smsSearch">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input type="search" id="smsSearch" name="search" value="{{ request('search') }}"
-                           placeholder="Search number, message, recipient, or error..." autocomplete="off">
+                           placeholder="Number, contact, student, or message..." autocomplete="off">
                 </label>
-                <button type="submit" class="act-btn act-btn--primary">Search</button>
+                <button type="submit" class="al-btn al-btn--primary al-btn--search">Search</button>
             </div>
 
-            <div class="act-filters">
-                <div class="act-field">
-                    <label for="smsStatus">Status</label>
-                    <select id="smsStatus" name="status">
-                        <option value="">All statuses</option>
-                        <option value="success" @selected(request('status') === 'success')>Success</option>
-                        <option value="failed" @selected(request('status') === 'failed')>Failed</option>
-                        <option value="skipped" @selected(request('status') === 'skipped')>Skipped</option>
-                    </select>
+            <div class="al-control-row">
+                <div class="al-control-group">
+                    <span class="al-control-group__label">Period</span>
+                    <div class="al-pills" role="group" aria-label="Date period">
+                        <a href="{{ $filterUrl(['from' => $today, 'to' => $today]) }}"
+                           class="al-pill {{ $isDatePreset('today') ? 'is-active' : '' }}">Today</a>
+                        <a href="{{ $filterUrl(['from' => $weekStart, 'to' => $today]) }}"
+                           class="al-pill {{ $isDatePreset('week') ? 'is-active' : '' }}">This week</a>
+                        <a href="{{ $filterUrl(['from' => $monthStart, 'to' => $today]) }}"
+                           class="al-pill {{ $isDatePreset('month') ? 'is-active' : '' }}">This month</a>
+                        <a href="{{ $filterUrl([], ['from', 'to']) }}"
+                           class="al-pill {{ $isDatePreset('all') ? 'is-active' : '' }}">All time</a>
+                    </div>
                 </div>
-                <div class="act-field">
-                    <label for="smsType">Type</label>
-                    <select id="smsType" name="type">
-                        <option value="">All types</option>
-                        @foreach($typeOptions as $type)
-                            <option value="{{ $type }}" @selected(request('type') === $type)>
-                                {{ $typeLabels[$type] ?? $type }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="act-field">
-                    <label for="smsFrom">From</label>
-                    <input type="date" id="smsFrom" name="from" value="{{ request('from') }}">
-                </div>
-                <div class="act-field">
-                    <label for="smsTo">To</label>
-                    <input type="date" id="smsTo" name="to" value="{{ request('to') }}">
-                </div>
-                <div class="act-field act-field--actions">
-                    <button type="submit" class="act-btn act-btn--primary">Apply</button>
-                    @if($hasFilters)
-                        <a href="{{ route('sms.logs') }}" class="act-btn act-btn--ghost">Clear</a>
-                    @endif
+
+                <div class="al-control-group">
+                    <span class="al-control-group__label">Status</span>
+                    <div class="al-pills" role="group" aria-label="Delivery status">
+                        <a href="{{ $filterUrl([], ['status']) }}"
+                           class="al-pill {{ $currentStatus === '' ? 'is-active' : '' }}">All</a>
+                        <a href="{{ $filterUrl(['status' => 'success']) }}"
+                           class="al-pill al-pill--sent {{ $currentStatus === 'success' ? 'is-active' : '' }}">Sent</a>
+                        <a href="{{ $filterUrl(['status' => 'failed']) }}"
+                           class="al-pill al-pill--failed {{ $currentStatus === 'failed' ? 'is-active' : '' }}">Failed</a>
+                        <a href="{{ $filterUrl(['status' => 'skipped']) }}"
+                           class="al-pill al-pill--skipped {{ $currentStatus === 'skipped' ? 'is-active' : '' }}">Skipped</a>
+                    </div>
                 </div>
             </div>
+
+            <details class="al-more-filters" {{ request()->hasAny(['from', 'to', 'type']) ? 'open' : '' }}>
+                <summary>More filters</summary>
+                <div class="al-more-filters__grid">
+                    <div class="al-field">
+                        <label for="smsFrom">From</label>
+                        <input type="date" id="smsFrom" name="from" value="{{ request('from') }}">
+                    </div>
+                    <div class="al-field">
+                        <label for="smsTo">To</label>
+                        <input type="date" id="smsTo" name="to" value="{{ request('to') }}">
+                    </div>
+                    <div class="al-field">
+                        <label for="smsType">Source</label>
+                        <select id="smsType" name="type">
+                            <option value="">All sources</option>
+                            @foreach($typeOptions as $type)
+                                <option value="{{ $type }}" @selected(request('type') === $type)>
+                                    {{ $typeLabels[$type] ?? $type }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="al-field al-field--actions">
+                        <button type="submit" class="al-btn al-btn--primary">Apply</button>
+                        @if($hasFilters)
+                            <a href="{{ route('sms.logs') }}" class="al-btn al-btn--ghost">Clear</a>
+                        @endif
+                    </div>
+                </div>
+            </details>
+
+            @if($currentStatus !== '')
+                <input type="hidden" name="status" value="{{ $currentStatus }}">
+            @endif
         </form>
     </section>
 
-    <section class="act-table-card">
-        <div class="act-table-wrap">
-            <table class="act-table">
+    <section class="al-table-card">
+        <div class="al-table-wrap">
+            <table class="al-table">
                 <thead>
                     <tr>
                         <th>When</th>
@@ -117,63 +163,63 @@
                         <tr>
                             <td data-label="When">
                                 @if($at)
-                                    <div class="act-time">
-                                        <span>{{ $at->format('M j, Y') }}</span>
-                                        <span class="act-time__clock">{{ $at->format('g:i:s A') }}</span>
+                                    <div class="al-time">
+                                        <span class="al-time__date">{{ $at->format('M j, Y') }}</span>
+                                        <span class="al-time__clock">{{ $at->format('g:i:s A') }}</span>
                                     </div>
                                 @else
                                     —
                                 @endif
                             </td>
                             <td data-label="To">
-                                <div class="act-user">
+                                <div class="al-user">
                                     <strong>{{ $log->to_number ?: '—' }}</strong>
                                     @if($log->recipient_label)
-                                        <span class="act-muted" style="font-style:normal;display:block;margin-top:0.15rem;">
+                                        <span class="al-muted" style="font-style:normal;display:block;margin-top:0.15rem;">
                                             {{ $log->recipient_label }}
                                         </span>
                                     @endif
                                     @if($log->student)
-                                        <span class="act-meta">
+                                        <span class="al-meta">
                                             Student: {{ trim($log->student->firstname.' '.$log->student->lastname) }}
                                         </span>
                                     @endif
                                 </div>
                             </td>
                             <td data-label="Type">
-                                <code class="act-code">{{ $log->typeLabel() }}</code>
+                                <code class="al-code">{{ $log->typeLabel() }}</code>
                                 @if($log->user)
-                                    <div class="act-meta">
+                                    <div class="al-meta">
                                         By {{ trim(($log->user->fname ?? '').' '.($log->user->lname ?? '')) ?: $log->user->email }}
                                     </div>
                                 @endif
                             </td>
                             <td data-label="Message">
-                                <div class="act-summary" style="font-weight:500;white-space:pre-wrap;">{{ $log->message }}</div>
+                                <div class="al-summary" style="font-weight:500;white-space:pre-wrap;">{{ $log->message }}</div>
                                 @if($log->error)
-                                    <div class="act-meta" style="color:#b91c1c;margin-top:0.35rem;">
+                                    <div class="al-meta" style="color:#b91c1c;margin-top:0.35rem;">
                                         {{ $log->error }}
                                     </div>
                                 @endif
                             </td>
                             <td data-label="Status">
                                 @if($log->status === 'success')
-                                    <span class="act-status act-status--ok">Success</span>
+                                    <span class="al-status al-status--in">Sent</span>
                                 @elseif($log->status === 'skipped')
-                                    <span class="act-status" style="background:#f1f5f9;color:#475569;">Skipped</span>
+                                    <span class="al-status al-status--muted">Skipped</span>
                                 @else
-                                    <span class="act-status act-status--error">Failed</span>
+                                    <span class="al-status al-status--out">Failed</span>
                                 @endif
                                 @if($log->http_status)
-                                    <div class="act-meta">HTTP {{ $log->http_status }}</div>
+                                    <div class="al-meta">HTTP {{ $log->http_status }}</div>
                                 @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="5">
-                                <div class="act-empty">
-                                    No SMS attempts logged yet. Sends from SMS Blast and gate notifications will appear here.
+                                <div class="al-empty">
+                                    No SMS attempts match these filters.
                                 </div>
                             </td>
                         </tr>
@@ -183,7 +229,7 @@
         </div>
 
         @if($logs->hasPages())
-            <div class="act-pagination">
+            <div class="al-table-card__foot">
                 {{ $logs->links('pagination::bootstrap-5') }}
             </div>
         @endif

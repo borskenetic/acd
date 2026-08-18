@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GateDevice;
 use App\Models\SmsLog;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SmsLogController extends Controller
 {
@@ -22,10 +24,13 @@ class SmsLogController extends Controller
             ->orderBy('type')
             ->pluck('type');
 
+        $gateDevices = GateDevice::query()->orderBy('name')->get(['id', 'name', 'is_active']);
+
         return view('sms.logs', [
             'logs' => $logs,
             'typeOptions' => $typeOptions,
             'typeLabels' => SmsLog::typeLabels(),
+            'gateDevices' => $gateDevices,
             'stats' => $this->summaryForQuery($request),
         ]);
     }
@@ -65,6 +70,23 @@ class SmsLogController extends Controller
 
         if ($request->filled('type')) {
             $query->where('type', $request->input('type'));
+        }
+
+        if ($request->filled('gate_device_id')) {
+            $deviceId = (int) $request->input('gate_device_id');
+            $query->where(function (Builder $q) use ($deviceId) {
+                $q->where('meta->gate_device_id', $deviceId)
+                    ->orWhereExists(function ($sub) use ($deviceId) {
+                        $sub->select(DB::raw(1))
+                            ->from('attendance_logs')
+                            ->whereColumn('attendance_logs.student_id', 'sms_logs.student_id')
+                            ->where('attendance_logs.gate_device_id', $deviceId)
+                            ->whereRaw(
+                                'ABS(TIMESTAMPDIFF(SECOND, attendance_logs.scanned_at, sms_logs.created_at)) <= ?',
+                                [180]
+                            );
+                    });
+            });
         }
 
         if ($request->filled('from')) {

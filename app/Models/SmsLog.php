@@ -68,4 +68,12 @@ class SmsLog extends Model
     {
         return self::typeLabels()[$this->type] ?? $this->type;
     }
+
+    public function kioskLabel(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $name = $meta['kiosk_name'] ?? null;
+
+        return is_string($name) && $name !== '' ? $name : null;
+    }
 }

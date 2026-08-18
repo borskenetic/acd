@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\GateDevice;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentAttendanceAlertState;
@@ -22,6 +23,7 @@ class AttendanceSmsService
         Carbon $scannedAt,
         ?string $sessionKey = null,
         ?string $forcedEvent = null,
+        ?GateDevice $gateDevice = null,
     ): void {
         $number = trim((string) ($student->emergency_number ?? ''));
         if ($number === '') {
@@ -47,7 +49,7 @@ class AttendanceSmsService
                 'child' => $childName,
                 'status' => $status,
                 'time' => $time,
-            ], $student);
+            ], $student, $gateDevice);
 
             return;
         }
@@ -61,7 +63,7 @@ class AttendanceSmsService
                 'child' => $childName,
                 'status' => $status,
                 'time' => $time,
-            ], $student);
+            ], $student, $gateDevice);
         } else {
             // SHS / College: keep arrival + departure (once each), guardian name in {name}.
             if (! $daily->arrival_sent) {
@@ -71,6 +73,7 @@ class AttendanceSmsService
                     ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time],
                     'arrival',
                     $student,
+                    $gateDevice,
                 );
                 if ($ok) {
                     $daily->update(['arrival_sent' => true]);
@@ -82,6 +85,7 @@ class AttendanceSmsService
                     ['name' => $guardianName, 'child' => $childName, 'status' => $status, 'time' => $time],
                     'departure',
                     $student,
+                    $gateDevice,
                 );
                 if ($ok) {
                     $daily->update(['departure_sent' => true]);
@@ -231,6 +235,7 @@ class AttendanceSmsService
         string $template,
         array $vars,
         ?Student $student = null,
+        ?GateDevice $gateDevice = null,
     ): void {
         $sent = $daily->events_sent ?? [];
         if (! is_array($sent)) {
@@ -241,7 +246,7 @@ class AttendanceSmsService
             return;
         }
 
-        if ($this->sendTemplate($number, $template, $vars, $event, $student)) {
+        if ($this->sendTemplate($number, $template, $vars, $event, $student, $gateDevice)) {
             $sent[] = $event;
             $daily->update(['events_sent' => array_values(array_unique($sent))]);
         }
@@ -263,6 +268,7 @@ class AttendanceSmsService
         array $vars,
         string $type = 'gate',
         ?Student $student = null,
+        ?GateDevice $gateDevice = null,
     ): bool {
         $number = trim($number);
         if ($number === '') {
@@ -279,10 +285,19 @@ class AttendanceSmsService
             ? $child
             : (is_string($vars['name'] ?? null) ? $vars['name'] : null);
 
+        $meta = null;
+        if ($gateDevice) {
+            $meta = [
+                'gate_device_id' => $gateDevice->id,
+                'kiosk_name' => $gateDevice->name,
+            ];
+        }
+
         return app(ModemSmsService::class)->send($number, $message, [
             'type' => $type !== '' ? $type : 'gate',
             'student_id' => $student?->id,
             'recipient_label' => $label,
+            'meta' => $meta,
         ]);
     }
 }

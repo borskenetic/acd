@@ -108,7 +108,7 @@
                 </div>
             </div>
 
-            <details class="al-more-filters" {{ request()->hasAny(['from', 'to', 'type']) ? 'open' : '' }}>
+            <details class="al-more-filters" {{ request()->hasAny(['from', 'to', 'type', 'gate_device_id']) ? 'open' : '' }}>
                 <summary>More filters</summary>
                 <div class="al-more-filters__grid">
                     <div class="al-field">
@@ -126,6 +126,17 @@
                             @foreach($typeOptions as $type)
                                 <option value="{{ $type }}" @selected(request('type') === $type)>
                                     {{ $typeLabels[$type] ?? $type }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="al-field">
+                        <label for="smsGate">Gate terminal</label>
+                        <select id="smsGate" name="gate_device_id">
+                            <option value="">All terminals</option>
+                            @foreach($gateDevices ?? [] as $device)
+                                <option value="{{ $device->id }}" @selected((string) request('gate_device_id') === (string) $device->id)>
+                                    {{ $device->name }}{{ $device->is_active ? '' : ' (inactive)' }}
                                 </option>
                             @endforeach
                         </select>
@@ -188,6 +199,9 @@
                             </td>
                             <td data-label="Type">
                                 <code class="al-code">{{ $log->typeLabel() }}</code>
+                                @if($log->kioskLabel())
+                                    <div class="al-meta">{{ $log->kioskLabel() }}</div>
+                                @endif
                                 @if($log->user)
                                     <div class="al-meta">
                                         By {{ trim(($log->user->fname ?? '').' '.($log->user->lname ?? '')) ?: $log->user->email }}

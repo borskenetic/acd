@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SmsLog;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -67,11 +68,9 @@ class ModemSmsService
         }
 
         try {
-            $response = Http::withHeaders(['X-API-KEY' => $apiKey])
-                ->timeout(30)
-                ->post($url, [
-                    ['number' => $normalized, 'message' => $message],
-                ]);
+            $response = $this->postToModem($url, $apiKey, [
+                ['number' => $normalized, 'message' => $message],
+            ], 30);
 
             $ok = $response->successful();
             $body = $response->body();
@@ -186,9 +185,7 @@ class ModemSmsService
         }
 
         try {
-            $response = Http::withHeaders(['X-API-KEY' => $apiKey])
-                ->timeout(300)
-                ->post($url, $payload);
+            $response = $this->postToModem($url, $apiKey, $payload, 300);
 
             $ok = $response->successful();
             $body = $response->body();
@@ -235,6 +232,21 @@ class ModemSmsService
 
             return ['sent' => 0, 'failed' => count($rows)];
         }
+    }
+
+    /**
+     * Retry TLS/connect drops that happen when many scans hit ngrok at once.
+     *
+     * @param  list<array{number: string, message: string}>  $payload
+     */
+    private function postToModem(string $url, ?string $apiKey, array $payload, int $timeout)
+    {
+        return Http::withHeaders(['X-API-KEY' => $apiKey])
+            ->timeout($timeout)
+            ->retry(4, 800, function ($exception) {
+                return $exception instanceof ConnectionException;
+            }, throw: false)
+            ->post($url, $payload);
     }
 
     public function normalizePhilippineMobile(string $number): string

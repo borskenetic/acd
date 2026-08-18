@@ -232,7 +232,14 @@ class StudentScanService
             ]);
 
             if ($sendSms) {
-                $this->sms->handleStudentScan($student, $newStatus, $log->scanned_at, $sessionKeyResolved);
+                $this->sms->handleStudentScan(
+                    $student,
+                    $newStatus,
+                    $log->scanned_at,
+                    $sessionKeyResolved,
+                    null,
+                    $gateDevice,
+                );
             }
 
             return [
@@ -305,7 +312,14 @@ class StudentScanService
             $log->refresh();
             $status = strtoupper((string) $log->status);
 
-            $this->sms->handleStudentScan($student, $status, $log->scanned_at, $sessionKey);
+            $this->sms->handleStudentScan(
+                $student,
+                $status,
+                $log->scanned_at,
+                $sessionKey,
+                null,
+                $gateDevice,
+            );
 
             return $log;
         });

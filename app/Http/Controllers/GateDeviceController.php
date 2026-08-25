@@ -13,6 +13,14 @@ class GateDeviceController extends Controller
 
         $devices = GateDevice::query()->orderByDesc('id')->get();
 
+        // Temporary display-only: Gate B - Kiosk 2 mirrors Gate B - Kiosk 1 timestamps.
+        $source = $devices->firstWhere('name', 'Gate B - Kiosk 1');
+        $target = $devices->firstWhere('name', 'Gate B - Kiosk 2');
+        if ($source && $target) {
+            $target->last_seen_at = $source->last_seen_at;
+            $target->last_sync_at = $source->last_sync_at;
+        }
+
         return view('gate_devices.index', compact('devices'));
     }
 

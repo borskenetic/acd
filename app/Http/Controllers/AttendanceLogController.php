@@ -7,26 +7,45 @@ use App\Models\AttendanceLog;
 use App\Models\GateDevice;
 use App\Models\GradeSection;
 use App\Models\Student;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use App\Services\PatronAttendanceReportService;
 use App\Services\AttendancePolicyService;
 use App\Support\AdvisoryScope;
-use App\Support\PatronOptions;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\AttendanceLogsExport;
+use Carbon\Carbon;
 
 class AttendanceLogController extends Controller
 {
     public function index(Request $request, AttendancePolicyService $policy)
     {
+        $tz = config('app.timezone', 'Asia/Manila');
+        $today = now($tz)->toDateString();
+
+        // Default to today so first paint does not scan 66k+ rows.
+        // "All time" is opt-in via period=all (clears from/to).
+        if (! $request->filled('from') && ! $request->filled('to') && $request->input('period') !== 'all') {
+            return redirect()->route('attendance_logs.index', array_merge(
+                $request->query(),
+                ['from' => $today, 'to' => $today]
+            ));
+        }
+
         $baseQuery = $this->filteredLogs($request, $policy);
 
         $logs = (clone $baseQuery)
             ->paginate(25)
             ->withQueryString();
 
-        $summary = $this->summaryForQuery(clone $baseQuery, $policy);
+        $classifications = $policy->classifyLogs($logs->items());
+
+        $summary = Cache::remember(
+            $this->summaryCacheKey($request),
+            45,
+            fn () => $this->summaryForQuery(clone $baseQuery, $policy)
+        );
 
         $yearOptions = AdvisoryScope::yearOptions(auth()->user());
 
@@ -55,17 +74,20 @@ class AttendanceLogController extends Controller
         $kiosks = GateDevice::query()->orderBy('name')->get(['id', 'name', 'is_active']);
         $kioskNameOptions = collect();
         if (Schema::hasColumn('attendance_logs', 'kiosk_name')) {
-            $kioskNameOptions = AttendanceLog::query()
-                ->whereNotNull('kiosk_name')
-                ->where('kiosk_name', '!=', '')
-                ->distinct()
-                ->orderBy('kiosk_name')
-                ->pluck('kiosk_name');
+            $kioskNameOptions = Cache::remember('attendance_logs:kiosk_names', 300, function () {
+                return AttendanceLog::query()
+                    ->whereNotNull('kiosk_name')
+                    ->where('kiosk_name', '!=', '')
+                    ->distinct()
+                    ->orderBy('kiosk_name')
+                    ->pluck('kiosk_name');
+            });
         }
 
         return view('attendance_logs.index', compact(
             'logs',
             'summary',
+            'classifications',
             'yearOptions',
             'homeroomSections',
             'policy',
@@ -79,37 +101,57 @@ class AttendanceLogController extends Controller
     {
         $tz = config('app.timezone', 'Asia/Manila');
         $today = now($tz)->toDateString();
+        [$todayStart, $todayEnd] = $this->dayBounds($today, $tz);
 
-        $lateQuery = $policy->applyLatePredicate(
+        $late = $policy->applyLatePredicate(
             $policy->restrictToFirstInOfDay((clone $query)->where('status', 'IN')),
             late: true
-        );
+        )->count();
 
-        $lateIdSubquery = (clone $lateQuery)->reorder()->select('attendance_logs.id');
+        $inStatus = (clone $query)->where('status', 'IN')->count();
 
         return [
             'total' => (clone $query)->count(),
             // On-time first IN + any later same-day IN (afternoon return, etc.).
-            'in' => (clone $query)->where('status', 'IN')->whereNotIn('attendance_logs.id', $lateIdSubquery)->count(),
-            'late' => (clone $lateQuery)->count(),
+            'in' => max(0, $inStatus - $late),
+            'late' => $late,
             'out' => (clone $query)->where('status', 'OUT')->count(),
-            'today' => (clone $query)->whereDate('scanned_at', $today)->count(),
+            'today' => (clone $query)->whereBetween('scanned_at', [$todayStart, $todayEnd])->count(),
         ];
+    }
+
+    private function summaryCacheKey(Request $request): string
+    {
+        $userId = auth()->id() ?? 'guest';
+        $filters = $request->only([
+            'from', 'to', 'period', 'year', 'year_level', 'homeroom_section',
+            'gate_device_id', 'kiosk_name', 'status', 'classification', 'search',
+        ]);
+
+        return 'attendance_logs:summary:'.$userId.':'.md5(json_encode($filters));
     }
 
     private function filteredLogs(Request $request, AttendancePolicyService $policy)
     {
         $classification = strtoupper((string) ($request->classification ?: $request->status));
+        $tz = config('app.timezone', 'Asia/Manila');
 
-        $query = AttendanceLog::with(['student', 'gateDevice']);
-        \App\Support\AdvisoryScope::applyToAttendanceLogs($query);
+        $query = AttendanceLog::with([
+            'student:id,firstname,lastname,student_id,year,section,course',
+            'gateDevice:id,name',
+        ]);
+        AdvisoryScope::applyToAttendanceLogs($query);
 
         return $query
-            ->when($request->from,
-                fn($q) => $q->whereDate('scanned_at', '>=', $request->from))
+            ->when($request->filled('from'), function ($q) use ($request, $tz) {
+                [$start] = $this->dayBounds($request->from, $tz);
+                $q->where('scanned_at', '>=', $start);
+            })
 
-            ->when($request->to,
-                fn($q) => $q->whereDate('scanned_at', '<=', $request->to))
+            ->when($request->filled('to'), function ($q) use ($request, $tz) {
+                [, $end] = $this->dayBounds($request->to, $tz);
+                $q->where('scanned_at', '<=', $end);
+            })
 
             ->when($request->year ?: $request->year_level,
                 fn ($q) => $q->whereHas('student',
@@ -150,6 +192,17 @@ class AttendanceLogController extends Controller
             ->orderBy('scanned_at', 'desc');
     }
 
+    /** @return array{0: string, 1: string} */
+    private function dayBounds(string $date, string $tz): array
+    {
+        $day = Carbon::parse($date, $tz);
+
+        return [
+            $day->copy()->startOfDay()->format('Y-m-d H:i:s'),
+            $day->copy()->endOfDay()->format('Y-m-d H:i:s'),
+        ];
+    }
+
     public function create()
     {
         $students = Student::all();
@@ -172,7 +225,7 @@ class AttendanceLogController extends Controller
 
     public function exportPdf(Request $request, AttendancePolicyService $policy)
     {
-        $logs = $this->filteredLogs($request, $policy)->get();
+        $logs = $this->filteredLogs($request, $policy)->limit(5000)->get();
 
         $pdf = Pdf::loadView('attendance_logs.pdf', compact('logs'));
         return $pdf->download('attendance_logs.pdf');
@@ -180,7 +233,7 @@ class AttendanceLogController extends Controller
 
     public function exportExcel(Request $request, AttendancePolicyService $policy)
     {
-        $logs = $this->filteredLogs($request, $policy)->get();
+        $logs = $this->filteredLogs($request, $policy)->limit(10000)->get();
 
         return Excel::download(
             new AttendanceLogsExport($logs),

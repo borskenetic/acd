@@ -39,7 +39,7 @@
         'today' => request('from') === $today && request('to') === $today,
         'week' => request('from') === $weekStart && request('to') === $today,
         'month' => request('from') === $monthStart && request('to') === $today,
-        'all' => ! request('from') && ! request('to'),
+        'all' => request('period') === 'all' && ! request('from') && ! request('to'),
         default => false,
     };
 @endphp
@@ -106,13 +106,13 @@
                 <div class="al-control-group">
                     <span class="al-control-group__label">Period</span>
                     <div class="al-pills" role="group" aria-label="Date period">
-                        <a href="{{ $filterUrl(['from' => $today, 'to' => $today]) }}"
+                        <a href="{{ $filterUrl(['from' => $today, 'to' => $today], ['period']) }}"
                            class="al-pill {{ $isDatePreset('today') ? 'is-active' : '' }}">Today</a>
-                        <a href="{{ $filterUrl(['from' => $weekStart, 'to' => $today]) }}"
+                        <a href="{{ $filterUrl(['from' => $weekStart, 'to' => $today], ['period']) }}"
                            class="al-pill {{ $isDatePreset('week') ? 'is-active' : '' }}">This week</a>
-                        <a href="{{ $filterUrl(['from' => $monthStart, 'to' => $today]) }}"
+                        <a href="{{ $filterUrl(['from' => $monthStart, 'to' => $today], ['period']) }}"
                            class="al-pill {{ $isDatePreset('month') ? 'is-active' : '' }}">This month</a>
-                        <a href="{{ $filterUrl([], ['from', 'to']) }}"
+                        <a href="{{ $filterUrl(['period' => 'all'], ['from', 'to']) }}"
                            class="al-pill {{ $isDatePreset('all') ? 'is-active' : '' }}">All time</a>
                     </div>
                 </div>
@@ -261,7 +261,7 @@
                     @forelse($logs as $log)
                         @php
                             $student = $log->student;
-                            $classification = $policy->classifyLog($log) ?? strtoupper((string) $log->status);
+                            $classification = $classifications[$log->id] ?? strtoupper((string) $log->status);
                             $initials = $student
                                 ? strtoupper(substr($student->firstname ?? '', 0, 1).substr($student->lastname ?? '', 0, 1))
                                 : '?';

@@ -324,19 +324,30 @@ class AttendancePolicyService
     /**
      * True when this row is the student's earliest IN on that calendar day.
      * Only the first IN can be classified LATE (afternoon returns stay IN).
+     *
+     * @param  array<string, int>|null  $firstInIdByStudentDay  optional map "studentId|Y-m-d" => first log id
      */
-    public function isFirstInOfDay(AttendanceLog $log): bool
+    public function isFirstInOfDay(AttendanceLog $log, ?array $firstInIdByStudentDay = null): bool
     {
         if (! $log->student_id || ! $log->scanned_at || ! $log->id) {
             return true;
         }
 
         $day = $log->scanned_at->copy()->timezone($this->timezone())->toDateString();
+        $mapKey = $log->student_id.'|'.$day;
+
+        if (is_array($firstInIdByStudentDay)) {
+            $firstId = $firstInIdByStudentDay[$mapKey] ?? null;
+
+            return $firstId === null || (int) $firstId === (int) $log->id;
+        }
+
+        [$start, $end] = $this->calendarDayBounds($day);
 
         $firstId = AttendanceLog::query()
             ->where('student_id', $log->student_id)
             ->where('status', 'IN')
-            ->whereDate('scanned_at', $day)
+            ->whereBetween('scanned_at', [$start, $end])
             ->orderBy('scanned_at')
             ->orderBy('id')
             ->value('id');
@@ -345,9 +356,78 @@ class AttendancePolicyService
     }
 
     /**
+     * Batch-load first-IN ids for a page of logs (avoids N+1 classify queries).
+     *
+     * @param  iterable<AttendanceLog>  $logs
+     * @return array<string, int> "studentId|Y-m-d" => first log id
+     */
+    public function firstInIdsForLogs(iterable $logs): array
+    {
+        $tz = $this->timezone();
+        $studentIds = [];
+        $minDay = null;
+        $maxDay = null;
+
+        foreach ($logs as $log) {
+            if (! $log->student_id || ! $log->scanned_at || strtoupper((string) $log->status) !== 'IN') {
+                continue;
+            }
+
+            $day = $log->scanned_at->copy()->timezone($tz)->toDateString();
+            $studentIds[$log->student_id] = true;
+            $minDay = $minDay === null || $day < $minDay ? $day : $minDay;
+            $maxDay = $maxDay === null || $day > $maxDay ? $day : $maxDay;
+        }
+
+        if ($studentIds === [] || $minDay === null || $maxDay === null) {
+            return [];
+        }
+
+        [$rangeStart] = $this->calendarDayBounds($minDay);
+        [, $rangeEnd] = $this->calendarDayBounds($maxDay);
+
+        $candidates = AttendanceLog::query()
+            ->whereIn('student_id', array_keys($studentIds))
+            ->where('status', 'IN')
+            ->whereBetween('scanned_at', [$rangeStart, $rangeEnd])
+            ->orderBy('scanned_at')
+            ->orderBy('id')
+            ->get(['id', 'student_id', 'scanned_at']);
+
+        $firstIds = [];
+        foreach ($candidates as $candidate) {
+            $key = $candidate->student_id.'|'
+                .$candidate->scanned_at->copy()->timezone($tz)->toDateString();
+            if (! isset($firstIds[$key])) {
+                $firstIds[$key] = (int) $candidate->id;
+            }
+        }
+
+        return $firstIds;
+    }
+
+    /**
+     * @param  iterable<AttendanceLog>  $logs
+     * @return array<int, string> log id => IN|LATE|OUT
+     */
+    public function classifyLogs(iterable $logs): array
+    {
+        $firstInIds = $this->firstInIdsForLogs($logs);
+        $classified = [];
+
+        foreach ($logs as $log) {
+            $classified[(int) $log->id] = $this->classifyLog($log, $firstInIds)
+                ?? strtoupper((string) $log->status);
+        }
+
+        return $classified;
+    }
+
+    /**
+     * @param  array<string, int>|null  $firstInIdByStudentDay
      * @return 'IN'|'LATE'|'OUT'|null
      */
-    public function classifyLog(AttendanceLog $log): ?string
+    public function classifyLog(AttendanceLog $log, ?array $firstInIdByStudentDay = null): ?string
     {
         $status = strtoupper((string) $log->status);
 
@@ -359,7 +439,7 @@ class AttendancePolicyService
             return null;
         }
 
-        if (! $this->isFirstInOfDay($log)) {
+        if (! $this->isFirstInOfDay($log, $firstInIdByStudentDay)) {
             return 'IN';
         }
 
@@ -371,6 +451,16 @@ class AttendancePolicyService
         $section = is_string($student?->section ?? null) ? $student->section : null;
 
         return $this->isLateIn($log->scanned_at, $year, $section) ? 'LATE' : 'IN';
+    }
+
+    /** @return array{0: string, 1: string} [start, end] inclusive datetime strings in app TZ */
+    private function calendarDayBounds(string $day): array
+    {
+        $tz = $this->timezone();
+        $start = Carbon::parse($day, $tz)->startOfDay()->format('Y-m-d H:i:s');
+        $end = Carbon::parse($day, $tz)->endOfDay()->format('Y-m-d H:i:s');
+
+        return [$start, $end];
     }
 
     public function applyClassificationFilter(Builder $query, string $classification): Builder

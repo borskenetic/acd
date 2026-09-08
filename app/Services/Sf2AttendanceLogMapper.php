@@ -222,8 +222,8 @@ class Sf2AttendanceLogMapper
                     continue;
                 }
 
-                // Friday = online classes → auto-present even without a scan yet.
-                if ($this->calendar->isFridayOnlineDay($date)) {
+                // SHS Friday online → present without a scan. K–10 Friday half-day needs morning IN.
+                if ($this->calendar->isFridayOnlineDay($date, $year)) {
                     continue;
                 }
 

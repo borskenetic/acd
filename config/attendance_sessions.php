@@ -17,7 +17,9 @@ return [
     'eod_auto_out_at' => env('ATTENDANCE_EOD_AUTO_OUT_AT', '22:00'),
 
     /*
-    | Grades 1–10: Friday PM is asynchronous → half day (morning IN + morning dismissal OUT).
+    | Grades 1–10: Friday PM has no classes → half day (morning IN + Friday logout OUT).
+    | Dismissal time comes from Attendance policy → Friday half-day logout.
+    | Kinder stays always half-day via schedules.kinder.half_day_out.
     */
     'friday_half_day' => (bool) env('ATTENDANCE_FRIDAY_HALF_DAY', true),
 

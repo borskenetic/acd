@@ -57,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->appendOutputTo($schedulerLog);
 
-        // Friday online classes: auto IN/OUT for all students at their policy times.
+        // Friday online: auto IN/OUT for Senior High only (K–10 are campus half-day).
         $schedule->command('attendance:friday-auto-present')
             ->weeklyOn(5, '07:00') // Friday 07:00 Asia/Manila
             ->timezone('Asia/Manila')

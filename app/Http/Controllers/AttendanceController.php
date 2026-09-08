@@ -162,6 +162,7 @@ class AttendanceController extends Controller
         if ($canK10) {
             $rules['login_time'] = 'required|date_format:H:i';
             $rules['logout_time'] = 'required|date_format:H:i';
+            $rules['friday_logout_time'] = 'required|date_format:H:i';
         }
         if ($canShs) {
             $rules['shs_login_time'] = 'required|date_format:H:i';

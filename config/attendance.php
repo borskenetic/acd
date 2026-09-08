@@ -24,6 +24,7 @@ return [
     'gate' => [
         'login_time' => env('ATTENDANCE_GATE_LOGIN_TIME', '07:30'),
         'logout_time' => env('ATTENDANCE_GATE_LOGOUT_TIME', '16:00'),
+        'friday_logout_time' => env('ATTENDANCE_FRIDAY_LOGOUT_TIME', '12:00'),
         'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 5),
         'shs_tardy_grace_minutes' => (int) env('ATTENDANCE_SHS_TARDY_GRACE_MINUTES', env('ATTENDANCE_TARDY_GRACE_MINUTES', 5)),
 

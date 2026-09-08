@@ -58,11 +58,13 @@ class AttendancePolicyService
     }
 
     /**
-     * Expected logout (H:i). Temporary override > section schedule > SHS > gate default.
+     * Expected logout (H:i). Temporary override > section schedule > SHS > Friday half-day > gate default.
      */
-    public function logoutTime(?string $year = null, ?string $section = null): string
+    public function logoutTime(?string $year = null, ?string $section = null, ?Carbon $asOf = null): string
     {
-        $temp = $this->activeTemporaryOverride();
+        $tz = $this->timezone();
+        $asOf = ($asOf ?? Carbon::now($tz))->copy()->timezone($tz);
+        $temp = $this->activeTemporaryOverride($asOf);
         $schedule = $this->scheduleFor($year, $section);
 
         if ($schedule !== null) {
@@ -86,7 +88,45 @@ class AttendancePolicyService
             return $temp['logout_time'];
         }
 
+        if ($this->isK10FridayHalfDay($year, $asOf)) {
+            return $this->fridayLogoutTime();
+        }
+
+        return $this->permanentLogoutTime();
+    }
+
+    /** Permanent Mon–Thu (and non-Friday) K–10 / general logout. */
+    public function permanentLogoutTime(): string
+    {
         return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
+    }
+
+    /**
+     * K–10 Friday half-day dismissal (no afternoon classes). Same morning login applies.
+     */
+    public function fridayLogoutTime(): string
+    {
+        return (string) ($this->policy()['friday_logout_time']
+            ?? config('attendance.gate.friday_logout_time', '12:00'));
+    }
+
+    public function isK10FridayHalfDay(?string $year, ?Carbon $asOf = null): bool
+    {
+        if (! (bool) config('attendance_sessions.friday_half_day', true)) {
+            return false;
+        }
+
+        $asOf ??= Carbon::now($this->timezone());
+        if (! $asOf->copy()->timezone($this->timezone())->isFriday()) {
+            return false;
+        }
+
+        $year = $this->normalizeLabel($year);
+        if ($year !== null && $this->isSeniorHighYear($year)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function shsLoginTime(): string
@@ -130,11 +170,6 @@ class AttendancePolicyService
     public function permanentLoginTime(): string
     {
         return (string) ($this->policy()['login_time'] ?? config('attendance.gate.login_time', '07:30'));
-    }
-
-    public function permanentLogoutTime(): string
-    {
-        return (string) ($this->policy()['logout_time'] ?? config('attendance.gate.logout_time', '16:00'));
     }
 
     /**
@@ -645,9 +680,13 @@ class AttendancePolicyService
     public function isDepartureWindow(Carbon $scannedAt, ?string $year = null, ?string $section = null): bool
     {
         $tz = $this->timezone();
-        $cutoff = Carbon::today($tz)->setTimeFromTimeString($this->logoutTime($year, $section));
+        $instant = $scannedAt->copy()->timezone($tz);
+        $cutoff = Carbon::parse(
+            $instant->toDateString().' '.$this->logoutTime($year, $section, $instant),
+            $tz
+        );
 
-        return $scannedAt->copy()->timezone($tz)->gte($cutoff);
+        return $instant->gte($cutoff);
     }
 
     /**
@@ -709,6 +748,7 @@ class AttendancePolicyService
         return [
             'login_time' => $this->normalizeTimeInput($this->permanentLoginTime()),
             'logout_time' => $this->normalizeTimeInput($this->permanentLogoutTime()),
+            'friday_logout_time' => $this->normalizeTimeInput($this->fridayLogoutTime()),
             'shs_login_time' => $this->normalizeTimeInput($this->shsLoginTime()),
             'shs_logout_time' => $this->normalizeTimeInput($this->shsLogoutTime()),
             'shs_evening_login_time' => $this->normalizeTimeInput($this->shsEveningLoginTime()),
@@ -788,6 +828,9 @@ class AttendancePolicyService
         if ($canK10 && array_key_exists('logout_time', $data)) {
             $payload['logout_time'] = $this->normalizeTimeInput((string) $data['logout_time']);
         }
+        if ($canK10 && array_key_exists('friday_logout_time', $data)) {
+            $payload['friday_logout_time'] = $this->normalizeTimeInput((string) $data['friday_logout_time']);
+        }
         if ($canShs && array_key_exists('shs_login_time', $data)) {
             $payload['shs_login_time'] = $this->normalizeTimeInput((string) $data['shs_login_time']);
         }
@@ -832,6 +875,7 @@ class AttendancePolicyService
             $payload['temporary_override']['reverts_to'] = [
                 'login_time' => $merged['login_time'] ?? $this->permanentLoginTime(),
                 'logout_time' => $merged['logout_time'] ?? $this->permanentLogoutTime(),
+                'friday_logout_time' => $merged['friday_logout_time'] ?? $this->fridayLogoutTime(),
                 'shs_login_time' => $merged['shs_login_time'] ?? $this->shsLoginTime(),
                 'shs_logout_time' => $merged['shs_logout_time'] ?? $this->shsLogoutTime(),
                 'shs_evening_login_time' => $merged['shs_evening_login_time'] ?? $this->shsEveningLoginTime(),

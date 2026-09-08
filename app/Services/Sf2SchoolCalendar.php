@@ -132,12 +132,37 @@ class Sf2SchoolCalendar
         return $out;
     }
 
-    public function isFridayOnlineDay(string $date): bool
+    /**
+     * Friday online (present without gate scan). Senior High only.
+     * Kinder–Grade 10 are on-campus half days and must scan morning IN.
+     */
+    public function isFridayOnlineDay(string $date, ?string $year = null): bool
     {
         $tz = config('sf2.timezone', 'Asia/Manila');
         $day = Carbon::parse($date, $tz);
 
-        return $day->isFriday() && $this->isAttendanceDay($date);
+        if (! $day->isFriday() || ! $this->isAttendanceDay($date)) {
+            return false;
+        }
+
+        $year = is_string($year) ? trim(preg_replace('/\s+/', ' ', $year) ?? '') : '';
+        if ($year === '') {
+            // Callers without a year: treat as online only when not scoping K–10.
+            return true;
+        }
+
+        $shs = config('patron.senior_high_grades', config('sf2.shs_grades', ['Grade 11', 'Grade 12']));
+        if (! is_array($shs)) {
+            $shs = ['Grade 11', 'Grade 12'];
+        }
+
+        foreach ($shs as $option) {
+            if (strcasecmp($year, (string) $option) === 0) {
+                return true;
+            }
+        }
+
+        return (bool) preg_match('/\b(?:grade\s*)?1[12]\b/i', $year);
     }
 
     protected function overrideType(string $date): ?string

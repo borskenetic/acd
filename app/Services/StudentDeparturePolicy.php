@@ -53,7 +53,7 @@ class StudentDeparturePolicy
 
     public function earliestOutLabel(): string
     {
-        $time = $this->attendancePolicy->logoutTime();
+        $time = $this->attendancePolicy->logoutTime(null, null, Carbon::now($this->timezone()));
 
         return Carbon::today($this->timezone())
             ->setTimeFromTimeString($time)
@@ -67,7 +67,10 @@ class StudentDeparturePolicy
 
     private function earliestOutToday(): Carbon
     {
-        return Carbon::today($this->timezone())->setTimeFromTimeString($this->attendancePolicy->logoutTime());
+        $now = Carbon::now($this->timezone());
+
+        return Carbon::today($this->timezone())
+            ->setTimeFromTimeString($this->attendancePolicy->logoutTime(null, null, $now));
     }
 
     private function resolveLevelValue(Student $student): ?string

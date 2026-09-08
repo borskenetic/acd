@@ -20,6 +20,10 @@ class StudentSessionScheduleService
 
     public const SESSION_HALF_DAY_OUT = 'half_day_out';
 
+    public function __construct(
+        protected AttendancePolicyService $policy,
+    ) {}
+
     public function timezone(): string
     {
         return (string) config('attendance_sessions.timezone', 'Asia/Manila');
@@ -241,9 +245,7 @@ class StudentSessionScheduleService
         $day = $at->copy()->timezone($this->timezone())->startOfDay();
 
         $time = match ($sessionKey) {
-            self::SESSION_HALF_DAY_OUT => $halfDay && empty($schedule['half_day'])
-                ? ($schedule['lunch_out'] ?? null) // Friday half-day uses morning dismissal
-                : ($schedule['half_day_out'] ?? $schedule['lunch_out'] ?? null),
+            self::SESSION_HALF_DAY_OUT => $this->halfDayOutTime($schedule, $halfDay),
             self::SESSION_LUNCH_OUT => $schedule['lunch_out'] ?? null,
             self::SESSION_EOD_OUT => $schedule['eod_out'] ?? null,
             default => null,
@@ -254,6 +256,24 @@ class StudentSessionScheduleService
         }
 
         return $day->copy()->setTimeFromTimeString($time);
+    }
+
+    /**
+     * Kinder (always half-day) keeps schedule half_day_out.
+     * Grades 1–10 Friday half-day uses policy Friday logout (same morning, no afternoon).
+     */
+    protected function halfDayOutTime(array $schedule, bool $halfDay): ?string
+    {
+        if (! empty($schedule['half_day'])) {
+            return $schedule['half_day_out'] ?? $schedule['lunch_out'] ?? null;
+        }
+
+        if ($halfDay) {
+            return $this->policy->fridayLogoutTime()
+                ?: ($schedule['lunch_out'] ?? null);
+        }
+
+        return $schedule['half_day_out'] ?? $schedule['lunch_out'] ?? null;
     }
 
     public function lunchOutAt(array $schedule, Carbon $at): ?Carbon

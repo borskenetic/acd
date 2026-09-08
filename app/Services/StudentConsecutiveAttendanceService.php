@@ -106,8 +106,9 @@ class StudentConsecutiveAttendanceService
             $scannedAt = $firstIn[$date] ?? null;
 
             if ($scannedAt === null) {
-                // Friday online classes count as present — ends current streak.
-                if ($this->calendar->isFridayOnlineDay($date)) {
+                // SHS Friday online counts as present — ends current streak.
+                // K–10 Friday half-day without a morning IN counts as absent.
+                if ($this->calendar->isFridayOnlineDay($date, $year)) {
                     break;
                 }
 

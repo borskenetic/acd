@@ -44,7 +44,7 @@ class AttendanceLog extends Model
 
         return match ((string) $this->source) {
             'gate_sync' => 'Gate terminal (offline)',
-            'friday_auto' => 'Friday online (auto)',
+            'friday_auto' => 'Friday online SHS (auto)',
             'auto_eod_out', 'auto_lunch_out', 'auto_afternoon_in' => 'System autofill',
             'streak_demo' => 'Demo seed',
             'web' => 'Unnamed kiosk',

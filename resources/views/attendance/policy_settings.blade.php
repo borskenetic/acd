@@ -7,12 +7,20 @@
     $logoutDisplay = \Carbon\Carbon::today($tz)->setTimeFromTimeString($policy->permanentLogoutTime())->format('g:i A');
     $lateCutoffDisplay = \Carbon\Carbon::today($tz)
         ->setTimeFromTimeString($policy->permanentLoginTime())
-        ->addMinutes($policy->tardyGraceMinutes())
+        ->addMinutes($policy->defaultTardyGraceMinutes())
         ->format('g:i A');
     $shsLogin = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_login_time'])->format('g:i A');
     $shsLogout = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_logout_time'])->format('g:i A');
+    $shsLateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($values['shs_login_time'])
+        ->addMinutes($policy->shsTardyGraceMinutes())
+        ->format('g:i A');
     $eveLogin = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_login_time'])->format('g:i A');
     $eveLogout = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_logout_time'])->format('g:i A');
+    $eveLateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($values['shs_evening_login_time'])
+        ->addMinutes($policy->shsTardyGraceMinutes())
+        ->format('g:i A');
     $activeTemp = $policy->activeTemporaryOverride();
     $canEditK10 = $canEditK10 ?? true;
     $canEditShs = $canEditShs ?? true;
@@ -127,6 +135,17 @@
                                value="{{ old('shs_logout_time', $values['shs_logout_time']) }}" required>
                         <div class="form-text">Currently {{ $shsLogout }}</div>
                     </div>
+                    @if($canEditShared)
+                    <div class="col-md-6">
+                        <label for="shsTardyGrace" class="form-label">Grace period before late (minutes)</label>
+                        <input type="number" name="shs_tardy_grace_minutes" id="shsTardyGrace" class="form-control"
+                               min="0" max="120" value="{{ old('shs_tardy_grace_minutes', $values['shs_tardy_grace_minutes']) }}" required>
+                        <div class="form-text">
+                            Day check-in after <strong>{{ $shsLateCutoffDisplay }}</strong> is LATE (login + grace).
+                            Also applies to evening (cutoff {{ $eveLateCutoffDisplay }}).
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -267,7 +286,8 @@
         <div class="card mb-4 border-0 bg-light">
             <div class="card-body small text-muted">
                 Grace period and SMS streak thresholds are school-wide and can only be changed by
-                superadmin / staff. Current: grace {{ $values['tardy_grace_minutes'] }} min;
+                superadmin / staff. Current: K–10 grace {{ $values['tardy_grace_minutes'] }} min;
+                SHS grace {{ $values['shs_tardy_grace_minutes'] }} min;
                 late streak {{ $values['consecutive_late_threshold'] }}
                 ({{ ($values['consecutive_late_sms_enabled'] ?? true) ? 'SMS on' : 'SMS off' }});
                 absent streak {{ $values['consecutive_absent_threshold'] }}

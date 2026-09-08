@@ -25,6 +25,7 @@ return [
         'login_time' => env('ATTENDANCE_GATE_LOGIN_TIME', '07:30'),
         'logout_time' => env('ATTENDANCE_GATE_LOGOUT_TIME', '16:00'),
         'tardy_grace_minutes' => (int) env('ATTENDANCE_TARDY_GRACE_MINUTES', 5),
+        'shs_tardy_grace_minutes' => (int) env('ATTENDANCE_SHS_TARDY_GRACE_MINUTES', env('ATTENDANCE_TARDY_GRACE_MINUTES', 5)),
 
         /*
         | Senior High day class times (Grade 11–12, non-evening sections).
@@ -38,7 +39,8 @@ return [
         /*
         | Per-year login overrides (H:i) for non-SHS grades if needed.
         | SHS years use shs_login_time above (overridable in policy UI).
-        | LATE = first IN after (login + tardy_grace_minutes) for that year.
+        | LATE = first IN after (login + grace) — K–10 uses tardy_grace_minutes,
+        | SHS day/evening use shs_tardy_grace_minutes.
         | Section schedules below take priority over this map.
         */
         'login_time_by_year' => [

@@ -18,15 +18,15 @@
     $currentClassification = strtoupper((string) (request('classification') ?: request('status', '')));
     $lateCutoffDisplay = \Carbon\Carbon::today($tz)
         ->setTimeFromTimeString($policy->loginTime())
-        ->addMinutes($policy->tardyGraceMinutes())
+        ->addMinutes($policy->defaultTardyGraceMinutes())
         ->format('g:i A');
     $grade12LateCutoffDisplay = \Carbon\Carbon::today($tz)
         ->setTimeFromTimeString($policy->loginTime('Grade 12'))
-        ->addMinutes($policy->tardyGraceMinutes())
+        ->addMinutes($policy->tardyGraceMinutes('Grade 12'))
         ->format('g:i A');
     $nightLateCutoffDisplay = \Carbon\Carbon::today($tz)
         ->setTimeFromTimeString($policy->loginTime('Grade 11', 'Abigail'))
-        ->addMinutes($policy->tardyGraceMinutes())
+        ->addMinutes($policy->tardyGraceMinutes('Grade 11', 'Abigail'))
         ->format('g:i A');
 
     $filterUrl = function (array $merge = [], array $except = []) use ($query) {

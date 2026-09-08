@@ -171,6 +171,7 @@ class AttendanceController extends Controller
         }
         if ($canShared) {
             $rules['tardy_grace_minutes'] = 'required|integer|min:0|max:120';
+            $rules['shs_tardy_grace_minutes'] = 'required|integer|min:0|max:120';
             $rules['consecutive_late_threshold'] = 'required|integer|min:1|max:30';
             $rules['consecutive_absent_threshold'] = 'required|integer|min:1|max:30';
             $rules['consecutive_late_sms_enabled'] = 'nullable|in:0,1';

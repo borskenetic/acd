@@ -282,9 +282,38 @@ class AttendancePolicyService
         return str_contains($a, $b) || str_contains($b, $a);
     }
 
-    public function tardyGraceMinutes(): int
+    /** Grace for K–10 / general (and fallback when year/section unknown). */
+    public function tardyGraceMinutes(?string $year = null, ?string $section = null): int
+    {
+        if ($this->usesShsGrace($year, $section)) {
+            return $this->shsTardyGraceMinutes();
+        }
+
+        return $this->defaultTardyGraceMinutes();
+    }
+
+    public function defaultTardyGraceMinutes(): int
     {
         return (int) ($this->policy()['tardy_grace_minutes'] ?? config('attendance.gate.tardy_grace_minutes', 10));
+    }
+
+    /** Grace for Senior High day and evening schedules. */
+    public function shsTardyGraceMinutes(): int
+    {
+        $policy = $this->policy();
+        if (array_key_exists('shs_tardy_grace_minutes', $policy) && $policy['shs_tardy_grace_minutes'] !== null && $policy['shs_tardy_grace_minutes'] !== '') {
+            return (int) $policy['shs_tardy_grace_minutes'];
+        }
+
+        return (int) (config('attendance.gate.shs_tardy_grace_minutes')
+            ?? $this->defaultTardyGraceMinutes());
+    }
+
+    public function usesShsGrace(?string $year = null, ?string $section = null): bool
+    {
+        $year = $this->normalizeLabel($year);
+
+        return $year !== null && $this->isSeniorHighYear($year);
     }
 
     public function consecutiveLateThreshold(): int
@@ -302,7 +331,7 @@ class AttendancePolicyService
         $tz = $this->timezone();
 
         return Carbon::parse($date.' '.$this->loginTime($year, $section), $tz)
-            ->addMinutes($this->tardyGraceMinutes());
+            ->addMinutes($this->tardyGraceMinutes($year, $section));
     }
 
     /** Time-of-day after which first IN counts as late (H:i:s). */
@@ -310,7 +339,7 @@ class AttendancePolicyService
     {
         return Carbon::today($this->timezone())
             ->setTimeFromTimeString($this->loginTime($year, $section))
-            ->addMinutes($this->tardyGraceMinutes())
+            ->addMinutes($this->tardyGraceMinutes($year, $section))
             ->format('H:i:s');
     }
 
@@ -537,7 +566,8 @@ class AttendancePolicyService
     public function applyLatePredicate(Builder $query, bool $late): Builder
     {
         $operator = $late ? '>' : '<=';
-        $grace = $this->tardyGraceMinutes();
+        $grace = $this->defaultTardyGraceMinutes();
+        $shsGrace = $this->shsTardyGraceMinutes();
         $tz = $this->timezone();
         $defaultCutoff = $this->lateCutoffTimeString();
         $sectionSchedules = $this->sectionSchedules();
@@ -546,15 +576,17 @@ class AttendancePolicyService
         return $query->where(function (Builder $outer) use (
             $operator,
             $grace,
+            $shsGrace,
             $tz,
             $defaultCutoff,
             $sectionSchedules,
             $yearOverrides
         ) {
             foreach ($sectionSchedules as $sched) {
+                $isShs = count(array_intersect($sched['years'], $this->seniorHighYears())) > 0;
                 $cutoff = Carbon::today($tz)
                     ->setTimeFromTimeString($sched['login_time'])
-                    ->addMinutes($grace)
+                    ->addMinutes($isShs ? $shsGrace : $grace)
                     ->format('H:i:s');
 
                 $outer->orWhere(function (Builder $q) use ($sched, $cutoff, $operator) {
@@ -567,7 +599,7 @@ class AttendancePolicyService
             foreach ($yearOverrides as $year => $loginTime) {
                 $cutoff = Carbon::today($tz)
                     ->setTimeFromTimeString($loginTime)
-                    ->addMinutes($grace)
+                    ->addMinutes($this->isSeniorHighYear($year) ? $shsGrace : $grace)
                     ->format('H:i:s');
 
                 $excludedSections = $this->sectionsCoveredForYear($year, $sectionSchedules);
@@ -681,7 +713,8 @@ class AttendancePolicyService
             'shs_logout_time' => $this->normalizeTimeInput($this->shsLogoutTime()),
             'shs_evening_login_time' => $this->normalizeTimeInput($this->shsEveningLoginTime()),
             'shs_evening_logout_time' => $this->normalizeTimeInput($this->shsEveningLogoutTime()),
-            'tardy_grace_minutes' => $this->tardyGraceMinutes(),
+            'tardy_grace_minutes' => $this->defaultTardyGraceMinutes(),
+            'shs_tardy_grace_minutes' => $this->shsTardyGraceMinutes(),
             'consecutive_late_threshold' => $this->consecutiveLateThreshold(),
             'consecutive_absent_threshold' => $this->consecutiveAbsentThreshold(),
             'consecutive_late_sms_enabled' => Setting::smsConsecutiveLateAlertsEnabled(),
@@ -771,6 +804,9 @@ class AttendancePolicyService
         if ($canShared) {
             if (array_key_exists('tardy_grace_minutes', $data)) {
                 $payload['tardy_grace_minutes'] = (int) $data['tardy_grace_minutes'];
+            }
+            if (array_key_exists('shs_tardy_grace_minutes', $data)) {
+                $payload['shs_tardy_grace_minutes'] = (int) $data['shs_tardy_grace_minutes'];
             }
             if (array_key_exists('consecutive_late_threshold', $data)) {
                 $payload['consecutive_late_threshold'] = (int) $data['consecutive_late_threshold'];

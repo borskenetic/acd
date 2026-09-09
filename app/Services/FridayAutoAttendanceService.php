@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Fridays are online classes — mark every student present with a morning IN
- * when they have no real scan yet. OUT is written only after dismissal time
- * has passed (otherwise EOD / half-day auto-out closes the day later).
+ * Friday online auto-present for Senior High only.
+ * Kinder–Grade 10 are on-campus half days (morning IN + midday OUT via the
+ * session schedule); they are not auto-marked.
  */
 class FridayAutoAttendanceService
 {
@@ -59,6 +59,14 @@ class FridayAutoAttendanceService
             ->orderBy('id')
             ->chunkById(200, function ($students) use ($dateStr, $tz, $now, &$ins, &$outs, &$skipped) {
                 foreach ($students as $student) {
+                    // K–10 campus half-day: students scan morning IN/OUT themselves.
+                    if ($this->schedule->usesSessionModel($student)
+                        || ! $this->policy->isSeniorHighYear($student->year)) {
+                        $skipped++;
+
+                        continue;
+                    }
+
                     $result = $this->markStudent($student, $dateStr, $tz, $now);
                     $ins += $result['in'] ? 1 : 0;
                     $outs += $result['out'] ? 1 : 0;
@@ -109,7 +117,7 @@ class FridayAutoAttendanceService
                 AttendanceLog::create([
                     'student_id' => $student->id,
                     'status' => 'IN',
-                    'section' => 'Friday online (auto)',
+                    'section' => 'Friday online SHS (auto)',
                     'scanned_at' => $inAt,
                     'source' => self::SOURCE,
                 ]);
@@ -121,7 +129,7 @@ class FridayAutoAttendanceService
                 AttendanceLog::create([
                     'student_id' => $student->id,
                     'status' => 'OUT',
-                    'section' => 'Friday online (auto)',
+                    'section' => 'Friday online SHS (auto)',
                     'scanned_at' => $outAt,
                     'source' => self::SOURCE,
                 ]);

@@ -5,14 +5,23 @@
     $tz = $policy->timezone();
     $loginDisplay = \Carbon\Carbon::today($tz)->setTimeFromTimeString($policy->permanentLoginTime())->format('g:i A');
     $logoutDisplay = \Carbon\Carbon::today($tz)->setTimeFromTimeString($policy->permanentLogoutTime())->format('g:i A');
+    $fridayLogoutDisplay = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['friday_logout_time'])->format('g:i A');
     $lateCutoffDisplay = \Carbon\Carbon::today($tz)
         ->setTimeFromTimeString($policy->permanentLoginTime())
-        ->addMinutes($policy->tardyGraceMinutes())
+        ->addMinutes($policy->defaultTardyGraceMinutes())
         ->format('g:i A');
     $shsLogin = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_login_time'])->format('g:i A');
     $shsLogout = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_logout_time'])->format('g:i A');
+    $shsLateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($values['shs_login_time'])
+        ->addMinutes($policy->shsTardyGraceMinutes())
+        ->format('g:i A');
     $eveLogin = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_login_time'])->format('g:i A');
     $eveLogout = \Carbon\Carbon::today($tz)->setTimeFromTimeString($values['shs_evening_logout_time'])->format('g:i A');
+    $eveLateCutoffDisplay = \Carbon\Carbon::today($tz)
+        ->setTimeFromTimeString($values['shs_evening_login_time'])
+        ->addMinutes($policy->shsTardyGraceMinutes())
+        ->format('g:i A');
     $activeTemp = $policy->activeTemporaryOverride();
     $canEditK10 = $canEditK10 ?? true;
     $canEditShs = $canEditShs ?? true;
@@ -67,20 +76,31 @@
                 <p class="text-muted">
                     Controls when a student’s <strong>first IN of the day</strong> is marked
                     <strong>LATE</strong> on logs, SF2, and consecutive-late SMS.
-                    Later same-day INs stay IN. Friday online classes auto-mark present system-wide.
+                    Later same-day INs stay IN.
+                    On <strong>Fridays</strong>, Kinder–Grade 10 are <strong>half day</strong>:
+                    same morning login, no afternoon classes (dismiss at the Friday logout below).
+                    Senior High Friday online auto-present is separate.
                 </p>
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label for="loginTime" class="form-label">Expected login time</label>
                         <input type="time" name="login_time" id="loginTime" class="form-control"
                                value="{{ old('login_time', $values['login_time']) }}" required>
-                        <div class="form-text">Currently {{ $loginDisplay }}</div>
+                        <div class="form-text">Currently {{ $loginDisplay }} (including Fridays)</div>
                     </div>
                     <div class="col-md-6">
-                        <label for="logoutTime" class="form-label">Expected logout time</label>
+                        <label for="logoutTime" class="form-label">Expected logout time (Mon–Thu)</label>
                         <input type="time" name="logout_time" id="logoutTime" class="form-control"
                                value="{{ old('logout_time', $values['logout_time']) }}" required>
                         <div class="form-text">Currently {{ $logoutDisplay }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="fridayLogoutTime" class="form-label">Friday half-day logout</label>
+                        <input type="time" name="friday_logout_time" id="fridayLogoutTime" class="form-control"
+                               value="{{ old('friday_logout_time', $values['friday_logout_time']) }}" required>
+                        <div class="form-text">
+                            Currently {{ $fridayLogoutDisplay }}. No afternoon sessions on Fridays.
+                        </div>
                     </div>
                     @if($canEditShared)
                     <div class="col-md-6">
@@ -100,7 +120,8 @@
         @else
         <div class="card mb-4 border-0 bg-light">
             <div class="card-body small text-muted">
-                <strong>K–10 / general times</strong> (read only): login {{ $loginDisplay }}, logout {{ $logoutDisplay }}.
+                <strong>K–10 / general times</strong> (read only): login {{ $loginDisplay }},
+                logout {{ $logoutDisplay }}, Friday half-day {{ $fridayLogoutDisplay }}.
                 Managed by K–10 Admin or superadmin.
             </div>
         </div>
@@ -127,6 +148,17 @@
                                value="{{ old('shs_logout_time', $values['shs_logout_time']) }}" required>
                         <div class="form-text">Currently {{ $shsLogout }}</div>
                     </div>
+                    @if($canEditShared)
+                    <div class="col-md-6">
+                        <label for="shsTardyGrace" class="form-label">Grace period before late (minutes)</label>
+                        <input type="number" name="shs_tardy_grace_minutes" id="shsTardyGrace" class="form-control"
+                               min="0" max="120" value="{{ old('shs_tardy_grace_minutes', $values['shs_tardy_grace_minutes']) }}" required>
+                        <div class="form-text">
+                            Day check-in after <strong>{{ $shsLateCutoffDisplay }}</strong> is LATE (login + grace).
+                            Also applies to evening (cutoff {{ $eveLateCutoffDisplay }}).
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -267,7 +299,8 @@
         <div class="card mb-4 border-0 bg-light">
             <div class="card-body small text-muted">
                 Grace period and SMS streak thresholds are school-wide and can only be changed by
-                superadmin / staff. Current: grace {{ $values['tardy_grace_minutes'] }} min;
+                superadmin / staff. Current: K–10 grace {{ $values['tardy_grace_minutes'] }} min;
+                SHS grace {{ $values['shs_tardy_grace_minutes'] }} min;
                 late streak {{ $values['consecutive_late_threshold'] }}
                 ({{ ($values['consecutive_late_sms_enabled'] ?? true) ? 'SMS on' : 'SMS off' }});
                 absent streak {{ $values['consecutive_absent_threshold'] }}

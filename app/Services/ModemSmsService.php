@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Jobs\SendModemSmsJob;
 use App\Models\SmsLog;
+use App\Models\StudentAttendanceAlertState;
+use App\Models\StudentDailySms;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +33,8 @@ class ModemSmsService
     /**
      * Gate / alert path: try once, then keep retrying when the modem queue is full.
      *
-     * Returns true when accepted now or queued for retry (so attendance can mark the event claimed).
+     * Returns true only when the modem accepted the message (HTTP 2xx).
+     * Pending retries apply the attendance claim from meta when they eventually succeed.
      *
      * @param  array{
      *   type?: string,
@@ -43,9 +46,7 @@ class ModemSmsService
      */
     public function sendWithRetry(string $number, string $message, array $context = []): bool
     {
-        $result = $this->deliver($number, $message, $context, withRetry: true);
-
-        return in_array($result, ['success', 'pending'], true);
+        return $this->deliver($number, $message, $context, withRetry: true) === 'success';
     }
 
     /**
@@ -76,6 +77,21 @@ class ModemSmsService
             );
 
             return 'skipped';
+        }
+
+        // Avoid a second in-flight copy for the same student/event while retries run.
+        if ($withRetry && is_numeric($studentId)) {
+            $existingPending = SmsLog::query()
+                ->where('student_id', (int) $studentId)
+                ->where('type', $type !== '' ? $type : 'unknown')
+                ->where('status', SmsLog::STATUS_PENDING)
+                ->where('created_at', '>=', now()->subDay())
+                ->orderByDesc('id')
+                ->first();
+
+            if ($existingPending) {
+                return 'pending';
+            }
         }
 
         $url = config('services.sms_modem.url') ?: env('SMS_MODEM_URL');
@@ -138,9 +154,11 @@ class ModemSmsService
 
                 if ($log) {
                     $this->dispatchRetry($log, $this->retryDelaySeconds(1));
+
+                    return 'pending';
                 }
 
-                return 'pending';
+                return 'failed';
             }
 
             $this->writeLog(
@@ -176,9 +194,11 @@ class ModemSmsService
 
                 if ($log) {
                     $this->dispatchRetry($log, $this->retryDelaySeconds(1));
+
+                    return 'pending';
                 }
 
-                return 'pending';
+                return 'failed';
             }
 
             $this->writeLog(
@@ -233,7 +253,7 @@ class ModemSmsService
                 $log->update([
                     'status' => SmsLog::STATUS_FAILED,
                     'error' => trim((string) $log->error)." — gave up after {$maxAttempts} attempts",
-                    'meta' => $meta + ['gave_up_at' => now()->toIso8601String()],
+                    'meta' => array_merge($meta, ['gave_up_at' => now()->toIso8601String()]),
                 ]);
 
                 return 'give_up';
@@ -274,10 +294,12 @@ class ModemSmsService
                         'status' => SmsLog::STATUS_SUCCESS,
                         'http_status' => $response->status(),
                         'error' => null,
-                        'meta' => $this->retryMeta($meta, attempt: $nextAttempt) + [
+                        'meta' => array_merge($this->retryMeta($meta, attempt: $nextAttempt), [
                             'delivered_at' => now()->toIso8601String(),
-                        ],
+                        ]),
                     ]);
+
+                    $this->applyAttendanceClaim($log->fresh() ?? $log);
 
                     return 'success';
                 }
@@ -602,11 +624,104 @@ class ModemSmsService
     {
         $meta = is_array($meta) ? $meta : [];
 
-        return $meta + [
+        return array_merge($meta, [
             'retry_attempt' => $attempt,
             'retryable' => true,
             'last_retry_at' => now()->toIso8601String(),
-        ];
+        ]);
+    }
+
+    /**
+     * When a deferred retry finally succeeds, mark the daily attendance SMS claim.
+     */
+    public function applyAttendanceClaim(SmsLog $log): void
+    {
+        $meta = is_array($log->meta) ? $log->meta : [];
+        $claim = $meta['attendance_claim'] ?? null;
+        if (! is_array($claim)) {
+            return;
+        }
+
+        $studentId = isset($claim['student_id']) && is_numeric($claim['student_id'])
+            ? (int) $claim['student_id']
+            : null;
+        $logDate = isset($claim['log_date']) && is_string($claim['log_date']) && $claim['log_date'] !== ''
+            ? $claim['log_date']
+            : null;
+        $kind = isset($claim['kind']) && is_string($claim['kind']) ? $claim['kind'] : null;
+
+        if ($studentId === null || $kind === null) {
+            return;
+        }
+
+        try {
+            if (in_array($kind, ['event', 'arrival', 'departure'], true)) {
+                if ($logDate === null) {
+                    return;
+                }
+
+                $daily = StudentDailySms::query()->firstOrCreate(
+                    ['student_id' => $studentId, 'log_date' => $logDate],
+                    ['arrival_sent' => false, 'departure_sent' => false, 'events_sent' => []]
+                );
+
+                if ($kind === 'arrival') {
+                    if (! $daily->arrival_sent) {
+                        $daily->update(['arrival_sent' => true]);
+                    }
+
+                    return;
+                }
+
+                if ($kind === 'departure') {
+                    if (! $daily->departure_sent) {
+                        $daily->update(['departure_sent' => true]);
+                    }
+
+                    return;
+                }
+
+                $event = isset($claim['event']) && is_string($claim['event']) ? $claim['event'] : null;
+                if ($event === null || $event === '') {
+                    return;
+                }
+
+                $sent = $daily->events_sent ?? [];
+                if (! is_array($sent)) {
+                    $sent = [];
+                }
+                if (! in_array($event, $sent, true)) {
+                    $sent[] = $event;
+                    $daily->update(['events_sent' => array_values(array_unique($sent))]);
+                }
+
+                return;
+            }
+
+            if ($kind === 'consecutive_late' || $kind === 'consecutive_absent') {
+                $count = isset($claim['streak_count']) && is_numeric($claim['streak_count'])
+                    ? (int) $claim['streak_count']
+                    : null;
+                if ($count === null) {
+                    return;
+                }
+
+                $state = StudentAttendanceAlertState::query()->firstOrCreate(
+                    ['student_id' => $studentId],
+                    ['late_streak_notified' => 0, 'absent_streak_notified' => 0]
+                );
+
+                if ($kind === 'consecutive_late' && $state->late_streak_notified < $count) {
+                    $state->update(['late_streak_notified' => $count]);
+                }
+
+                if ($kind === 'consecutive_absent' && $state->absent_streak_notified < $count) {
+                    $state->update(['absent_streak_notified' => $count]);
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     private function writeLog(

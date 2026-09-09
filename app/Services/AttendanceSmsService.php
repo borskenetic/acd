@@ -74,6 +74,11 @@ class AttendanceSmsService
                     'arrival',
                     $student,
                     $gateDevice,
+                    [
+                        'student_id' => $student->id,
+                        'log_date' => $date,
+                        'kind' => 'arrival',
+                    ],
                 );
                 if ($ok) {
                     $daily->update(['arrival_sent' => true]);
@@ -86,6 +91,11 @@ class AttendanceSmsService
                     'departure',
                     $student,
                     $gateDevice,
+                    [
+                        'student_id' => $student->id,
+                        'log_date' => $date,
+                        'kind' => 'departure',
+                    ],
                 );
                 if ($ok) {
                     $daily->update(['departure_sent' => true]);
@@ -140,6 +150,12 @@ class AttendanceSmsService
                 ],
                 'consecutive_absent',
                 $student,
+                null,
+                [
+                    'student_id' => $student->id,
+                    'kind' => 'consecutive_absent',
+                    'streak_count' => $consecutiveAbsent,
+                ],
             );
 
             if ($ok) {
@@ -188,6 +204,12 @@ class AttendanceSmsService
             ],
             'consecutive_late',
             $student,
+            null,
+            [
+                'student_id' => $student->id,
+                'kind' => 'consecutive_late',
+                'streak_count' => $consecutiveLate,
+            ],
         );
 
         if ($ok) {
@@ -261,7 +283,16 @@ class AttendanceSmsService
             return;
         }
 
-        if ($this->sendTemplate($number, $template, $vars, $event, $student, $gateDevice)) {
+        $logDate = $daily->log_date instanceof \DateTimeInterface
+            ? $daily->log_date->format('Y-m-d')
+            : (string) $daily->log_date;
+
+        if ($this->sendTemplate($number, $template, $vars, $event, $student, $gateDevice, [
+            'student_id' => $student?->id ?? $daily->student_id,
+            'log_date' => $logDate,
+            'kind' => 'event',
+            'event' => $event,
+        ])) {
             $sent[] = $event;
             $daily->update(['events_sent' => array_values(array_unique($sent))]);
         }
@@ -276,7 +307,10 @@ class AttendanceSmsService
         );
     }
 
-    /** @param  array<string, string>  $vars */
+    /**
+     * @param  array<string, string>  $vars
+     * @param  array<string, mixed>|null  $attendanceClaim
+     */
     protected function sendTemplate(
         string $number,
         string $template,
@@ -284,6 +318,7 @@ class AttendanceSmsService
         string $type = 'gate',
         ?Student $student = null,
         ?GateDevice $gateDevice = null,
+        ?array $attendanceClaim = null,
     ): bool {
         $number = trim($number);
         if ($number === '') {
@@ -300,19 +335,20 @@ class AttendanceSmsService
             ? $child
             : (is_string($vars['name'] ?? null) ? $vars['name'] : null);
 
-        $meta = null;
+        $meta = [];
         if ($gateDevice) {
-            $meta = [
-                'gate_device_id' => $gateDevice->id,
-                'kiosk_name' => $gateDevice->name,
-            ];
+            $meta['gate_device_id'] = $gateDevice->id;
+            $meta['kiosk_name'] = $gateDevice->name;
+        }
+        if (is_array($attendanceClaim) && $attendanceClaim !== []) {
+            $meta['attendance_claim'] = $attendanceClaim;
         }
 
         return app(ModemSmsService::class)->sendWithRetry($number, $message, [
             'type' => $type !== '' ? $type : 'gate',
             'student_id' => $student?->id,
             'recipient_label' => $label,
-            'meta' => $meta,
+            'meta' => $meta !== [] ? $meta : null,
         ]);
     }
 }

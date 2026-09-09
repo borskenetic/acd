@@ -35,6 +35,7 @@
         Messages are sent to the student&apos;s <strong>emergency contact number</strong>.
         <code>{name}</code> is the <strong>emergency contact / guardian name</strong> (not the student).
         Elementary/JHS get one SMS per real gate scan (morning IN, lunch OUT, afternoon IN, EOD OUT).
+        Half-day OUT and early lunch OUT (before that grade&apos;s lunch time) use their own templates.
         Lunch/afternoon system autofills do not send SMS; missed EOD auto-OUT does notify the guardian.
         SHS/College still use arrival + departure (once each per day).
     </p>
@@ -53,9 +54,26 @@
         </div>
 
         <div class="card mb-3">
-            <div class="card-header fw-semibold">Lunch / half-day OUT</div>
+            <div class="card-header fw-semibold">Lunch OUT</div>
             <div class="card-body">
                 <textarea name="lunch_out" class="form-control" rows="2" required>{{ old('lunch_out', $lunchOut) }}</textarea>
+                <p class="small text-muted mb-0 mt-2">Used when the lunch OUT scan is at or after that grade&apos;s lunch OUT time (Grades 1–2: 11:00, Grade 3: 11:15, Grades 4–10: 12:00).</p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Half-day OUT</div>
+            <div class="card-body">
+                <textarea name="half_day_out" class="form-control" rows="2" required>{{ old('half_day_out', $halfDayOut) }}</textarea>
+                <p class="small text-muted mb-0 mt-2">Kinder every day; Grades 1–10 on Friday morning dismissal. Never uses the lunch/break wording.</p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Early OUT (before lunch time)</div>
+            <div class="card-body">
+                <textarea name="early_out" class="form-control" rows="2" required>{{ old('early_out', $earlyOut) }}</textarea>
+                <p class="small text-muted mb-0 mt-2">Used for a lunch OUT scan recorded before that grade&apos;s scheduled lunch OUT time (e.g. offline gate sync).</p>
             </div>
         </div>
 

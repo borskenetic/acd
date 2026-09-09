@@ -56,7 +56,7 @@ class AttendanceSmsService
 
         if ($this->sessionSchedule->usesSessionModel($student)) {
             $event = $forcedEvent ?: ($sessionKey ?: $this->inferSessionEvent($student, $status, $scannedAt));
-            $template = $this->templateForSessionEvent($event);
+            $template = $this->templateForSessionEvent($event, $student, $scannedAt);
 
             $this->sendOnce($daily, $event, $number, $template, [
                 'name' => $guardianName,
@@ -214,17 +214,32 @@ class AttendanceSmsService
         return $expected['session_key'] ?? (strtoupper($status) === 'IN' ? 'morning_in' : 'eod_out');
     }
 
-    protected function templateForSessionEvent(string $event): string
+    protected function templateForSessionEvent(string $event, ?Student $student = null, ?Carbon $scannedAt = null): string
     {
         return match ($event) {
             StudentSessionScheduleService::SESSION_MORNING_IN => Setting::scanSmsMorningInTemplate(),
-            StudentSessionScheduleService::SESSION_LUNCH_OUT,
-            StudentSessionScheduleService::SESSION_HALF_DAY_OUT => Setting::scanSmsLunchOutTemplate(),
+            StudentSessionScheduleService::SESSION_HALF_DAY_OUT => Setting::scanSmsHalfDayOutTemplate(),
+            StudentSessionScheduleService::SESSION_LUNCH_OUT => $this->lunchOutTemplate($student, $scannedAt),
             StudentSessionScheduleService::SESSION_AFTERNOON_IN => Setting::scanSmsAfternoonInTemplate(),
             StudentSessionScheduleService::SESSION_EOD_OUT => Setting::scanSmsEodOutTemplate(),
             'missed_eod' => Setting::scanSmsMissedEodTemplate(),
             default => Setting::scanSmsArrivalTemplate(),
         };
+    }
+
+    protected function lunchOutTemplate(?Student $student, ?Carbon $scannedAt): string
+    {
+        if ($student && $scannedAt) {
+            $schedule = $this->sessionSchedule->resolveSchedule($student);
+            if ($schedule !== null) {
+                $lunchOutAt = $this->sessionSchedule->lunchOutAt($schedule, $scannedAt);
+                if ($lunchOutAt && $scannedAt->copy()->timezone($this->sessionSchedule->timezone())->lt($lunchOutAt)) {
+                    return Setting::scanSmsEarlyOutTemplate();
+                }
+            }
+        }
+
+        return Setting::scanSmsLunchOutTemplate();
     }
 
     /** @param  array<string, string>  $vars */

@@ -109,6 +109,8 @@ class SmsController extends Controller
             'departure' => Setting::scanSmsDepartureTemplate(),
             'morningIn' => Setting::scanSmsMorningInTemplate(),
             'lunchOut' => Setting::scanSmsLunchOutTemplate(),
+            'halfDayOut' => Setting::scanSmsHalfDayOutTemplate(),
+            'earlyOut' => Setting::scanSmsEarlyOutTemplate(),
             'afternoonIn' => Setting::scanSmsAfternoonInTemplate(),
             'eodOut' => Setting::scanSmsEodOutTemplate(),
             'missedEod' => Setting::scanSmsMissedEodTemplate(),
@@ -134,6 +136,8 @@ class SmsController extends Controller
         if ($scope['k10']) {
             $rules['morning_in'] = 'required|string|max:500';
             $rules['lunch_out'] = 'required|string|max:500';
+            $rules['half_day_out'] = 'required|string|max:500';
+            $rules['early_out'] = 'required|string|max:500';
             $rules['afternoon_in'] = 'required|string|max:500';
             $rules['eod_out'] = 'required|string|max:500';
             $rules['missed_eod'] = 'required|string|max:500';
@@ -155,6 +159,8 @@ class SmsController extends Controller
         if ($scope['k10']) {
             $payload['morning_in'] = $request->input('morning_in');
             $payload['lunch_out'] = $request->input('lunch_out');
+            $payload['half_day_out'] = $request->input('half_day_out');
+            $payload['early_out'] = $request->input('early_out');
             $payload['afternoon_in'] = $request->input('afternoon_in');
             $payload['eod_out'] = $request->input('eod_out');
             $payload['missed_eod'] = $request->input('missed_eod');

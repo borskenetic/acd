@@ -22,6 +22,10 @@ class Setting extends Model
 
     public const KEY_SCAN_SMS_LUNCH_OUT = 'scan_sms_lunch_out';
 
+    public const KEY_SCAN_SMS_HALF_DAY_OUT = 'scan_sms_half_day_out';
+
+    public const KEY_SCAN_SMS_EARLY_OUT = 'scan_sms_early_out';
+
     public const KEY_SCAN_SMS_AFTERNOON_IN = 'scan_sms_afternoon_in';
 
     public const KEY_SCAN_SMS_EOD_OUT = 'scan_sms_eod_out';
@@ -152,6 +156,18 @@ class Setting extends Model
             ?? 'Hello {name}, your child scanned out for lunch/break at {time}.';
     }
 
+    public static function scanSmsHalfDayOutTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_HALF_DAY_OUT)->value('value')
+            ?? 'Hello {name}, your child left the campus at {time}.';
+    }
+
+    public static function scanSmsEarlyOutTemplate(): string
+    {
+        return static::where('key', self::KEY_SCAN_SMS_EARLY_OUT)->value('value')
+            ?? 'Hello {name}, your child left the campus at {time}.';
+    }
+
     public static function scanSmsAfternoonInTemplate(): string
     {
         return static::where('key', self::KEY_SCAN_SMS_AFTERNOON_IN)->value('value')
@@ -227,6 +243,8 @@ class Setting extends Model
             'departure' => self::KEY_SCAN_SMS_DEPARTURE,
             'morning_in' => self::KEY_SCAN_SMS_MORNING_IN,
             'lunch_out' => self::KEY_SCAN_SMS_LUNCH_OUT,
+            'half_day_out' => self::KEY_SCAN_SMS_HALF_DAY_OUT,
+            'early_out' => self::KEY_SCAN_SMS_EARLY_OUT,
             'afternoon_in' => self::KEY_SCAN_SMS_AFTERNOON_IN,
             'eod_out' => self::KEY_SCAN_SMS_EOD_OUT,
             'missed_eod' => self::KEY_SCAN_SMS_MISSED_EOD,

@@ -63,6 +63,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ->timezone('Asia/Manila')
             ->withoutOverlapping()
             ->appendOutputTo($schedulerLog);
+
+        // Drain pending gate SMS when the modem queue was full (503).
+        // --failed-503 also picks up today's earlier hard failures from before retries existed.
+        $schedule->command('sms:retry-pending --failed-503')
+            ->everyMinute()
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (TokenMismatchException $e, Request $request) {

@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Jobs\SendModemSmsJob;
 use App\Models\SmsLog;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -21,6 +24,34 @@ class ModemSmsService
      * }  $context
      */
     public function send(string $number, string $message, array $context = []): bool
+    {
+        return $this->deliver($number, $message, $context, withRetry: false) === 'success';
+    }
+
+    /**
+     * Gate / alert path: try once, then keep retrying when the modem queue is full.
+     *
+     * Returns true when accepted now or queued for retry (so attendance can mark the event claimed).
+     *
+     * @param  array{
+     *   type?: string,
+     *   student_id?: int|null,
+     *   user_id?: int|null,
+     *   recipient_label?: string|null,
+     *   meta?: array<string, mixed>|null
+     * }  $context
+     */
+    public function sendWithRetry(string $number, string $message, array $context = []): bool
+    {
+        $result = $this->deliver($number, $message, $context, withRetry: true);
+
+        return in_array($result, ['success', 'pending'], true);
+    }
+
+    /**
+     * @return 'success'|'pending'|'failed'|'skipped'
+     */
+    protected function deliver(string $number, string $message, array $context, bool $withRetry): string
     {
         $type = (string) ($context['type'] ?? 'unknown');
         $studentId = $context['student_id'] ?? null;
@@ -44,7 +75,7 @@ class ModemSmsService
                 meta: $meta,
             );
 
-            return false;
+            return 'skipped';
         }
 
         $url = config('services.sms_modem.url') ?: env('SMS_MODEM_URL');
@@ -64,7 +95,7 @@ class ModemSmsService
                 meta: $meta,
             );
 
-            return false;
+            return 'failed';
         }
 
         try {
@@ -72,16 +103,51 @@ class ModemSmsService
                 ['number' => $normalized, 'message' => $message],
             ], 30);
 
-            $ok = $response->successful();
-            $body = $response->body();
-            $error = $ok ? null : ('Modem responded HTTP '.$response->status()
-                .($body !== '' ? ': '.mb_substr($body, 0, 300) : ''));
+            if ($response->successful()) {
+                $this->writeLog(
+                    toNumber: $normalized,
+                    message: $message,
+                    type: $type,
+                    status: SmsLog::STATUS_SUCCESS,
+                    httpStatus: $response->status(),
+                    error: null,
+                    studentId: $studentId,
+                    userId: $userId,
+                    label: $label,
+                    meta: $meta,
+                );
+
+                return 'success';
+            }
+
+            $error = $this->formatHttpError($response);
+
+            if ($withRetry && $this->isRetryableHttpStatus($response->status())) {
+                $log = $this->writeLog(
+                    toNumber: $normalized,
+                    message: $message,
+                    type: $type,
+                    status: SmsLog::STATUS_PENDING,
+                    httpStatus: $response->status(),
+                    error: $error.' — queued for retry',
+                    studentId: $studentId,
+                    userId: $userId,
+                    label: $label,
+                    meta: $this->retryMeta($meta, attempt: 1),
+                );
+
+                if ($log) {
+                    $this->dispatchRetry($log, $this->retryDelaySeconds(1));
+                }
+
+                return 'pending';
+            }
 
             $this->writeLog(
                 toNumber: $normalized,
                 message: $message,
                 type: $type,
-                status: $ok ? SmsLog::STATUS_SUCCESS : SmsLog::STATUS_FAILED,
+                status: SmsLog::STATUS_FAILED,
                 httpStatus: $response->status(),
                 error: $error,
                 studentId: $studentId,
@@ -90,9 +156,30 @@ class ModemSmsService
                 meta: $meta,
             );
 
-            return $ok;
+            return 'failed';
         } catch (\Throwable $e) {
             report($e);
+
+            if ($withRetry && $this->isRetryableException($e)) {
+                $log = $this->writeLog(
+                    toNumber: $normalized,
+                    message: $message,
+                    type: $type,
+                    status: SmsLog::STATUS_PENDING,
+                    httpStatus: null,
+                    error: $e->getMessage().' — queued for retry',
+                    studentId: $studentId,
+                    userId: $userId,
+                    label: $label,
+                    meta: $this->retryMeta($meta, attempt: 1),
+                );
+
+                if ($log) {
+                    $this->dispatchRetry($log, $this->retryDelaySeconds(1));
+                }
+
+                return 'pending';
+            }
 
             $this->writeLog(
                 toNumber: $normalized,
@@ -107,8 +194,239 @@ class ModemSmsService
                 meta: $meta,
             );
 
-            return false;
+            return 'failed';
         }
+    }
+
+    /**
+     * Re-attempt a pending (or requeued failed) log. Updates the same sms_logs row.
+     *
+     * @return 'success'|'retry'|'give_up'|'skipped'
+     */
+    public function attemptPendingDelivery(SmsLog $log): string
+    {
+        $lock = Cache::lock('sms-retry-'.$log->id, 45);
+        if (! $lock->get()) {
+            return 'retry';
+        }
+
+        try {
+            $log->refresh();
+
+            if ($log->status === SmsLog::STATUS_SUCCESS) {
+                return 'success';
+            }
+
+            if ($log->status === SmsLog::STATUS_SKIPPED) {
+                return 'skipped';
+            }
+
+            if (! in_array($log->status, [SmsLog::STATUS_PENDING, SmsLog::STATUS_FAILED], true)) {
+                return 'give_up';
+            }
+
+            $meta = is_array($log->meta) ? $log->meta : [];
+            $attempt = (int) ($meta['retry_attempt'] ?? 0);
+            $maxAttempts = max(1, (int) config('services.sms_modem.retry_max_attempts', 60));
+
+            if ($attempt >= $maxAttempts) {
+                $log->update([
+                    'status' => SmsLog::STATUS_FAILED,
+                    'error' => trim((string) $log->error)." — gave up after {$maxAttempts} attempts",
+                    'meta' => $meta + ['gave_up_at' => now()->toIso8601String()],
+                ]);
+
+                return 'give_up';
+            }
+
+            $number = (string) ($log->to_number ?? '');
+            $message = (string) $log->message;
+            if ($number === '' || $message === '') {
+                $log->update([
+                    'status' => SmsLog::STATUS_SKIPPED,
+                    'error' => 'Missing number or message',
+                ]);
+
+                return 'skipped';
+            }
+
+            $url = config('services.sms_modem.url') ?: env('SMS_MODEM_URL');
+            $apiKey = config('services.sms_modem.key') ?: env('SMS_MODEM_API_KEY');
+
+            if (! $url) {
+                $log->update([
+                    'status' => SmsLog::STATUS_FAILED,
+                    'error' => 'SMS modem URL is not configured (SMS_MODEM_URL)',
+                ]);
+
+                return 'give_up';
+            }
+
+            $nextAttempt = $attempt + 1;
+
+            try {
+                $response = $this->postToModem($url, $apiKey, [
+                    ['number' => $number, 'message' => $message],
+                ], 30);
+
+                if ($response->successful()) {
+                    $log->update([
+                        'status' => SmsLog::STATUS_SUCCESS,
+                        'http_status' => $response->status(),
+                        'error' => null,
+                        'meta' => $this->retryMeta($meta, attempt: $nextAttempt) + [
+                            'delivered_at' => now()->toIso8601String(),
+                        ],
+                    ]);
+
+                    return 'success';
+                }
+
+                $error = $this->formatHttpError($response);
+
+                if ($this->isRetryableHttpStatus($response->status()) && $nextAttempt < $maxAttempts) {
+                    $log->update([
+                        'status' => SmsLog::STATUS_PENDING,
+                        'http_status' => $response->status(),
+                        'error' => $error.' — retrying',
+                        'meta' => $this->retryMeta($meta, attempt: $nextAttempt),
+                    ]);
+
+                    return 'retry';
+                }
+
+                $log->update([
+                    'status' => SmsLog::STATUS_FAILED,
+                    'http_status' => $response->status(),
+                    'error' => $error,
+                    'meta' => $this->retryMeta($meta, attempt: $nextAttempt),
+                ]);
+
+                return 'give_up';
+            } catch (\Throwable $e) {
+                report($e);
+
+                if ($this->isRetryableException($e) && $nextAttempt < $maxAttempts) {
+                    $log->update([
+                        'status' => SmsLog::STATUS_PENDING,
+                        'http_status' => null,
+                        'error' => $e->getMessage().' — retrying',
+                        'meta' => $this->retryMeta($meta, attempt: $nextAttempt),
+                    ]);
+
+                    return 'retry';
+                }
+
+                $log->update([
+                    'status' => SmsLog::STATUS_FAILED,
+                    'http_status' => null,
+                    'error' => $e->getMessage(),
+                    'meta' => $this->retryMeta($meta, attempt: $nextAttempt),
+                ]);
+
+                return 'give_up';
+            }
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Process due pending rows (scheduler safety net / artisan).
+     *
+     * @return array{success: int, retry: int, give_up: int, skipped: int}
+     */
+    public function processDueRetries(?int $limit = null, bool $includeFailedRetryable = false): array
+    {
+        $limit ??= max(1, (int) config('services.sms_modem.retry_batch_size', 40));
+
+        $query = SmsLog::query()
+            ->where('status', SmsLog::STATUS_PENDING)
+            ->orderBy('id')
+            ->limit($limit);
+
+        $logs = $query->get();
+
+        if ($includeFailedRetryable && $logs->count() < $limit) {
+            $maxAttempts = max(1, (int) config('services.sms_modem.retry_max_attempts', 60));
+
+            $extra = SmsLog::query()
+                ->where('status', SmsLog::STATUS_FAILED)
+                ->where(function ($q) {
+                    $q->where('http_status', 503)
+                        ->orWhere('error', 'like', '%queue is full%')
+                        ->orWhere('error', 'like', '%Connection%');
+                })
+                ->where(function ($q) {
+                    $q->whereNull('error')
+                        ->orWhere('error', 'not like', '%gave up%');
+                })
+                ->where('created_at', '>=', now()->subDay())
+                ->orderBy('id')
+                ->limit($limit - $logs->count())
+                ->get()
+                ->filter(function (SmsLog $log) use ($maxAttempts) {
+                    $meta = is_array($log->meta) ? $log->meta : [];
+                    $attempt = (int) ($meta['retry_attempt'] ?? 0);
+
+                    return $attempt < $maxAttempts;
+                });
+
+            foreach ($extra as $log) {
+                $meta = is_array($log->meta) ? $log->meta : [];
+                $log->update([
+                    'status' => SmsLog::STATUS_PENDING,
+                    'error' => trim((string) preg_replace('/\s*—\s*requeued$/u', '', (string) $log->error)).' — requeued',
+                    'meta' => $this->retryMeta($meta, attempt: (int) ($meta['retry_attempt'] ?? 0)),
+                ]);
+            }
+
+            $logs = $logs->concat($extra->values());
+        }
+
+        $counts = ['success' => 0, 'retry' => 0, 'give_up' => 0, 'skipped' => 0];
+
+        foreach ($logs as $log) {
+            $result = $this->attemptPendingDelivery($log);
+            if ($result === 'retry') {
+                $log->refresh();
+                $attempt = (int) ((is_array($log->meta) ? $log->meta['retry_attempt'] : null) ?? 1);
+                $this->dispatchRetry($log, $this->retryDelaySeconds($attempt));
+                $counts['retry']++;
+            } elseif (isset($counts[$result])) {
+                $counts[$result]++;
+            }
+        }
+
+        return $counts;
+    }
+
+    public function dispatchRetry(SmsLog $log, int $delaySeconds = 20): void
+    {
+        SendModemSmsJob::dispatch($log->id)
+            ->onConnection('database')
+            ->delay(now()->addSeconds(max(5, $delaySeconds)));
+    }
+
+    public function retryDelaySeconds(int $attempt): int
+    {
+        $base = max(5, (int) config('services.sms_modem.retry_base_seconds', 20));
+        $cap = max($base, (int) config('services.sms_modem.retry_max_seconds', 180));
+        $exp = min(max(0, $attempt - 1), 4);
+
+        return (int) min($cap, $base * (2 ** $exp));
+    }
+
+    public function isRetryableHttpStatus(?int $status): bool
+    {
+        return in_array($status, [408, 429, 500, 502, 503, 504], true);
+    }
+
+    public function isRetryableException(\Throwable $e): bool
+    {
+        return $e instanceof ConnectionException
+            || str_contains(strtolower($e->getMessage()), 'connection')
+            || str_contains(strtolower($e->getMessage()), 'timed out');
     }
 
     /**
@@ -268,6 +586,29 @@ class ModemSmsService
         return $number;
     }
 
+    private function formatHttpError(Response $response): string
+    {
+        $body = $response->body();
+
+        return 'Modem responded HTTP '.$response->status()
+            .($body !== '' ? ': '.mb_substr($body, 0, 300) : '');
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meta
+     * @return array<string, mixed>
+     */
+    private function retryMeta(?array $meta, int $attempt): array
+    {
+        $meta = is_array($meta) ? $meta : [];
+
+        return $meta + [
+            'retry_attempt' => $attempt,
+            'retryable' => true,
+            'last_retry_at' => now()->toIso8601String(),
+        ];
+    }
+
     private function writeLog(
         ?string $toNumber,
         string $message,
@@ -279,9 +620,9 @@ class ModemSmsService
         mixed $userId,
         mixed $label,
         ?array $meta,
-    ): void {
+    ): ?SmsLog {
         try {
-            SmsLog::query()->create([
+            return SmsLog::query()->create([
                 'to_number' => $toNumber,
                 'message' => $message,
                 'type' => $type !== '' ? $type : 'unknown',
@@ -295,6 +636,8 @@ class ModemSmsService
             ]);
         } catch (\Throwable $e) {
             report($e);
+
+            return null;
         }
     }
 }

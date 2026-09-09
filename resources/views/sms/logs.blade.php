@@ -58,7 +58,7 @@
             <strong class="al-stat-card__value">{{ number_format($stats['sent']) }}</strong>
         </div>
         <div class="al-stat-card al-stat-card--out">
-            <span class="al-stat-card__label">Failed / skipped</span>
+            <span class="al-stat-card__label">Failed / pending / skipped</span>
             <strong class="al-stat-card__value">{{ number_format($stats['failed']) }}</strong>
         </div>
         <div class="al-stat-card al-stat-card--today">
@@ -100,6 +100,8 @@
                            class="al-pill {{ $currentStatus === '' ? 'is-active' : '' }}">All</a>
                         <a href="{{ $filterUrl(['status' => 'success']) }}"
                            class="al-pill al-pill--sent {{ $currentStatus === 'success' ? 'is-active' : '' }}">Sent</a>
+                        <a href="{{ $filterUrl(['status' => 'pending']) }}"
+                           class="al-pill {{ $currentStatus === 'pending' ? 'is-active' : '' }}">Pending retry</a>
                         <a href="{{ $filterUrl(['status' => 'failed']) }}"
                            class="al-pill al-pill--failed {{ $currentStatus === 'failed' ? 'is-active' : '' }}">Failed</a>
                         <a href="{{ $filterUrl(['status' => 'skipped']) }}"
@@ -219,6 +221,8 @@
                             <td data-label="Status">
                                 @if($log->status === 'success')
                                     <span class="al-status al-status--in">Sent</span>
+                                @elseif($log->status === 'pending')
+                                    <span class="al-status al-status--muted">Pending retry</span>
                                 @elseif($log->status === 'skipped')
                                     <span class="al-status al-status--muted">Skipped</span>
                                 @else

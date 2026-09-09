@@ -48,7 +48,7 @@ class SmsLogController extends Controller
             'matching' => (clone $matching)->count(),
             'sent' => (clone $withoutStatus)->where('status', SmsLog::STATUS_SUCCESS)->count(),
             'failed' => (clone $withoutStatus)
-                ->whereIn('status', [SmsLog::STATUS_FAILED, SmsLog::STATUS_SKIPPED])
+                ->whereIn('status', [SmsLog::STATUS_FAILED, SmsLog::STATUS_SKIPPED, SmsLog::STATUS_PENDING])
                 ->count(),
             'today' => (clone $withoutStatus)->whereDate('created_at', $today)->count(),
         ];

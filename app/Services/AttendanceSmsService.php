@@ -308,7 +308,7 @@ class AttendanceSmsService
             ];
         }
 
-        return app(ModemSmsService::class)->send($number, $message, [
+        return app(ModemSmsService::class)->sendWithRetry($number, $message, [
             'type' => $type !== '' ? $type : 'gate',
             'student_id' => $student?->id,
             'recipient_label' => $label,

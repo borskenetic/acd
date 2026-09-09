@@ -13,6 +13,8 @@ class SmsLog extends Model
 
     public const STATUS_SKIPPED = 'skipped';
 
+    public const STATUS_PENDING = 'pending';
+
     protected $fillable = [
         'to_number',
         'message',

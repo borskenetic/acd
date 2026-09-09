@@ -41,6 +41,10 @@ return [
     'sms_modem' => [
         'url' => env('SMS_MODEM_URL'),
         'key' => env('SMS_MODEM_API_KEY'),
+        'retry_max_attempts' => (int) env('SMS_MODEM_RETRY_MAX_ATTEMPTS', 60),
+        'retry_base_seconds' => (int) env('SMS_MODEM_RETRY_BASE_SECONDS', 20),
+        'retry_max_seconds' => (int) env('SMS_MODEM_RETRY_MAX_SECONDS', 180),
+        'retry_batch_size' => (int) env('SMS_MODEM_RETRY_BATCH_SIZE', 40),
     ],
 
 ];

@@ -118,6 +118,7 @@ class SmsController extends Controller
             'consecutiveAbsent' => Setting::smsConsecutiveAbsentTemplate(),
             'consecutiveLateEnabled' => Setting::smsConsecutiveLateAlertsEnabled(),
             'consecutiveAbsentEnabled' => Setting::smsConsecutiveAbsentAlertsEnabled(),
+            'scanSmsEnabled' => Setting::scanSmsEventsEnabled(),
             'canEditK10' => $scope['k10'],
             'canEditShs' => $scope['shs'],
             'canEditAlerts' => $scope['alerts'],
@@ -132,6 +133,9 @@ class SmsController extends Controller
             abort(403, 'You cannot manage gate SMS templates.');
         }
 
+        $k10Events = ['morning_in', 'lunch_out', 'half_day_out', 'early_out', 'afternoon_in', 'eod_out', 'missed_eod'];
+        $shsEvents = ['arrival', 'departure'];
+
         $rules = [];
         if ($scope['k10']) {
             $rules['morning_in'] = 'required|string|max:500';
@@ -141,10 +145,16 @@ class SmsController extends Controller
             $rules['afternoon_in'] = 'required|string|max:500';
             $rules['eod_out'] = 'required|string|max:500';
             $rules['missed_eod'] = 'required|string|max:500';
+            foreach ($k10Events as $event) {
+                $rules[$event.'_enabled'] = 'nullable|in:0,1';
+            }
         }
         if ($scope['shs']) {
             $rules['arrival'] = 'required|string|max:500';
             $rules['departure'] = 'required|string|max:500';
+            foreach ($shsEvents as $event) {
+                $rules[$event.'_enabled'] = 'nullable|in:0,1';
+            }
         }
         if ($scope['alerts']) {
             $rules['consecutive_late'] = 'required|string|max:500';
@@ -164,10 +174,16 @@ class SmsController extends Controller
             $payload['afternoon_in'] = $request->input('afternoon_in');
             $payload['eod_out'] = $request->input('eod_out');
             $payload['missed_eod'] = $request->input('missed_eod');
+            foreach ($k10Events as $event) {
+                Setting::setScanSmsEventEnabled($event, $request->input($event.'_enabled') === '1');
+            }
         }
         if ($scope['shs']) {
             $payload['arrival'] = $request->input('arrival');
             $payload['departure'] = $request->input('departure');
+            foreach ($shsEvents as $event) {
+                Setting::setScanSmsEventEnabled($event, $request->input($event.'_enabled') === '1');
+            }
         }
         if ($scope['alerts']) {
             $payload['consecutive_late'] = $request->input('consecutive_late');

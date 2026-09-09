@@ -325,6 +325,12 @@ class AttendanceSmsService
             return false;
         }
 
+        // Disabled gate templates skip sending but count as handled so once-per-day
+        // flags (arrival/departure/events_sent) still advance.
+        if (Setting::isScanSmsEvent($type) && ! Setting::scanSmsEventEnabled($type)) {
+            return true;
+        }
+
         $message = $template;
         foreach ($vars as $key => $value) {
             $message = str_replace('{'.$key.'}', $value, $message);

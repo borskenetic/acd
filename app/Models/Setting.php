@@ -32,6 +32,24 @@ class Setting extends Model
 
     public const KEY_SCAN_SMS_MISSED_EOD = 'scan_sms_missed_eod';
 
+    public const KEY_SCAN_SMS_ARRIVAL_ENABLED = 'scan_sms_arrival_enabled';
+
+    public const KEY_SCAN_SMS_DEPARTURE_ENABLED = 'scan_sms_departure_enabled';
+
+    public const KEY_SCAN_SMS_MORNING_IN_ENABLED = 'scan_sms_morning_in_enabled';
+
+    public const KEY_SCAN_SMS_LUNCH_OUT_ENABLED = 'scan_sms_lunch_out_enabled';
+
+    public const KEY_SCAN_SMS_HALF_DAY_OUT_ENABLED = 'scan_sms_half_day_out_enabled';
+
+    public const KEY_SCAN_SMS_EARLY_OUT_ENABLED = 'scan_sms_early_out_enabled';
+
+    public const KEY_SCAN_SMS_AFTERNOON_IN_ENABLED = 'scan_sms_afternoon_in_enabled';
+
+    public const KEY_SCAN_SMS_EOD_OUT_ENABLED = 'scan_sms_eod_out_enabled';
+
+    public const KEY_SCAN_SMS_MISSED_EOD_ENABLED = 'scan_sms_missed_eod_enabled';
+
     public const KEY_SMS_CONSECUTIVE_LATE = 'sms_consecutive_late';
 
     public const KEY_SMS_CONSECUTIVE_ABSENT = 'sms_consecutive_absent';
@@ -39,6 +57,19 @@ class Setting extends Model
     public const KEY_SMS_CONSECUTIVE_LATE_ENABLED = 'sms_consecutive_late_enabled';
 
     public const KEY_SMS_CONSECUTIVE_ABSENT_ENABLED = 'sms_consecutive_absent_enabled';
+
+    /** @var array<string, string> */
+    public const SCAN_SMS_EVENT_ENABLED_KEYS = [
+        'arrival' => self::KEY_SCAN_SMS_ARRIVAL_ENABLED,
+        'departure' => self::KEY_SCAN_SMS_DEPARTURE_ENABLED,
+        'morning_in' => self::KEY_SCAN_SMS_MORNING_IN_ENABLED,
+        'lunch_out' => self::KEY_SCAN_SMS_LUNCH_OUT_ENABLED,
+        'half_day_out' => self::KEY_SCAN_SMS_HALF_DAY_OUT_ENABLED,
+        'early_out' => self::KEY_SCAN_SMS_EARLY_OUT_ENABLED,
+        'afternoon_in' => self::KEY_SCAN_SMS_AFTERNOON_IN_ENABLED,
+        'eod_out' => self::KEY_SCAN_SMS_EOD_OUT_ENABLED,
+        'missed_eod' => self::KEY_SCAN_SMS_MISSED_EOD_ENABLED,
+    ];
 
     public const KEY_ATTENDANCE_POLICY = 'attendance_policy';
 
@@ -222,6 +253,45 @@ class Setting extends Model
             ['key' => self::KEY_SMS_CONSECUTIVE_ABSENT_ENABLED],
             ['value' => $enabled ? '1' : '0']
         );
+    }
+
+    public static function isScanSmsEvent(string $event): bool
+    {
+        return array_key_exists($event, self::SCAN_SMS_EVENT_ENABLED_KEYS);
+    }
+
+    public static function scanSmsEventEnabled(string $event): bool
+    {
+        $key = self::SCAN_SMS_EVENT_ENABLED_KEYS[$event] ?? null;
+        if ($key === null) {
+            return true;
+        }
+
+        return static::booleanSetting($key, true);
+    }
+
+    public static function setScanSmsEventEnabled(string $event, bool $enabled): void
+    {
+        $key = self::SCAN_SMS_EVENT_ENABLED_KEYS[$event] ?? null;
+        if ($key === null) {
+            return;
+        }
+
+        static::updateOrCreate(
+            ['key' => $key],
+            ['value' => $enabled ? '1' : '0']
+        );
+    }
+
+    /** @return array<string, bool> */
+    public static function scanSmsEventsEnabled(): array
+    {
+        $enabled = [];
+        foreach (array_keys(self::SCAN_SMS_EVENT_ENABLED_KEYS) as $event) {
+            $enabled[$event] = static::scanSmsEventEnabled($event);
+        }
+
+        return $enabled;
     }
 
     protected static function booleanSetting(string $key, bool $default): bool

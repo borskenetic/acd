@@ -19,6 +19,7 @@ use App\Http\Controllers\SmsLogController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\SchoolCalendarController;
 use App\Http\Controllers\SchoolSetupController;
+use App\Http\Controllers\MissedOutsReportController;
 use App\Http\Controllers\Sf2ReportController;
 use App\Http\Controllers\VisitorAdminController;
 use App\Http\Controllers\VisitorLogController;
@@ -172,6 +173,10 @@ Route::middleware(['auth', 'can:isAdminOrStaffOrFaculty'])->group(function () {
         Route::get('/attendance-logs/reports', [AttendanceLogController::class, 'reportsHub'])->name('attendance_logs.reports.hub');
         Route::get('/attendance-logs/reports/dashboard', [AttendanceLogController::class, 'reportsDashboard'])->name('attendance_logs.reports.dashboard');
         Route::get('/attendance-logs/reports/export', [AttendanceLogController::class, 'reportsExportCsv'])->name('attendance_logs.reports.export');
+
+        Route::get('/missed-outs', [MissedOutsReportController::class, 'index'])->name('missed_outs.index');
+        Route::get('/missed-outs/export/excel', [MissedOutsReportController::class, 'exportExcel'])->name('missed_outs.export.excel');
+        Route::get('/missed-outs/export/csv', [MissedOutsReportController::class, 'exportCsv'])->name('missed_outs.export.csv');
     });
 
     Route::prefix('sf2')->name('sf2.')->group(function () {

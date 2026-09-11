@@ -45,6 +45,9 @@
         <a href="{{ route('attendance_logs.reports.export', request()->only(['from','to'])) }}" class="export-btn text-center">
             Download combined CSV export
         </a>
+        <a href="{{ route('missed_outs.index', request()->only(['from','to'])) }}" class="export-btn text-center">
+            Missed Outs report (forgot to scan OUT)
+        </a>
     </div>
 
     <p class="small text-muted mb-2">Open a single report:</p>

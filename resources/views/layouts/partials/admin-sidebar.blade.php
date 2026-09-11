@@ -22,6 +22,7 @@
     ];
     if ($isStaffish) {
         $reportsChildren[] = ['label' => 'Patron Reports',      'route' => 'attendance_logs.reports.hub',  'patterns' => ['attendance_logs.reports.*'], 'icon' => 'chart'];
+        $reportsChildren[] = ['label' => 'Missed Outs',         'route' => 'missed_outs.index',           'patterns' => ['missed_outs.*'],              'icon' => 'clock'];
         $reportsChildren[] = ['label' => 'Visitor Logs',        'route' => 'visitor_logs.index',           'patterns' => ['visitor_logs.*'],              'icon' => 'clock'];
     }
     // Staff has no Admin menu — surface full activity here
@@ -52,7 +53,7 @@
         [
             'label'    => 'Reports',
             'icon'     => 'chart',
-            'patterns' => ['sf2.*', 'attendance_logs.*', 'visitor_logs.*', 'activity_logs.*'],
+            'patterns' => ['sf2.*', 'attendance_logs.*', 'missed_outs.*', 'visitor_logs.*', 'activity_logs.*'],
             'children' => $reportsChildren,
         ],
         [

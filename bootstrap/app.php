@@ -45,21 +45,24 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->appendOutputTo($schedulerLog);
 
-        $schedule->command('attendance:auto-eod-out')
-            ->dailyAt(config('attendance_sessions.eod_auto_out_at', '22:00'))
-            ->timezone('Asia/Manila')
-            ->withoutOverlapping()
-            ->appendOutputTo($schedulerLog);
-
         $schedule->command('attendance:check-consecutive-absences')
             ->dailyAt('16:30')
             ->timezone('Asia/Manila')
             ->withoutOverlapping()
             ->appendOutputTo($schedulerLog);
 
-        // Friday online: auto IN/OUT for Senior High only (K–10 are campus half-day).
+        // Friday online SHS: end-of-day fill for anyone still missing IN/OUT.
+        // Runs before EOD so timestamps stay at scheduled login/logout (on time),
+        // while real scans during the day are left alone.
+        $eodAt = config('attendance_sessions.eod_auto_out_at', '22:00');
         $schedule->command('attendance:friday-auto-present')
-            ->weeklyOn(5, '07:00') // Friday 07:00 Asia/Manila
+            ->weeklyOn(5, $eodAt) // Friday 22:00 Asia/Manila (default)
+            ->timezone('Asia/Manila')
+            ->withoutOverlapping()
+            ->appendOutputTo($schedulerLog);
+
+        $schedule->command('attendance:auto-eod-out')
+            ->dailyAt($eodAt)
             ->timezone('Asia/Manila')
             ->withoutOverlapping()
             ->appendOutputTo($schedulerLog);

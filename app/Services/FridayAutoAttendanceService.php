@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Friday online auto-present for Senior High only.
- * Kinder–Grade 10 are on-campus half days (morning IN + midday OUT via the
- * session schedule); they are not auto-marked.
+ * Friday online end-of-day fill for Senior High only.
+ * Runs after the school day so real scans proceed normally; anyone still
+ * missing IN and/or OUT gets rows stamped at scheduled login/logout (on time).
+ * Kinder–Grade 10 are on-campus half days and are not auto-marked.
  */
 class FridayAutoAttendanceService
 {

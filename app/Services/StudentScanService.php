@@ -184,31 +184,10 @@ class StudentScanService
 
             if ($forcedStatus !== null) {
                 $newStatus = strtoupper($forcedStatus);
-            } elseif ($this->sessionSchedule->usesSessionModel($student)) {
-                $decision = $this->sessionSchedule->decideNextScan($student, $scannedAt);
-
-                if ($decision['type'] === 'already_scanned') {
-                    throw new \RuntimeException($decision['message'] ?? 'Already scanned.');
-                }
-
-                if ($decision['type'] === 'early_out_blocked') {
-                    throw new \RuntimeException($decision['message'] ?? $this->earlyOutMessage());
-                }
-
-                $newStatus = $decision['next_status'];
-                $sessionKeyResolved = $decision['session_key'] ?? null;
             } else {
-                $lastLog = $this->lastLogForStudent($student);
-                $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog, $scannedAt);
-                if ($cooldown !== null) {
-                    throw new \RuntimeException($cooldown['message'] ?? 'Already scanned.');
-                }
-
-                $newStatus = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
-
-                if ($newStatus === 'OUT' && $this->departure->blocksCheckout($student, $scannedAt)) {
-                    throw new \RuntimeException($this->earlyOutMessage());
-                }
+                $allowed = $this->assertScanAllowed($student, $scannedAt);
+                $newStatus = $allowed['status'];
+                $sessionKeyResolved = $allowed['session_key'];
             }
 
             if ($section !== null && $section !== '') {
@@ -254,9 +233,10 @@ class StudentScanService
     /**
      * Record a scan uploaded from an offline gate terminal.
      *
-     * Kiosk-supplied IN/OUT is ignored: the server derives status from this student's
-     * existing history so a stale kiosk cannot create a second IN at another gate.
-     * After insert, same-day rows are re-sequenced for out-of-order uploads.
+     * Kiosk-supplied IN/OUT is ignored: the server derives status via assertScanAllowed
+     * (cooldown, session early-OUT / max scans) so a second kiosk cannot flip IN→OUT
+     * minutes later. Nearby later logs also block out-of-order uploads. After insert,
+     * same-day rows are re-sequenced for remaining out-of-order cases.
      */
     public function recordSyncedScan(
         Student $student,
@@ -292,9 +272,9 @@ class StudentScanService
             $this->sessions->closeStaleOpenInForStudent($student);
 
             $scannedAt = $scannedAt->copy()->timezone($this->sessionSchedule->timezone());
-            $resolved = $this->resolveStatusFromHistory($student, $scannedAt);
-            $status = $resolved['status'];
-            $sessionKey = $resolved['session_key'];
+            $allowed = $this->assertScanAllowed($student, $scannedAt, rejectNearbyLater: true);
+            $status = $allowed['status'];
+            $sessionKey = $allowed['session_key'];
 
             $log = AttendanceLog::create([
                 'student_id' => $student->id,
@@ -323,6 +303,91 @@ class StudentScanService
 
             return $log;
         });
+    }
+
+    /**
+     * Enforce cooldown / session early-OUT / max scans for a proposed scan at $at.
+     * When $rejectNearbyLater is true (gate sync), also reject if a later log already
+     * sits inside the cooldown window (out-of-order uploads).
+     *
+     * @return array{status: string, session_key: ?string}
+     */
+    public function assertScanAllowed(Student $student, Carbon $at, bool $rejectNearbyLater = false): array
+    {
+        $at = $at->copy()->timezone($this->sessionSchedule->timezone());
+
+        if ($rejectNearbyLater) {
+            $this->assertNoLaterCooldownNeighbor($student, $at);
+        }
+
+        if ($this->sessionSchedule->usesSessionModel($student)) {
+            $decision = $this->sessionSchedule->decideNextScanAsOf($student, $at);
+
+            if ($decision['type'] === 'already_scanned') {
+                throw new \RuntimeException($decision['message'] ?? 'Already scanned.');
+            }
+
+            if ($decision['type'] === 'early_out_blocked') {
+                throw new \RuntimeException($decision['message'] ?? $this->earlyOutMessage());
+            }
+
+            if ($decision['type'] !== 'ok') {
+                throw new \RuntimeException($decision['message'] ?? 'Scan not allowed.');
+            }
+
+            return [
+                'status' => $decision['next_status'],
+                'session_key' => $decision['session_key'] ?? null,
+            ];
+        }
+
+        $lastLog = $this->lastLogBefore($student, $at);
+        $cooldown = $this->sessionSchedule->cooldownBlockIfNeeded($student, $lastLog, $at);
+        if ($cooldown !== null) {
+            throw new \RuntimeException($cooldown['message'] ?? 'Already scanned.');
+        }
+
+        $status = ($lastLog && $this->sessions->isInStatus($lastLog->status)) ? 'OUT' : 'IN';
+
+        if ($status === 'OUT' && $this->departure->blocksCheckout($student, $at)) {
+            throw new \RuntimeException($this->earlyOutMessage());
+        }
+
+        return [
+            'status' => $status,
+            'session_key' => null,
+        ];
+    }
+
+    /**
+     * Reject when a scan already exists after $at within the anti-rescan cooldown.
+     */
+    protected function assertNoLaterCooldownNeighbor(Student $student, Carbon $at): void
+    {
+        $next = AttendanceLog::query()
+            ->where('student_id', $student->id)
+            ->where('scanned_at', '>', $at)
+            ->orderBy('scanned_at')
+            ->orderBy('id')
+            ->first();
+
+        if (! $next || ! $next->scanned_at) {
+            return;
+        }
+
+        $nextAt = $next->scanned_at->copy()->timezone($this->sessionSchedule->timezone());
+        $gapSeconds = $at->diffInSeconds($nextAt, true);
+        $minutes = max(
+            $this->sessionSchedule->cooldownMinutes($student, $at),
+            $this->sessionSchedule->cooldownMinutes($student, $nextAt),
+        );
+
+        if ($gapSeconds < ($minutes * 60)) {
+            $lastStatus = strtoupper((string) $next->status);
+            throw new \RuntimeException(
+                $this->sessionSchedule->alreadyScannedMessage($lastStatus, 'current')
+            );
+        }
     }
 
     /**

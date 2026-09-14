@@ -118,7 +118,7 @@ class StudentSessionScheduleService
     }
 
     /**
-     * Decide the next allowed scan for a session-model student.
+     * Decide the next allowed scan for a session-model student (live: all of today's logs).
      *
      * @return array{
      *   type: string,
@@ -134,13 +134,54 @@ class StudentSessionScheduleService
     {
         $at ??= Carbon::now($this->timezone());
         $at = $at->copy()->timezone($this->timezone());
+
+        return $this->decideFromPriorLogs($student, $this->todayLogs($student, $at), $at);
+    }
+
+    /**
+     * Same rules as decideNextScan, but only logs strictly before $at count
+     * (for backdated / offline gate sync inserts).
+     *
+     * @return array{
+     *   type: string,
+     *   next_status?: string,
+     *   session_key?: string,
+     *   session_label?: string,
+     *   message?: string,
+     *   allowed_after?: string,
+     *   last_status?: string
+     * }
+     */
+    public function decideNextScanAsOf(Student $student, Carbon $at): array
+    {
+        $at = $at->copy()->timezone($this->timezone());
+        $prior = $this->todayLogs($student, $at)
+            ->filter(fn (AttendanceLog $log) => $log->scanned_at && $log->scanned_at->lt($at))
+            ->values();
+
+        return $this->decideFromPriorLogs($student, $prior, $at);
+    }
+
+    /**
+     * @param  Collection<int, AttendanceLog>  $logs
+     * @return array{
+     *   type: string,
+     *   next_status?: string,
+     *   session_key?: string,
+     *   session_label?: string,
+     *   message?: string,
+     *   allowed_after?: string,
+     *   last_status?: string
+     * }
+     */
+    protected function decideFromPriorLogs(Student $student, Collection $logs, Carbon $at): array
+    {
         $schedule = $this->resolveSchedule($student);
 
         if ($schedule === null) {
             return ['type' => 'not_session'];
         }
 
-        $logs = $this->todayLogs($student, $at);
         $count = $logs->count();
         $halfDay = $this->isHalfDayToday($student, $at);
         $maxScans = $halfDay ? 2 : 4;

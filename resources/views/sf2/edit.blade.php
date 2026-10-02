@@ -68,6 +68,6 @@
 @endsection
 
 @push('scripts')
-<script src="{{ \App\Support\VersionedAsset::url('js/sf2-calendar.js') }}"></script>
+<script src="{{ \App\Support\VersionedAsset::url('js/sf2-calendar.js') }}&sf2cal=half2"></script>
 <script src="{{ \App\Support\VersionedAsset::url('js/sf2-form.js') }}"></script>
 @endpush

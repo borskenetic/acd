@@ -14,19 +14,41 @@
   font-weight: 600;
 }
 
-.sf2-cal-mode[data-mode="absent"].active {
+/* Hover must not look like the selected mode (Bootstrap outline fills on :hover). */
+.sf2-cal-mode[data-mode="absent"]:hover:not(.active) {
+  background-color: #f8d7da;
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.sf2-cal-mode[data-mode="tardy"]:hover:not(.active) {
+  background-color: #ffe5d0;
+  border-color: #fd7e14;
+  color: #fd7e14;
+}
+
+.sf2-cal-mode[data-mode="half"]:hover:not(.active) {
+  background-color: #e0f7fc;
+  border-color: #0dcaf0;
+  color: #055160;
+}
+
+.sf2-cal-mode[data-mode="absent"].active,
+.sf2-cal-mode[data-mode="absent"].active:hover {
   background-color: #dc3545;
   border-color: #dc3545;
   color: #fff;
 }
 
-.sf2-cal-mode[data-mode="tardy"].active {
+.sf2-cal-mode[data-mode="tardy"].active,
+.sf2-cal-mode[data-mode="tardy"].active:hover {
   background-color: #fd7e14;
   border-color: #fd7e14;
   color: #fff;
 }
 
-.sf2-cal-mode[data-mode="half"].active {
+.sf2-cal-mode[data-mode="half"].active,
+.sf2-cal-mode[data-mode="half"].active:hover {
   background-color: #0dcaf0;
   border-color: #0dcaf0;
   color: #000;

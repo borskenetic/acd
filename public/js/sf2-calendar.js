@@ -49,13 +49,52 @@
     return dow >= 1 && dow <= 5;
   }
 
+  function parseJsonDates(raw) {
+    try {
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** Prefer the visible active mode button so UI and mark logic cannot drift. */
+  function currentMode(calRoot) {
+    const activeBtn = calRoot.querySelector('.sf2-cal-mode.active');
+    const fromBtn = activeBtn && activeBtn.getAttribute('data-mode');
+    return normalizeMode(fromBtn || calRoot.getAttribute('data-mode') || 'absent');
+  }
+
+  function normalizeMode(mode) {
+    const value = String(mode || 'absent').trim();
+    if (value === 'half' || value === 'half-day') {
+      return 'half';
+    }
+    if (value === 'tardy') {
+      return 'tardy';
+    }
+    return 'absent';
+  }
+
+  function setMode(calRoot, mode) {
+    const value = normalizeMode(mode);
+    calRoot.setAttribute('data-mode', value);
+    calRoot.querySelectorAll('.sf2-cal-mode').forEach((btn) => {
+      const btnMode = normalizeMode(btn.getAttribute('data-mode'));
+      btn.classList.toggle('active', btnMode === value);
+    });
+  }
+
   function syncHiddenInputs(calRoot) {
     const absentInput = calRoot.querySelector('.sf2-absent-input');
     const tardyInput = calRoot.querySelector('.sf2-tardy-input');
     const halfInput = calRoot.querySelector('.sf2-half-input');
-    const absent = JSON.parse(calRoot.dataset.absent || '[]');
-    const tardy = JSON.parse(calRoot.dataset.tardy || '[]');
-    const half = JSON.parse(calRoot.dataset.half || '[]');
+    const absent = parseJsonDates(calRoot.getAttribute('data-absent'));
+    const tardy = parseJsonDates(calRoot.getAttribute('data-tardy'));
+    // Use data-half-dates (not data-half) so it cannot clash with data-half-initial.
+    const half = parseJsonDates(
+      calRoot.getAttribute('data-half-dates') || calRoot.getAttribute('data-half')
+    );
     if (absentInput) {
       absentInput.value = absent.join('\n');
     }
@@ -80,10 +119,12 @@
     }
 
     const { month, year } = my;
-    const absent = new Set(JSON.parse(calRoot.dataset.absent || '[]'));
-    const tardy = new Set(JSON.parse(calRoot.dataset.tardy || '[]'));
-    const half = new Set(JSON.parse(calRoot.dataset.half || '[]'));
-    const mode = calRoot.dataset.mode || 'absent';
+    const absent = new Set(parseJsonDates(calRoot.getAttribute('data-absent')));
+    const tardy = new Set(parseJsonDates(calRoot.getAttribute('data-tardy')));
+    const half = new Set(parseJsonDates(
+      calRoot.getAttribute('data-half-dates') || calRoot.getAttribute('data-half')
+    ));
+    const mode = currentMode(calRoot);
 
     const first = new Date(year, month - 1, 1);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -133,14 +174,16 @@
       label.textContent = `${monthNames[month]} ${year}`;
     }
 
-    calRoot.dataset.mode = mode;
+    calRoot.setAttribute('data-mode', mode);
   }
 
   function toggleDay(calRoot, dateStr) {
-    const absent = new Set(JSON.parse(calRoot.dataset.absent || '[]'));
-    const tardy = new Set(JSON.parse(calRoot.dataset.tardy || '[]'));
-    const half = new Set(JSON.parse(calRoot.dataset.half || '[]'));
-    const mode = calRoot.dataset.mode || 'absent';
+    const absent = new Set(parseJsonDates(calRoot.getAttribute('data-absent')));
+    const tardy = new Set(parseJsonDates(calRoot.getAttribute('data-tardy')));
+    const half = new Set(parseJsonDates(
+      calRoot.getAttribute('data-half-dates') || calRoot.getAttribute('data-half')
+    ));
+    const mode = currentMode(calRoot);
 
     if (mode === 'absent') {
       if (absent.has(dateStr)) {
@@ -158,7 +201,7 @@
         absent.delete(dateStr);
         tardy.delete(dateStr);
       }
-    } else {
+    } else if (mode === 'tardy') {
       if (tardy.has(dateStr)) {
         tardy.delete(dateStr);
       } else {
@@ -168,9 +211,10 @@
       }
     }
 
-    calRoot.dataset.absent = JSON.stringify([...absent].sort());
-    calRoot.dataset.tardy = JSON.stringify([...tardy].sort());
-    calRoot.dataset.half = JSON.stringify([...half].sort());
+    calRoot.setAttribute('data-absent', JSON.stringify([...absent].sort()));
+    calRoot.setAttribute('data-tardy', JSON.stringify([...tardy].sort()));
+    calRoot.setAttribute('data-half-dates', JSON.stringify([...half].sort()));
+    calRoot.removeAttribute('data-half');
     syncHiddenInputs(calRoot);
     renderGrid(calRoot);
   }
@@ -185,28 +229,28 @@
     }
 
     calRoot.dataset.mounted = '1';
-    calRoot.dataset.mode = calRoot.dataset.mode || 'absent';
+    setMode(calRoot, calRoot.getAttribute('data-mode') || 'absent');
 
     const absentInit = parseDateList(calRoot.dataset.absentInitial);
     const tardyInit = parseDateList(calRoot.dataset.tardyInitial);
     const halfInit = parseDateList(calRoot.dataset.halfInitial);
-    calRoot.dataset.absent = JSON.stringify(absentInit);
-    calRoot.dataset.tardy = JSON.stringify(tardyInit);
-    calRoot.dataset.half = JSON.stringify(halfInit);
+    calRoot.setAttribute('data-absent', JSON.stringify(absentInit));
+    calRoot.setAttribute('data-tardy', JSON.stringify(tardyInit));
+    calRoot.setAttribute('data-half-dates', JSON.stringify(halfInit));
+    calRoot.removeAttribute('data-half');
     syncHiddenInputs(calRoot);
 
     calRoot.querySelectorAll('.sf2-cal-mode').forEach((btn) => {
       btn.addEventListener('click', () => {
-        calRoot.dataset.mode = btn.dataset.mode;
-        calRoot.querySelectorAll('.sf2-cal-mode').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
+        setMode(calRoot, btn.getAttribute('data-mode') || 'absent');
       });
     });
 
     calRoot.querySelector('.sf2-cal-clear')?.addEventListener('click', () => {
-      calRoot.dataset.absent = '[]';
-      calRoot.dataset.tardy = '[]';
-      calRoot.dataset.half = '[]';
+      calRoot.setAttribute('data-absent', '[]');
+      calRoot.setAttribute('data-tardy', '[]');
+      calRoot.setAttribute('data-half-dates', '[]');
+      calRoot.removeAttribute('data-half');
       syncHiddenInputs(calRoot);
       renderGrid(calRoot);
     });

@@ -85,9 +85,9 @@
 }
 
 .sf2-cal-day.is-half {
-  background: #cff4fc;
-  border-color: #0dcaf0;
-  color: #055160;
+  background: #0dcaf0;
+  border-color: #0aa2c0;
+  color: #000;
   font-weight: 600;
 }
 
@@ -124,5 +124,5 @@
 
 .sf2-cal-swatch.absent { background: #dc3545; border-color: #bb2d3b; }
 .sf2-cal-swatch.tardy { background: linear-gradient(to bottom, #fd7e14 50%, #fff 50%); }
-.sf2-cal-swatch.half { background: #cff4fc; border-color: #0dcaf0; }
+.sf2-cal-swatch.half { background: #0dcaf0; border-color: #0aa2c0; }
 .sf2-cal-swatch.present { background: #fff; }
